@@ -1,0 +1,17 @@
+name = "return-desktop"
+description = "Mission recipe placeholder for switching back into DESKTOP mode after user approval."
+initial_mode = "MOBILE"
+target_mode = "DESKTOP"
+
+[[steps]]
+id = "apply-desktop-profile"
+ingredient = "profile.apply"
+depends_on = []
+verify = true
+compensation_policy = "none"
+retry_count = 0
+retry_delay_ms = 0
+allow_diagnostics = false
+
+[steps.arguments]
+profile_name = "DESKTOP"

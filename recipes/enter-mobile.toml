@@ -1,0 +1,17 @@
+name = "enter-mobile"
+description = "Mission recipe placeholder for switching into MOBILE mode after user approval."
+initial_mode = "DESKTOP"
+target_mode = "MOBILE"
+
+[[steps]]
+id = "apply-mobile-profile"
+ingredient = "profile.apply"
+depends_on = []
+verify = true
+compensation_policy = "none"
+retry_count = 0
+retry_delay_ms = 0
+allow_diagnostics = false
+
+[steps.arguments]
+profile_name = "MOBILE"

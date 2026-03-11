@@ -1,0 +1,32 @@
+name = "failure-blocks"
+description = "Test recipe showing dependency-gated failure."
+initial_mode = "DESKTOP"
+target_mode = "MOBILE"
+
+[[steps]]
+id = "failing-command"
+ingredient = "command.invoke"
+depends_on = []
+verify = true
+compensation_policy = "none"
+retry_count = 0
+retry_delay_ms = 0
+allow_diagnostics = false
+
+[steps.arguments]
+file_path = "C:\\Program Files\\PowerShell\\7\\pwsh.exe"
+arguments = ["-NoProfile", "-Command", "Write-Error 'boom'; exit 3"]
+
+[[steps]]
+id = "blocked-command"
+ingredient = "command.invoke"
+depends_on = ["failing-command"]
+verify = true
+compensation_policy = "none"
+retry_count = 0
+retry_delay_ms = 0
+allow_diagnostics = false
+
+[steps.arguments]
+file_path = "C:\\Program Files\\PowerShell\\7\\pwsh.exe"
+arguments = ["-NoProfile", "-Command", "Write-Output 'never'"]

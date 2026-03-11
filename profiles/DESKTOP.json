@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "name": "DESKTOP",
+  "mode": "DESKTOP",
+  "approved": false,
+  "approval_status": "Pending",
+  "source": "repository-placeholder",
+  "approval_required": [
+    "active_monitors",
+    "disabled_monitors",
+    "primary_monitor",
+    "resolution_per_monitor",
+    "orientation_per_monitor",
+    "refresh_rate_policy",
+    "dpi_and_text_scaling",
+    "process_actions",
+    "service_actions",
+    "command_actions",
+    "unsupported_setting_policy"
+  ],
+  "display": {
+    "captured_at": null,
+    "computer_name": null,
+    "display_backend": "approval-gated",
+    "monitor_identity": "device_name",
+    "monitors": [],
+    "scaling": {
+      "status": "ApprovalRequired"
+    }
+  },
+  "process_actions": [],
+  "service_actions": [],
+  "command_actions": []
+}

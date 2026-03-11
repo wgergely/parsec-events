@@ -1,0 +1,18 @@
+name = "command-success"
+description = "Test recipe for successful command execution."
+initial_mode = "DESKTOP"
+target_mode = "DESKTOP"
+
+[[steps]]
+id = "run-command"
+ingredient = "command.invoke"
+depends_on = []
+verify = true
+compensation_policy = "none"
+retry_count = 0
+retry_delay_ms = 0
+allow_diagnostics = false
+
+[steps.arguments]
+file_path = "C:\\Program Files\\PowerShell\\7\\pwsh.exe"
+arguments = ["-NoProfile", "-Command", "Write-Output 'ok'"]
