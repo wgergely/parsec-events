@@ -19,10 +19,59 @@ function Set-ParsecIngredientObservedResolution {
     $script:IngredientObservedState.monitors[0].topology.target_mode.height = $Height
 }
 
+function Add-ParsecIngredientSupportedMode {
+    param(
+        [Parameter(Mandatory)]
+        [int] $Width,
+
+        [Parameter(Mandatory)]
+        [int] $Height,
+
+        [Parameter()]
+        [int] $BitsPerPel = 32,
+
+        [Parameter()]
+        [int] $RefreshRateHz = 60,
+
+        [Parameter()]
+        [string] $Orientation = 'Landscape'
+    )
+
+    $existing = @(
+        $script:IngredientSupportedModes | Where-Object {
+            [int] $_.width -eq $Width -and
+            [int] $_.height -eq $Height -and
+            [int] $_.bits_per_pel -eq $BitsPerPel -and
+            [int] $_.refresh_rate_hz -eq $RefreshRateHz
+        }
+    )
+    if ($existing.Count -gt 0) {
+        return
+    }
+
+    $script:IngredientSupportedModes += [ordered]@{
+        width = $Width
+        height = $Height
+        bits_per_pel = $BitsPerPel
+        refresh_rate_hz = $RefreshRateHz
+        orientation = $Orientation
+    }
+}
+
 function Initialize-ParsecIngredientTestEnvironment {
     $script:IngredientResolutionMutationEnabled = $true
     $script:IngredientResolutionObservationLagRemaining = 0
     $script:IngredientResolutionPendingResolution = $null
+    $script:IngredientNvidiaAvailable = $true
+    $script:IngredientNvidiaLibraryPath = 'C:\Windows\System32\nvapi64.dll'
+    $script:IngredientNvidiaDisplayIds = @{
+        '\\.\DISPLAY1' = [uint32] 101
+    }
+    $script:IngredientNvidiaCustomResolutions = @{
+        '101' = @()
+    }
+    $script:IngredientNvidiaSupportedModeLagRemaining = 0
+    $script:IngredientNvidiaPendingSupportedMode = $null
     $script:IngredientSupportedModes = @(
         [ordered]@{ width = 1280; height = 720; bits_per_pel = 32; refresh_rate_hz = 60; orientation = 'Landscape' },
         [ordered]@{ width = 1920; height = 1080; bits_per_pel = 32; refresh_rate_hz = 60; orientation = 'Landscape' }
@@ -180,6 +229,21 @@ function Initialize-ParsecIngredientTestEnvironment {
         }
         GetSupportedModes = {
             param($Arguments)
+
+            if ($null -ne $script:IngredientNvidiaPendingSupportedMode) {
+                if ($script:IngredientNvidiaSupportedModeLagRemaining -gt 0) {
+                    $script:IngredientNvidiaSupportedModeLagRemaining--
+                }
+                else {
+                    Add-ParsecIngredientSupportedMode `
+                        -Width ([int] $script:IngredientNvidiaPendingSupportedMode.width) `
+                        -Height ([int] $script:IngredientNvidiaPendingSupportedMode.height) `
+                        -BitsPerPel ([int] $script:IngredientNvidiaPendingSupportedMode.bits_per_pel) `
+                        -RefreshRateHz ([int] $script:IngredientNvidiaPendingSupportedMode.refresh_rate_hz)
+                    $script:IngredientNvidiaPendingSupportedMode = $null
+                }
+            }
+
             return @($script:IngredientSupportedModes | ForEach-Object { ConvertTo-ParsecPlainObject -InputObject $_ })
         }
         SetEnabled = {
@@ -232,6 +296,103 @@ function Initialize-ParsecIngredientTestEnvironment {
             }
 
             New-ParsecResult -Status 'Succeeded' -Message 'scaling' -Requested $Arguments
+        }
+    }
+
+    $script:ParsecNvidiaAdapter = @{
+        GetAvailability = {
+            return [ordered]@{
+                available = [bool] $script:IngredientNvidiaAvailable
+                library_path = if ($script:IngredientNvidiaAvailable) { $script:IngredientNvidiaLibraryPath } else { $null }
+                backend = 'TestNvidiaAdapter'
+                message = if ($script:IngredientNvidiaAvailable) { 'NVIDIA adapter available.' } else { 'NVIDIA adapter unavailable.' }
+                errors = if ($script:IngredientNvidiaAvailable) { @() } else { @('CapabilityUnavailable') }
+            }
+        }
+        ResolveDisplayTarget = {
+            param($Arguments)
+
+            if (-not $script:IngredientNvidiaAvailable) {
+                throw 'NVIDIA adapter unavailable.'
+            }
+
+            $deviceName = [string] $Arguments.device_name
+            if (-not $script:IngredientNvidiaDisplayIds.ContainsKey($deviceName)) {
+                throw "No NVIDIA display target was registered for '$deviceName'."
+            }
+
+            [ordered]@{
+                device_name = $deviceName
+                normalized_display_name = ('\\' + $deviceName.Substring(4))
+                display_id = [uint32] $script:IngredientNvidiaDisplayIds[$deviceName]
+                library_path = $script:IngredientNvidiaLibraryPath
+                backend = 'TestNvidiaAdapter'
+            }
+        }
+        GetCustomResolutions = {
+            param($Arguments)
+
+            $displayIdKey = [string] ([uint32] $Arguments.display_id)
+            if (-not $script:IngredientNvidiaCustomResolutions.ContainsKey($displayIdKey)) {
+                return @()
+            }
+
+            return @($script:IngredientNvidiaCustomResolutions[$displayIdKey] | ForEach-Object { ConvertTo-ParsecPlainObject -InputObject $_ })
+        }
+        AddCustomResolution = {
+            param($Arguments)
+
+            if (-not $script:IngredientNvidiaAvailable) {
+                return New-ParsecResult -Status 'Failed' -Message 'NVIDIA adapter unavailable.' -Requested $Arguments -Errors @('CapabilityUnavailable')
+            }
+
+            $displayIdKey = [string] ([uint32] $Arguments.display_id)
+            if (-not $script:IngredientNvidiaCustomResolutions.ContainsKey($displayIdKey)) {
+                $script:IngredientNvidiaCustomResolutions[$displayIdKey] = @()
+            }
+
+            $customResolution = [ordered]@{
+                width = [int] $Arguments.width
+                height = [int] $Arguments.height
+                depth = if ($Arguments.ContainsKey('bits_per_pel')) { [int] $Arguments.bits_per_pel } else { 32 }
+                refresh_rate_hz = if ($Arguments.ContainsKey('refresh_rate_hz')) { [double] $Arguments.refresh_rate_hz } else { 60.0 }
+                color_format = 0
+                timing_status = 0
+                hardware_mode_set_only = $false
+            }
+
+            $existing = @(
+                $script:IngredientNvidiaCustomResolutions[$displayIdKey] | Where-Object {
+                    [int] $_.width -eq [int] $customResolution.width -and
+                    [int] $_.height -eq [int] $customResolution.height
+                }
+            )
+            if ($existing.Count -eq 0) {
+                $script:IngredientNvidiaCustomResolutions[$displayIdKey] += $customResolution
+            }
+
+            $script:IngredientNvidiaPendingSupportedMode = [ordered]@{
+                width = [int] $customResolution.width
+                height = [int] $customResolution.height
+                bits_per_pel = [int] $customResolution.depth
+                refresh_rate_hz = [int] [Math]::Round([double] $customResolution.refresh_rate_hz)
+            }
+            if ($script:IngredientNvidiaSupportedModeLagRemaining -le 0) {
+                Add-ParsecIngredientSupportedMode `
+                    -Width ([int] $customResolution.width) `
+                    -Height ([int] $customResolution.height) `
+                    -BitsPerPel ([int] $customResolution.depth) `
+                    -RefreshRateHz ([int] [Math]::Round([double] $customResolution.refresh_rate_hz))
+                $script:IngredientNvidiaPendingSupportedMode = $null
+            }
+
+            New-ParsecResult -Status 'Succeeded' -Message 'nvidia-custom-resolution' -Requested $Arguments -Outputs @{
+                display_id = [uint32] $Arguments.display_id
+                width = [int] $customResolution.width
+                height = [int] $customResolution.height
+                refresh_rate_hz = [double] $customResolution.refresh_rate_hz
+                bits_per_pel = [int] $customResolution.depth
+            }
         }
     }
 }

@@ -1,0 +1,45 @@
+name = "nvidia.add-custom-resolution"
+aliases = ["nvidia-add-custom-resolution"]
+kind = "nvidia"
+description = "Persist a custom NVIDIA resolution for a target display."
+capabilities = ["apply", "wait", "verify"]
+required_backends = ["NvidiaAdapter"]
+safety_class = "PersistentSystemChange"
+success_signals = []
+failure_signals = []
+wait_conditions = []
+
+[readiness]
+timeout_ms = 6000
+poll_interval_ms = 250
+success_count = 2
+
+[operation_schemas.apply]
+required = ["width", "height"]
+[operation_schemas.apply.types]
+device_name = "string"
+screen_id = "integer"
+width = "integer"
+height = "integer"
+refresh_rate_hz = "integer"
+bits_per_pel = "integer"
+
+[operation_schemas.wait]
+required = ["width", "height"]
+[operation_schemas.wait.types]
+device_name = "string"
+screen_id = "integer"
+width = "integer"
+height = "integer"
+refresh_rate_hz = "integer"
+bits_per_pel = "integer"
+
+[operation_schemas.verify]
+required = ["width", "height"]
+[operation_schemas.verify.types]
+device_name = "string"
+screen_id = "integer"
+width = "integer"
+height = "integer"
+refresh_rate_hz = "integer"
+bits_per_pel = "integer"

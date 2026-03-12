@@ -7,6 +7,7 @@ $privateLoadOrder = @(
     'Utility.ps1',
     'Toml.ps1',
     'State.ps1',
+    'NvidiaInterop.ps1',
     'IngredientRuntime.ps1',
     'IngredientInvocation.ps1',
     'Execution.ps1'
