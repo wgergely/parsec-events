@@ -1,105 +1,128 @@
+function Set-ParsecIngredientObservedResolution {
+    param(
+        [Parameter(Mandatory)]
+        [int] $Width,
+
+        [Parameter(Mandatory)]
+        [int] $Height
+    )
+
+    $script:IngredientObservedState.monitors[0].bounds.width = $Width
+    $script:IngredientObservedState.monitors[0].bounds.height = $Height
+    $script:IngredientObservedState.monitors[0].working_area.width = $Width
+    $script:IngredientObservedState.monitors[0].working_area.height = [Math]::Max($Height - 40, 0)
+    $script:IngredientObservedState.monitors[0].display.width = $Width
+    $script:IngredientObservedState.monitors[0].display.height = $Height
+    $script:IngredientObservedState.monitors[0].topology.source_mode.width = $Width
+    $script:IngredientObservedState.monitors[0].topology.source_mode.height = $Height
+    $script:IngredientObservedState.monitors[0].topology.target_mode.width = $Width
+    $script:IngredientObservedState.monitors[0].topology.target_mode.height = $Height
+}
+
 function Initialize-ParsecIngredientTestEnvironment {
     $script:IngredientResolutionMutationEnabled = $true
+    $script:IngredientResolutionObservationLagRemaining = 0
+    $script:IngredientResolutionPendingResolution = $null
     $script:IngredientSupportedModes = @(
         [ordered]@{ width = 1280; height = 720; bits_per_pel = 32; refresh_rate_hz = 60; orientation = 'Landscape' },
         [ordered]@{ width = 1920; height = 1080; bits_per_pel = 32; refresh_rate_hz = 60; orientation = 'Landscape' }
     )
     $script:IngredientObservedState = [ordered]@{
-        captured_at      = [DateTimeOffset]::UtcNow.ToString('o')
-        computer_name    = 'TESTHOST'
-        display_backend  = 'TestAdapter'
+        captured_at = [DateTimeOffset]::UtcNow.ToString('o')
+        computer_name = 'TESTHOST'
+        display_backend = 'TestAdapter'
         monitor_identity = 'adapter_id+target_id'
-        monitors         = @(
+        monitors = @(
             [ordered]@{
-                device_name  = '\\.\DISPLAY1'
-                source_name  = '\\.\DISPLAY1'
+                device_name = '\\.\DISPLAY1'
+                source_name = '\\.\DISPLAY1'
                 friendly_name = 'Primary Panel'
-                is_primary   = $true
-                enabled      = $true
-                bounds       = [ordered]@{ x = 0; y = 0; width = 1920; height = 1080 }
+                is_primary = $true
+                enabled = $true
+                bounds = [ordered]@{ x = 0; y = 0; width = 1920; height = 1080 }
                 working_area = [ordered]@{ x = 0; y = 0; width = 1920; height = 1040 }
-                orientation  = 'Landscape'
-                display      = [ordered]@{
-                    width              = 1920
-                    height             = 1080
-                    bits_per_pel       = 32
-                    refresh_rate_hz    = 60
-                    effective_dpi_x    = 144
-                    effective_dpi_y    = 144
-                    scale_percent      = 150
+                orientation = 'Landscape'
+                display = [ordered]@{
+                    width = 1920
+                    height = 1080
+                    bits_per_pel = 32
+                    refresh_rate_hz = 60
+                    effective_dpi_x = 144
+                    effective_dpi_y = 144
+                    scale_percent = 150
                     text_scale_percent = 130
                 }
-                identity     = [ordered]@{
-                    scheme              = 'adapter_id+target_id'
-                    adapter_id          = '00000000:00000001'
-                    source_id           = 0
-                    target_id           = 1
-                    source_name         = '\\.\DISPLAY1'
+                identity = [ordered]@{
+                    scheme = 'adapter_id+target_id'
+                    adapter_id = '00000000:00000001'
+                    source_id = 0
+                    target_id = 1
+                    source_name = '\\.\DISPLAY1'
                     monitor_device_path = '\\?\DISPLAY#PRIMARY'
                 }
-                topology     = [ordered]@{
-                    is_active           = $true
-                    target_available    = $true
-                    path_flags          = 1
+                topology = [ordered]@{
+                    is_active = $true
+                    target_available = $true
+                    path_flags = 1
                     source_status_flags = 0
                     target_status_flags = 0
-                    output_technology   = 0
-                    scaling_mode        = 0
-                    scan_line_ordering  = 0
-                    source_mode         = [ordered]@{
-                        available    = $true
-                        width        = 1920
-                        height       = 1080
-                        position_x   = 0
-                        position_y   = 0
+                    output_technology = 0
+                    scaling_mode = 0
+                    scan_line_ordering = 0
+                    source_mode = [ordered]@{
+                        available = $true
+                        width = 1920
+                        height = 1080
+                        position_x = 0
+                        position_y = 0
                         pixel_format = 0
                     }
-                    target_mode         = [ordered]@{
-                        available  = $true
-                        width      = 1920
-                        height     = 1080
+                    target_mode = [ordered]@{
+                        available = $true
+                        width = 1920
+                        height = 1080
                         pixel_rate = 0
                     }
                 }
                 monitor_device_path = '\\?\DISPLAY#PRIMARY'
             }
         )
-        scaling          = [ordered]@{
-            status             = 'Captured'
-            ui_scale_percent   = 150
+        scaling = [ordered]@{
+            status = 'Captured'
+            ui_scale_percent = 150
             text_scale_percent = 130
-            monitors           = @(
+            monitors = @(
                 [ordered]@{
-                    device_name        = '\\.\DISPLAY1'
-                    scale_percent      = 150
-                    effective_dpi_x    = 144
-                    effective_dpi_y    = 144
+                    device_name = '\\.\DISPLAY1'
+                    scale_percent = 150
+                    effective_dpi_x = 144
+                    effective_dpi_y = 144
                     text_scale_percent = 130
                 }
             )
         }
-        topology         = [ordered]@{
+        topology = [ordered]@{
             query_mode = 'QDC_ALL_PATHS'
             path_count = 1
-            paths      = @(
+            paths = @(
                 [ordered]@{
-                    adapter_id          = '00000000:00000001'
-                    source_id           = 0
-                    target_id           = 1
-                    source_name         = '\\.\DISPLAY1'
-                    friendly_name       = 'Primary Panel'
+                    adapter_id = '00000000:00000001'
+                    source_id = 0
+                    target_id = 1
+                    source_name = '\\.\DISPLAY1'
+                    friendly_name = 'Primary Panel'
                     monitor_device_path = '\\?\DISPLAY#PRIMARY'
-                    is_active           = $true
-                    target_available    = $true
+                    is_active = $true
+                    target_available = $true
                 }
             )
         }
-        font_scaling     = [ordered]@{
+        font_scaling = [ordered]@{
             text_scale_percent = 130
         }
-        theme            = [ordered]@{
-            mode        = 'Dark'
-            app_mode    = 'Dark'
+        theme = [ordered]@{
+            mode = 'Dark'
+            app_mode = 'Dark'
             system_mode = 'Dark'
         }
     }
@@ -119,8 +142,8 @@ function Initialize-ParsecIngredientTestEnvironment {
                 $appMode = if ($Arguments.ContainsKey('app_mode')) { $Arguments.app_mode } elseif ($mode -in @('Dark', 'Light')) { $mode } else { 'Dark' }
                 $systemMode = if ($Arguments.ContainsKey('system_mode')) { $Arguments.system_mode } elseif ($mode -in @('Dark', 'Light')) { $mode } else { 'Dark' }
                 [ordered]@{
-                    mode        = $mode
-                    app_mode    = $appMode
+                    mode = $mode
+                    app_mode = $appMode
                     system_mode = $systemMode
                 }
             }
@@ -142,6 +165,16 @@ function Initialize-ParsecIngredientTestEnvironment {
 
     $script:ParsecDisplayAdapter = @{
         GetObservedState = {
+            if ($null -ne $script:IngredientResolutionPendingResolution) {
+                if ($script:IngredientResolutionObservationLagRemaining -gt 0) {
+                    $script:IngredientResolutionObservationLagRemaining--
+                }
+                else {
+                    Set-ParsecIngredientObservedResolution -Width ([int] $script:IngredientResolutionPendingResolution.width) -Height ([int] $script:IngredientResolutionPendingResolution.height)
+                    $script:IngredientResolutionPendingResolution = $null
+                }
+            }
+
             $script:IngredientObservedState.captured_at = [DateTimeOffset]::UtcNow.ToString('o')
             return ConvertTo-ParsecPlainObject -InputObject $script:IngredientObservedState
         }
@@ -164,16 +197,15 @@ function Initialize-ParsecIngredientTestEnvironment {
             if ($script:IngredientResolutionMutationEnabled) {
                 $width = [int] $Arguments.width
                 $height = [int] $Arguments.height
-                $script:IngredientObservedState.monitors[0].bounds.width = $width
-                $script:IngredientObservedState.monitors[0].bounds.height = $height
-                $script:IngredientObservedState.monitors[0].working_area.width = $width
-                $script:IngredientObservedState.monitors[0].working_area.height = [Math]::Max($height - 40, 0)
-                $script:IngredientObservedState.monitors[0].display.width = $width
-                $script:IngredientObservedState.monitors[0].display.height = $height
-                $script:IngredientObservedState.monitors[0].topology.source_mode.width = $width
-                $script:IngredientObservedState.monitors[0].topology.source_mode.height = $height
-                $script:IngredientObservedState.monitors[0].topology.target_mode.width = $width
-                $script:IngredientObservedState.monitors[0].topology.target_mode.height = $height
+                if ($script:IngredientResolutionObservationLagRemaining -gt 0) {
+                    $script:IngredientResolutionPendingResolution = [ordered]@{
+                        width = $width
+                        height = $height
+                    }
+                }
+                else {
+                    Set-ParsecIngredientObservedResolution -Width $width -Height $height
+                }
             }
 
             New-ParsecResult -Status 'Succeeded' -Message 'resolution' -Requested $Arguments

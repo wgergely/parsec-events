@@ -21,13 +21,13 @@ function ConvertTo-ParsecRecipe {
     }
 
     return [ordered]@{
-        name         = [string] $Document.name
-        description  = if ($Document.Contains('description')) { [string] $Document.description } else { '' }
+        name = [string] $Document.name
+        description = if ($Document.Contains('description')) { [string] $Document.description } else { '' }
         initial_mode = if ($Document.Contains('initial_mode')) { [string] $Document.initial_mode } else { $null }
-        target_mode  = if ($Document.Contains('target_mode')) { [string] $Document.target_mode } else { $null }
-        path         = $Path
+        target_mode = if ($Document.Contains('target_mode')) { [string] $Document.target_mode } else { $null }
+        path = $Path
         ingredient_definitions = $definitions
-        steps        = @($steps)
+        steps = @($steps)
     }
 }
 
@@ -149,18 +149,18 @@ function Resolve-ParsecRecipeStep {
     }
 
     return [ordered]@{
-        id                  = [string] $Step.id
-        definition          = $definitionName
-        ingredient          = $ingredient
-        operation           = if ($Step.Contains('operation')) { [string] $Step.operation } elseif ($definition.Contains('operation')) { [string] $definition.operation } else { 'apply' }
-        depends_on          = @($resolvedDependsOn)
-        arguments           = $resolvedArguments
-        verify              = if ($Step.Contains('verify')) { [bool] $Step.verify } elseif ($definition.Contains('verify')) { [bool] $definition.verify } else { $true }
+        id = [string] $Step.id
+        definition = $definitionName
+        ingredient = $ingredient
+        operation = if ($Step.Contains('operation')) { [string] $Step.operation } elseif ($definition.Contains('operation')) { [string] $definition.operation } else { 'apply' }
+        depends_on = @($resolvedDependsOn)
+        arguments = $resolvedArguments
+        verify = if ($Step.Contains('verify')) { [bool] $Step.verify } elseif ($definition.Contains('verify')) { [bool] $definition.verify } else { $true }
         compensation_policy = if ($Step.Contains('compensation_policy')) { [string] $Step.compensation_policy } elseif ($definition.Contains('compensation_policy')) { [string] $definition.compensation_policy } else { 'none' }
-        retry_count         = if ($Step.Contains('retry_count')) { [int] $Step.retry_count } elseif ($definition.Contains('retry_count')) { [int] $definition.retry_count } else { 0 }
-        retry_delay_ms      = if ($Step.Contains('retry_delay_ms')) { [int] $Step.retry_delay_ms } elseif ($definition.Contains('retry_delay_ms')) { [int] $definition.retry_delay_ms } else { 0 }
-        allow_diagnostics   = if ($Step.Contains('allow_diagnostics')) { [bool] $Step.allow_diagnostics } elseif ($definition.Contains('allow_diagnostics')) { [bool] $definition.allow_diagnostics } else { $false }
-        condition           = $resolvedCondition
+        retry_count = if ($Step.Contains('retry_count')) { [int] $Step.retry_count } elseif ($definition.Contains('retry_count')) { [int] $definition.retry_count } else { 0 }
+        retry_delay_ms = if ($Step.Contains('retry_delay_ms')) { [int] $Step.retry_delay_ms } elseif ($definition.Contains('retry_delay_ms')) { [int] $definition.retry_delay_ms } else { 0 }
+        allow_diagnostics = if ($Step.Contains('allow_diagnostics')) { [bool] $Step.allow_diagnostics } elseif ($definition.Contains('allow_diagnostics')) { [bool] $definition.allow_diagnostics } else { $false }
+        condition = $resolvedCondition
     }
 }
 
@@ -256,17 +256,18 @@ function Invoke-ParsecStep {
         $dependencyResult = Get-ParsecStepResultById -RunState $RunState -StepId $dependency
         if ($null -eq $dependencyResult -or -not (Test-ParsecSuccessfulStatus -Status $dependencyResult.status)) {
             return [ordered]@{
-                step_id             = $Step.id
-                ingredient          = $Step.ingredient
-                operation           = $Step.operation
-                status              = 'Blocked'
-                operation_result    = $null
-                execution_result    = $null
+                step_id = $Step.id
+                ingredient = $Step.ingredient
+                operation = $Step.operation
+                status = 'Blocked'
+                operation_result = $null
+                execution_result = $null
+                readiness_result = $null
                 verification_result = $null
                 compensation_result = $null
-                started_at          = [DateTimeOffset]::UtcNow.ToString('o')
-                completed_at        = [DateTimeOffset]::UtcNow.ToString('o')
-                message             = "Blocked by dependency '$dependency'."
+                started_at = [DateTimeOffset]::UtcNow.ToString('o')
+                completed_at = [DateTimeOffset]::UtcNow.ToString('o')
+                message = "Blocked by dependency '$dependency'."
                 requested_arguments = ConvertTo-ParsecPlainObject -InputObject $Step.arguments
             }
         }
@@ -274,17 +275,18 @@ function Invoke-ParsecStep {
 
     if (-not (Test-ParsecStepCondition -Step $Step -RunState $RunState)) {
         return [ordered]@{
-            step_id             = $Step.id
-            ingredient          = $Step.ingredient
-            operation           = $Step.operation
-            status              = 'Skipped'
-            operation_result    = $null
-            execution_result    = $null
+            step_id = $Step.id
+            ingredient = $Step.ingredient
+            operation = $Step.operation
+            status = 'Skipped'
+            operation_result = $null
+            execution_result = $null
+            readiness_result = $null
             verification_result = $null
             compensation_result = $null
-            started_at          = [DateTimeOffset]::UtcNow.ToString('o')
-            completed_at        = [DateTimeOffset]::UtcNow.ToString('o')
-            message             = 'Step condition evaluated to false.'
+            started_at = [DateTimeOffset]::UtcNow.ToString('o')
+            completed_at = [DateTimeOffset]::UtcNow.ToString('o')
+            message = 'Step condition evaluated to false.'
             requested_arguments = ConvertTo-ParsecPlainObject -InputObject $Step.arguments
         }
     }
@@ -305,6 +307,7 @@ function Invoke-ParsecStep {
     while ($true)
 
     $verificationResult = $null
+    $readinessResult = $null
     $finalStatus = $operationResult.Status
     $definition = Get-ParsecIngredientDefinition -Name $Step.ingredient
     $operationOutputs = ConvertTo-ParsecPlainObject -InputObject $operationResult.Outputs
@@ -312,7 +315,14 @@ function Invoke-ParsecStep {
         $RunState.active_snapshot = [string] $operationOutputs['snapshot_name']
     }
 
-    if ($Step.verify -and (Test-ParsecSuccessfulStatus -Status $operationResult.Status) -and (Test-ParsecIngredientOperationSupported -Definition $definition -Operation 'verify')) {
+    if ($Step.operation -eq 'apply' -and (Test-ParsecSuccessfulStatus -Status $operationResult.Status) -and (Test-ParsecIngredientOperationSupported -Definition $definition -Operation 'wait')) {
+        $readinessResult = Wait-ParsecIngredientReadiness -Name $Step.ingredient -Arguments $Step.arguments -ExecutionResult $operationResult -StateRoot $StateRoot -RunState $RunState
+        if ($null -ne $readinessResult -and -not (Test-ParsecSuccessfulStatus -Status $readinessResult.Status)) {
+            $finalStatus = if ($readinessResult.Status -eq 'Ambiguous') { 'Ambiguous' } else { 'Failed' }
+        }
+    }
+
+    if ($Step.verify -and (Test-ParsecSuccessfulStatus -Status $finalStatus) -and (Test-ParsecIngredientOperationSupported -Definition $definition -Operation 'verify')) {
         $verificationResult = Invoke-ParsecIngredientOperation -Name $Step.ingredient -Operation 'verify' -Arguments $Step.arguments -ExecutionResult $operationResult -StateRoot $StateRoot -RunState $RunState
         if ($null -ne $verificationResult -and -not (Test-ParsecSuccessfulStatus -Status $verificationResult.Status)) {
             $finalStatus = if ($verificationResult.Status -eq 'Ambiguous') { 'Ambiguous' } else { 'SucceededWithDrift' }
@@ -331,17 +341,18 @@ function Invoke-ParsecStep {
     }
 
     return [ordered]@{
-        step_id             = $Step.id
-        ingredient          = $Step.ingredient
-        operation           = $Step.operation
-        status              = $finalStatus
-        operation_result    = $operationResult
-        execution_result    = $operationResult
+        step_id = $Step.id
+        ingredient = $Step.ingredient
+        operation = $Step.operation
+        status = $finalStatus
+        operation_result = $operationResult
+        execution_result = $operationResult
+        readiness_result = $readinessResult
         verification_result = $verificationResult
         compensation_result = $compensationResult
-        started_at          = [DateTimeOffset]::UtcNow.ToString('o')
-        completed_at        = [DateTimeOffset]::UtcNow.ToString('o')
-        message             = if ($null -ne $verificationResult -and $verificationResult.Message) { $verificationResult.Message } else { $operationResult.Message }
+        started_at = [DateTimeOffset]::UtcNow.ToString('o')
+        completed_at = [DateTimeOffset]::UtcNow.ToString('o')
+        message = if ($null -ne $verificationResult -and $verificationResult.Message) { $verificationResult.Message } elseif ($null -ne $readinessResult -and $readinessResult.Message) { $readinessResult.Message } else { $operationResult.Message }
         requested_arguments = ConvertTo-ParsecPlainObject -InputObject $Step.arguments
     }
 }
@@ -394,23 +405,46 @@ function Invoke-ParsecRecipeSequenceStep {
         $dependencyResult = Get-ParsecStepResultById -RunState $RunRecord -StepId $dependency
         if ($null -eq $dependencyResult -or -not (Test-ParsecSuccessfulStatus -Status $dependencyResult.status)) {
             return [ordered]@{
-                step_id             = $Step.id
-                ingredient          = $Step.ingredient
-                operation           = $Step.operation
-                status              = 'Blocked'
-                invocation_id       = $null
-                token_id            = $null
-                token_path          = $null
-                capture_result      = $null
-                operation_result    = $null
-                execution_result    = $null
+                step_id = $Step.id
+                ingredient = $Step.ingredient
+                operation = $Step.operation
+                status = 'Blocked'
+                invocation_id = $null
+                token_id = $null
+                token_path = $null
+                capture_result = $null
+                operation_result = $null
+                execution_result = $null
+                readiness_result = $null
                 verification_result = $null
                 compensation_result = $null
-                started_at          = [DateTimeOffset]::UtcNow.ToString('o')
-                completed_at        = [DateTimeOffset]::UtcNow.ToString('o')
-                message             = "Blocked by dependency '$dependency'."
+                started_at = [DateTimeOffset]::UtcNow.ToString('o')
+                completed_at = [DateTimeOffset]::UtcNow.ToString('o')
+                message = "Blocked by dependency '$dependency'."
                 requested_arguments = ConvertTo-ParsecPlainObject -InputObject $Step.arguments
             }
+        }
+    }
+
+    if (-not (Test-ParsecStepCondition -Step $Step -RunState $RunRecord)) {
+        return [ordered]@{
+            step_id = $Step.id
+            ingredient = $Step.ingredient
+            operation = $Step.operation
+            status = 'Skipped'
+            invocation_id = $null
+            token_id = $null
+            token_path = $null
+            capture_result = $null
+            operation_result = $null
+            execution_result = $null
+            readiness_result = $null
+            verification_result = $null
+            compensation_result = $null
+            started_at = [DateTimeOffset]::UtcNow.ToString('o')
+            completed_at = [DateTimeOffset]::UtcNow.ToString('o')
+            message = 'Step condition evaluated to false.'
+            requested_arguments = ConvertTo-ParsecPlainObject -InputObject $Step.arguments
         }
     }
 
@@ -441,21 +475,22 @@ function Invoke-ParsecRecipeSequenceStep {
         }
 
         return [ordered]@{
-            step_id             = $Step.id
-            ingredient          = $invocation.ingredient_name
-            operation           = $Step.operation
-            status              = $finalStatus
-            invocation_id       = $invocation.invocation_id
-            token_id            = $invocation.token_id
-            token_path          = $invocation.token_path
-            capture_result      = $invocation.capture_result
-            operation_result    = $invocation.operation_result
-            execution_result    = $invocation.operation_result
+            step_id = $Step.id
+            ingredient = $invocation.ingredient_name
+            operation = $Step.operation
+            status = $finalStatus
+            invocation_id = $invocation.invocation_id
+            token_id = $invocation.token_id
+            token_path = $invocation.token_path
+            capture_result = $invocation.capture_result
+            operation_result = $invocation.operation_result
+            execution_result = $invocation.operation_result
+            readiness_result = $invocation.readiness_result
             verification_result = $invocation.verify_result
             compensation_result = if ($null -ne $compensationInvocation) { $compensationInvocation.reset_result } else { $null }
-            started_at          = $invocation.started_at
-            completed_at        = $invocation.completed_at
-            message             = if ($null -ne $compensationInvocation) { $compensationInvocation.message } else { $invocation.message }
+            started_at = $invocation.started_at
+            completed_at = $invocation.completed_at
+            message = if ($null -ne $compensationInvocation) { $compensationInvocation.message } else { $invocation.message }
             requested_arguments = ConvertTo-ParsecPlainObject -InputObject $Step.arguments
         }
     }
@@ -465,7 +500,7 @@ function Invoke-ParsecRecipeSequenceStep {
     $operationResult = $null
     do {
         $attempt++
-        $operationResult = Invoke-ParsecIngredientOperation -Name $definition.Name -Operation $Step.operation -Arguments $Step.arguments -StateRoot $StateRoot -RunState @{}
+        $operationResult = Invoke-ParsecIngredientOperation -Name $definition.Name -Operation $Step.operation -Arguments $Step.arguments -StateRoot $StateRoot -RunState $RunRecord
         if ((Test-ParsecSuccessfulStatus -Status $operationResult.Status) -or $attempt -gt $Step.retry_count) {
             break
         }
@@ -479,28 +514,29 @@ function Invoke-ParsecRecipeSequenceStep {
     $verificationResult = $null
     $finalStatus = [string] $operationResult.Status
     if ($Step.verify -and $Step.operation -ne 'verify' -and (Test-ParsecSuccessfulStatus -Status $operationResult.Status) -and (Test-ParsecIngredientOperationSupported -Definition $definition -Operation 'verify')) {
-        $verificationResult = Invoke-ParsecIngredientOperation -Name $definition.Name -Operation 'verify' -Arguments $Step.arguments -ExecutionResult $operationResult -StateRoot $StateRoot -RunState @{}
+        $verificationResult = Invoke-ParsecIngredientOperation -Name $definition.Name -Operation 'verify' -Arguments $Step.arguments -ExecutionResult $operationResult -StateRoot $StateRoot -RunState $RunRecord
         if ($null -ne $verificationResult -and -not (Test-ParsecSuccessfulStatus -Status $verificationResult.Status)) {
             $finalStatus = if ($verificationResult.Status -eq 'Ambiguous') { 'Ambiguous' } else { 'Failed' }
         }
     }
 
     return [ordered]@{
-        step_id             = $Step.id
-        ingredient          = $definition.Name
-        operation           = $Step.operation
-        status              = $finalStatus
-        invocation_id       = $null
-        token_id            = $null
-        token_path          = $null
-        capture_result      = $null
-        operation_result    = $operationResult
-        execution_result    = $operationResult
+        step_id = $Step.id
+        ingredient = $definition.Name
+        operation = $Step.operation
+        status = $finalStatus
+        invocation_id = $null
+        token_id = $null
+        token_path = $null
+        capture_result = $null
+        operation_result = $operationResult
+        execution_result = $operationResult
+        readiness_result = $null
         verification_result = $verificationResult
         compensation_result = $null
-        started_at          = [DateTimeOffset]::UtcNow.ToString('o')
-        completed_at        = [DateTimeOffset]::UtcNow.ToString('o')
-        message             = if ($null -ne $verificationResult -and $verificationResult.Message) { $verificationResult.Message } else { $operationResult.Message }
+        started_at = [DateTimeOffset]::UtcNow.ToString('o')
+        completed_at = [DateTimeOffset]::UtcNow.ToString('o')
+        message = if ($null -ne $verificationResult -and $verificationResult.Message) { $verificationResult.Message } else { $operationResult.Message }
         requested_arguments = ConvertTo-ParsecPlainObject -InputObject $Step.arguments
     }
 }
@@ -516,14 +552,18 @@ function Invoke-ParsecRecipeSequence {
     )
 
     $stateRoot = Initialize-ParsecStateRoot -StateRoot $StateRoot
+    $executorState = Get-ParsecExecutorStateDocument -StateRoot $stateRoot
     $runRecord = [ordered]@{
-        run_id            = New-ParsecRunIdentifier
-        recipe_name       = $Recipe.name
-        recipe_file       = $Recipe.path
-        terminal_status   = 'Running'
-        started_at        = [DateTimeOffset]::UtcNow.ToString('o')
-        completed_at      = $null
-        step_results      = @()
+        run_id = New-ParsecRunIdentifier
+        recipe_name = $Recipe.name
+        recipe_file = $Recipe.path
+        desired_state = $Recipe.target_mode
+        actual_state = $executorState.actual_mode
+        active_snapshot = $executorState.active_snapshot
+        terminal_status = 'Running'
+        started_at = [DateTimeOffset]::UtcNow.ToString('o')
+        completed_at = $null
+        step_results = @()
         compensation_logs = @()
     }
 
@@ -557,10 +597,10 @@ function Invoke-ParsecRecipeInternal {
     $runState.active_snapshot = $executorState.active_snapshot
     Save-ParsecExecutorStateDocument -StateDocument $executorState -StateRoot $stateRoot | Out-Null
     Write-ParsecEventRecord -EventType 'executor-run-started' -Payload @{
-        run_id          = $runState.run_id
-        transition_id   = $runState.transition_id
-        recipe_name     = $Recipe.name
-        desired_state   = $Recipe.target_mode
+        run_id = $runState.run_id
+        transition_id = $runState.transition_id
+        recipe_name = $Recipe.name
+        desired_state = $Recipe.target_mode
         active_snapshot = $runState.active_snapshot
     } -StateRoot $stateRoot | Out-Null
 
@@ -581,12 +621,12 @@ function Invoke-ParsecRecipeInternal {
         }
 
         Write-ParsecEventRecord -EventType 'executor-step-completed' -Payload @{
-            run_id          = $runState.run_id
-            transition_id   = $runState.transition_id
-            step_id         = $step.id
-            ingredient      = $step.ingredient
-            operation       = $step.operation
-            status          = $stepResult.status
+            run_id = $runState.run_id
+            transition_id = $runState.transition_id
+            step_id = $step.id
+            ingredient = $step.ingredient
+            operation = $step.operation
+            status = $stepResult.status
             active_snapshot = $runState.active_snapshot
         } -StateRoot $stateRoot | Out-Null
 
@@ -616,16 +656,16 @@ function Invoke-ParsecRecipeInternal {
     $executorState.last_error = if (@($runState.errors).Count -gt 0) { $runState.errors[-1] } else { $null }
     Save-ParsecExecutorStateDocument -StateDocument $executorState -StateRoot $stateRoot | Out-Null
     Write-ParsecEventRecord -EventType 'executor-run-completed' -Payload @{
-        run_id            = $runState.run_id
-        transition_id     = $runState.transition_id
-        recipe_name       = $Recipe.name
-        terminal_status   = $runState.terminal_status
-        actual_state      = $runState.actual_state
-        last_good_state   = $runState.last_good_state
-        active_snapshot   = $runState.active_snapshot
-        transition_phase  = $runState.transition_phase
-        error_count       = @($runState.errors).Count
-        warning_count     = @($runState.warnings).Count
+        run_id = $runState.run_id
+        transition_id = $runState.transition_id
+        recipe_name = $Recipe.name
+        terminal_status = $runState.terminal_status
+        actual_state = $runState.actual_state
+        last_good_state = $runState.last_good_state
+        active_snapshot = $runState.active_snapshot
+        transition_phase = $runState.transition_phase
+        error_count = @($runState.errors).Count
+        warning_count = @($runState.warnings).Count
     } -StateRoot $stateRoot | Out-Null
 
     return $runState

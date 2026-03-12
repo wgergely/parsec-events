@@ -35,23 +35,27 @@ function New-ParsecIngredientDefinition {
         [string[]] $FailureSignals = @(),
 
         [Parameter()]
-        [string[]] $WaitConditions = @()
+        [string[]] $WaitConditions = @(),
+
+        [Parameter()]
+        [hashtable] $Readiness = @{}
     )
 
     return [pscustomobject]@{
-        PSTypeName       = 'ParsecEventExecutor.IngredientDefinition'
-        Name             = $Name
-        Aliases          = @($Aliases)
-        Kind             = $Kind
-        Description      = $Description
-        Capabilities     = @($Capabilities)
+        PSTypeName = 'ParsecEventExecutor.IngredientDefinition'
+        Name = $Name
+        Aliases = @($Aliases)
+        Kind = $Kind
+        Description = $Description
+        Capabilities = @($Capabilities)
         RequiredBackends = @($RequiredBackends)
         OperationSchemas = $OperationSchemas
-        Operations       = $Operations
-        SafetyClass      = $SafetyClass
-        SuccessSignals   = @($SuccessSignals)
-        FailureSignals   = @($FailureSignals)
-        WaitConditions   = @($WaitConditions)
+        Operations = $Operations
+        SafetyClass = $SafetyClass
+        SuccessSignals = @($SuccessSignals)
+        FailureSignals = @($FailureSignals)
+        WaitConditions = @($WaitConditions)
+        Readiness = ConvertTo-ParsecPlainObject -InputObject $Readiness
     }
 }
 
@@ -927,8 +931,8 @@ function New-ParsecDisplayChangeFailureResult {
     $message = "Display change '$Action' failed with status '$statusName' ($Code)."
     return New-ParsecResult -Status 'Failed' -Message $message -Requested $Requested -Outputs @{
         native_status = $Code
-        native_name   = $statusName
-        action        = $Action
+        native_name = $statusName
+        action = $Action
     } -Errors $errors
 }
 
@@ -987,8 +991,8 @@ function Invoke-ParsecApplyDisplayMode {
 
     return New-ParsecResult -Status 'Succeeded' -Message "Display change '$Action' applied." -Requested $Requested -Outputs @{
         native_status = 0
-        native_name   = 'Succeeded'
-        action        = $Action
+        native_name = 'Succeeded'
+        action = $Action
     }
 }
 
@@ -1142,10 +1146,10 @@ function Get-ParsecThemeState {
     $mode = if ($appMode -eq $systemMode) { $appMode } else { 'Custom' }
 
     return [ordered]@{
-        mode                    = $mode
-        app_mode                = $appMode
-        system_mode             = $systemMode
-        apps_use_light_theme    = $appsUseLightTheme
+        mode = $mode
+        app_mode = $appMode
+        system_mode = $systemMode
+        apps_use_light_theme = $appsUseLightTheme
         system_uses_light_theme = $systemUsesLightTheme
     }
 }
@@ -1295,11 +1299,11 @@ function Set-ParsecUiScaleStateInternal {
 
     return New-ParsecResult -Status 'Succeeded' -Message "UI scaling requested at $scalePercent%." -Observed @{
         ui_scale_percent = $scalePercent
-        log_pixels       = $logPixels
+        log_pixels = $logPixels
         requires_signout = $true
     } -Outputs @{
         ui_scale_percent = $scalePercent
-        log_pixels       = $logPixels
+        log_pixels = $logPixels
         requires_signout = $true
     }
 }
@@ -1313,14 +1317,14 @@ function Initialize-ParsecPersonalizationAdapter {
     }
 
     $script:ParsecPersonalizationAdapter = @{
-        GetThemeState    = {
+        GetThemeState = {
             return Get-ParsecThemeState
         }
-        SetThemeState    = {
+        SetThemeState = {
             param([hashtable] $Arguments)
             return Set-ParsecThemeStateInternal -Arguments $Arguments
         }
-        SetTextScale     = {
+        SetTextScale = {
             param([hashtable] $Arguments)
             return Set-ParsecTextScaleStateInternal -Arguments $Arguments
         }
@@ -1381,38 +1385,38 @@ function Get-ParsecDisplayCaptureState {
 
         $topologyPaths = foreach ($path in @($displayPaths)) {
             [ordered]@{
-                adapter_id           = [string] $path.AdapterKey
-                source_id            = [int] $path.SourceId
-                target_id            = [int] $path.TargetId
-                source_name          = [string] $path.SourceDeviceName
-                friendly_name        = [string] $path.MonitorFriendlyName
-                monitor_device_path  = [string] $path.MonitorDevicePath
-                adapter_device_path  = [string] $path.AdapterDevicePath
-                is_active            = [bool] $path.IsActive
-                target_available     = [bool] $path.TargetAvailable
-                rotation             = [int] $path.Rotation
-                scaling              = [int] $path.Scaling
-                output_technology    = [int] $path.OutputTechnology
-                scan_line_ordering   = [int] $path.ScanLineOrdering
-                refresh_rate         = [ordered]@{
-                    numerator   = [int] $path.RefreshRateNumerator
+                adapter_id = [string] $path.AdapterKey
+                source_id = [int] $path.SourceId
+                target_id = [int] $path.TargetId
+                source_name = [string] $path.SourceDeviceName
+                friendly_name = [string] $path.MonitorFriendlyName
+                monitor_device_path = [string] $path.MonitorDevicePath
+                adapter_device_path = [string] $path.AdapterDevicePath
+                is_active = [bool] $path.IsActive
+                target_available = [bool] $path.TargetAvailable
+                rotation = [int] $path.Rotation
+                scaling = [int] $path.Scaling
+                output_technology = [int] $path.OutputTechnology
+                scan_line_ordering = [int] $path.ScanLineOrdering
+                refresh_rate = [ordered]@{
+                    numerator = [int] $path.RefreshRateNumerator
                     denominator = [int] $path.RefreshRateDenominator
                 }
-                path_flags           = [int] $path.PathFlags
-                source_status_flags  = [int] $path.SourceStatusFlags
-                target_status_flags  = [int] $path.TargetStatusFlags
-                source_mode          = [ordered]@{
-                    available  = [bool] $path.HasSourceMode
-                    width      = if ($path.HasSourceMode) { [int] $path.SourceWidth } else { $null }
-                    height     = if ($path.HasSourceMode) { [int] $path.SourceHeight } else { $null }
+                path_flags = [int] $path.PathFlags
+                source_status_flags = [int] $path.SourceStatusFlags
+                target_status_flags = [int] $path.TargetStatusFlags
+                source_mode = [ordered]@{
+                    available = [bool] $path.HasSourceMode
+                    width = if ($path.HasSourceMode) { [int] $path.SourceWidth } else { $null }
+                    height = if ($path.HasSourceMode) { [int] $path.SourceHeight } else { $null }
                     position_x = if ($path.HasSourceMode) { [int] $path.SourcePositionX } else { $null }
                     position_y = if ($path.HasSourceMode) { [int] $path.SourcePositionY } else { $null }
                     pixel_format = if ($path.HasSourceMode) { [int] $path.PixelFormat } else { $null }
                 }
-                target_mode          = [ordered]@{
-                    available  = [bool] $path.HasTargetMode
-                    width      = if ($path.HasTargetMode) { [int] $path.TargetWidth } else { $null }
-                    height     = if ($path.HasTargetMode) { [int] $path.TargetHeight } else { $null }
+                target_mode = [ordered]@{
+                    available = [bool] $path.HasTargetMode
+                    width = if ($path.HasTargetMode) { [int] $path.TargetWidth } else { $null }
+                    height = if ($path.HasTargetMode) { [int] $path.TargetHeight } else { $null }
                     pixel_rate = if ($path.HasTargetMode) { [uint64] $path.PixelRate } else { $null }
                 }
             }
@@ -1431,12 +1435,12 @@ function Get-ParsecDisplayCaptureState {
         }
 
         $sortedDisplayPaths = @($meaningfulDisplayPaths) | Sort-Object `
-            @{ Expression = { if ($_.IsActive) { 0 } else { 1 } } }, `
-            @{ Expression = { if ($_.TargetAvailable) { 0 } else { 1 } } }, `
-            @{ Expression = { if ($_.HasSourceMode) { 0 } else { 1 } } }, `
-            @{ Expression = { if (-not [string]::IsNullOrWhiteSpace([string] $_.MonitorDevicePath)) { 0 } else { 1 } } }, `
-            @{ Expression = { [string] $_.SourceDeviceName } }, `
-            @{ Expression = { [int] $_.TargetId } }
+        @{ Expression = { if ($_.IsActive) { 0 } else { 1 } } }, `
+        @{ Expression = { if ($_.TargetAvailable) { 0 } else { 1 } } }, `
+        @{ Expression = { if ($_.HasSourceMode) { 0 } else { 1 } } }, `
+        @{ Expression = { if (-not [string]::IsNullOrWhiteSpace([string] $_.MonitorDevicePath)) { 0 } else { 1 } } }, `
+        @{ Expression = { [string] $_.SourceDeviceName } }, `
+        @{ Expression = { [int] $_.TargetId } }
 
         foreach ($path in $sortedDisplayPaths) {
             $identityKey = Get-ParsecDisplayIdentityKey -DisplayPath $path
@@ -1465,69 +1469,69 @@ function Get-ParsecDisplayCaptureState {
             $y = if ($path.HasSourceMode) { [int] $path.SourcePositionY } elseif ($null -ne $nativeMonitor) { [int] $nativeMonitor.Top } else { $null }
 
             [ordered]@{
-                device_name  = $deviceName
-                source_name  = [string] $path.SourceDeviceName
+                device_name = $deviceName
+                source_name = [string] $path.SourceDeviceName
                 friendly_name = [string] $path.MonitorFriendlyName
                 monitor_device_path = [string] $path.MonitorDevicePath
                 adapter_device_path = [string] $path.AdapterDevicePath
-                adapter_id   = [string] $path.AdapterKey
-                source_id    = [int] $path.SourceId
-                target_id    = [int] $path.TargetId
-                is_primary   = if ($null -ne $nativeMonitor) { [bool] $nativeMonitor.IsPrimary } else { $false }
-                enabled      = [bool] $path.IsActive
+                adapter_id = [string] $path.AdapterKey
+                source_id = [int] $path.SourceId
+                target_id = [int] $path.TargetId
+                is_primary = if ($null -ne $nativeMonitor) { [bool] $nativeMonitor.IsPrimary } else { $false }
+                enabled = [bool] $path.IsActive
                 target_available = [bool] $path.TargetAvailable
-                bounds       = [ordered]@{
-                    x      = $x
-                    y      = $y
-                    width  = $width
+                bounds = [ordered]@{
+                    x = $x
+                    y = $y
+                    width = $width
                     height = $height
                 }
                 working_area = [ordered]@{
-                    x      = if ($null -ne $nativeMonitor) { [int] $nativeMonitor.WorkLeft } else { $null }
-                    y      = if ($null -ne $nativeMonitor) { [int] $nativeMonitor.WorkTop } else { $null }
-                    width  = if ($null -ne $nativeMonitor) { [int] $nativeMonitor.WorkWidth } else { $null }
+                    x = if ($null -ne $nativeMonitor) { [int] $nativeMonitor.WorkLeft } else { $null }
+                    y = if ($null -ne $nativeMonitor) { [int] $nativeMonitor.WorkTop } else { $null }
+                    width = if ($null -ne $nativeMonitor) { [int] $nativeMonitor.WorkWidth } else { $null }
                     height = if ($null -ne $nativeMonitor) { [int] $nativeMonitor.WorkHeight } else { $null }
                 }
-                orientation  = ConvertTo-ParsecDisplayConfigRotationName -Rotation ([int] $path.Rotation)
-                display      = [ordered]@{
-                    width             = $width
-                    height            = $height
-                    bits_per_pel      = if ($null -ne $nativeMonitor) { [int] $nativeMonitor.BitsPerPel } else { $null }
-                    refresh_rate_hz   = $refreshRate
-                    effective_dpi_x   = if ($null -ne $nativeMonitor -and $nativeMonitor.HasEffectiveDpi) { [int] $nativeMonitor.EffectiveDpiX } else { $null }
-                    effective_dpi_y   = if ($null -ne $nativeMonitor -and $nativeMonitor.HasEffectiveDpi) { [int] $nativeMonitor.EffectiveDpiY } else { $null }
-                    scale_percent     = $scalePercent
+                orientation = ConvertTo-ParsecDisplayConfigRotationName -Rotation ([int] $path.Rotation)
+                display = [ordered]@{
+                    width = $width
+                    height = $height
+                    bits_per_pel = if ($null -ne $nativeMonitor) { [int] $nativeMonitor.BitsPerPel } else { $null }
+                    refresh_rate_hz = $refreshRate
+                    effective_dpi_x = if ($null -ne $nativeMonitor -and $nativeMonitor.HasEffectiveDpi) { [int] $nativeMonitor.EffectiveDpiX } else { $null }
+                    effective_dpi_y = if ($null -ne $nativeMonitor -and $nativeMonitor.HasEffectiveDpi) { [int] $nativeMonitor.EffectiveDpiY } else { $null }
+                    scale_percent = $scalePercent
                     text_scale_percent = [int] $textScalePercent
                 }
-                identity     = [ordered]@{
-                    scheme              = 'adapter_id+target_id'
-                    adapter_id          = [string] $path.AdapterKey
-                    source_id           = [int] $path.SourceId
-                    target_id           = [int] $path.TargetId
-                    source_name         = [string] $path.SourceDeviceName
+                identity = [ordered]@{
+                    scheme = 'adapter_id+target_id'
+                    adapter_id = [string] $path.AdapterKey
+                    source_id = [int] $path.SourceId
+                    target_id = [int] $path.TargetId
+                    source_name = [string] $path.SourceDeviceName
                     monitor_device_path = [string] $path.MonitorDevicePath
                 }
-                topology     = [ordered]@{
-                    is_active          = [bool] $path.IsActive
-                    target_available   = [bool] $path.TargetAvailable
-                    path_flags         = [int] $path.PathFlags
+                topology = [ordered]@{
+                    is_active = [bool] $path.IsActive
+                    target_available = [bool] $path.TargetAvailable
+                    path_flags = [int] $path.PathFlags
                     source_status_flags = [int] $path.SourceStatusFlags
                     target_status_flags = [int] $path.TargetStatusFlags
-                    output_technology  = [int] $path.OutputTechnology
-                    scaling_mode       = [int] $path.Scaling
+                    output_technology = [int] $path.OutputTechnology
+                    scaling_mode = [int] $path.Scaling
                     scan_line_ordering = [int] $path.ScanLineOrdering
-                    source_mode        = [ordered]@{
-                        available  = [bool] $path.HasSourceMode
-                        width      = if ($path.HasSourceMode) { [int] $path.SourceWidth } else { $null }
-                        height     = if ($path.HasSourceMode) { [int] $path.SourceHeight } else { $null }
+                    source_mode = [ordered]@{
+                        available = [bool] $path.HasSourceMode
+                        width = if ($path.HasSourceMode) { [int] $path.SourceWidth } else { $null }
+                        height = if ($path.HasSourceMode) { [int] $path.SourceHeight } else { $null }
                         position_x = if ($path.HasSourceMode) { [int] $path.SourcePositionX } else { $null }
                         position_y = if ($path.HasSourceMode) { [int] $path.SourcePositionY } else { $null }
                         pixel_format = if ($path.HasSourceMode) { [int] $path.PixelFormat } else { $null }
                     }
-                    target_mode        = [ordered]@{
-                        available  = [bool] $path.HasTargetMode
-                        width      = if ($path.HasTargetMode) { [int] $path.TargetWidth } else { $null }
-                        height     = if ($path.HasTargetMode) { [int] $path.TargetHeight } else { $null }
+                    target_mode = [ordered]@{
+                        available = [bool] $path.HasTargetMode
+                        width = if ($path.HasTargetMode) { [int] $path.TargetWidth } else { $null }
+                        height = if ($path.HasTargetMode) { [int] $path.TargetHeight } else { $null }
                         pixel_rate = if ($path.HasTargetMode) { [uint64] $path.PixelRate } else { $null }
                     }
                 }
@@ -1535,36 +1539,36 @@ function Get-ParsecDisplayCaptureState {
         }
 
         return [ordered]@{
-            captured_at      = [DateTimeOffset]::UtcNow.ToString('o')
-            computer_name    = $env:COMPUTERNAME
-            display_backend  = 'CCD.QueryDisplayConfig+Win32.EnumDisplaySettings'
+            captured_at = [DateTimeOffset]::UtcNow.ToString('o')
+            computer_name = $env:COMPUTERNAME
+            display_backend = 'CCD.QueryDisplayConfig+Win32.EnumDisplaySettings'
             monitor_identity = 'adapter_id+target_id'
-            monitors         = @($monitors)
-            topology         = [ordered]@{
+            monitors = @($monitors)
+            topology = [ordered]@{
                 query_mode = 'QDC_ALL_PATHS'
                 path_count = @($displayPaths).Count
-                paths      = @($topologyPaths)
+                paths = @($topologyPaths)
             }
-            scaling          = [ordered]@{
-                status             = 'Captured'
-                ui_scale_percent   = [int] $uiScalePercent
+            scaling = [ordered]@{
+                status = 'Captured'
+                ui_scale_percent = [int] $uiScalePercent
                 text_scale_percent = [int] $textScalePercent
-                monitors           = @(
+                monitors = @(
                     foreach ($monitor in @($monitors)) {
                         [ordered]@{
-                            device_name        = [string] $monitor.device_name
-                            scale_percent      = $monitor.display.scale_percent
-                            effective_dpi_x    = $monitor.display.effective_dpi_x
-                            effective_dpi_y    = $monitor.display.effective_dpi_y
+                            device_name = [string] $monitor.device_name
+                            scale_percent = $monitor.display.scale_percent
+                            effective_dpi_x = $monitor.display.effective_dpi_x
+                            effective_dpi_y = $monitor.display.effective_dpi_y
                             text_scale_percent = [int] $textScalePercent
                         }
                     }
                 )
             }
-            font_scaling     = [ordered]@{
+            font_scaling = [ordered]@{
                 text_scale_percent = [int] $textScalePercent
             }
-            theme            = $themeState
+            theme = $themeState
         }
     }
     catch {
@@ -1575,56 +1579,56 @@ function Get-ParsecDisplayCaptureState {
         $themeState = Invoke-ParsecPersonalizationAdapter -Method 'GetThemeState'
         $monitors = foreach ($screen in $screens) {
             [ordered]@{
-                device_name  = $screen.DeviceName
-                is_primary   = [bool] $screen.Primary
-                enabled      = $true
-                bounds       = [ordered]@{
-                    x      = $screen.Bounds.X
-                    y      = $screen.Bounds.Y
-                    width  = $screen.Bounds.Width
+                device_name = $screen.DeviceName
+                is_primary = [bool] $screen.Primary
+                enabled = $true
+                bounds = [ordered]@{
+                    x = $screen.Bounds.X
+                    y = $screen.Bounds.Y
+                    width = $screen.Bounds.Width
                     height = $screen.Bounds.Height
                 }
                 working_area = [ordered]@{
-                    x      = $screen.WorkingArea.X
-                    y      = $screen.WorkingArea.Y
-                    width  = $screen.WorkingArea.Width
+                    x = $screen.WorkingArea.X
+                    y = $screen.WorkingArea.Y
+                    width = $screen.WorkingArea.Width
                     height = $screen.WorkingArea.Height
                 }
-                orientation  = if ($screen.Bounds.Height -gt $screen.Bounds.Width) { 'Portrait' } else { 'Landscape' }
-                display      = [ordered]@{
-                    width              = $screen.Bounds.Width
-                    height             = $screen.Bounds.Height
-                    bits_per_pel       = $null
-                    refresh_rate_hz    = $null
-                    effective_dpi_x    = $null
-                    effective_dpi_y    = $null
-                    scale_percent      = $null
+                orientation = if ($screen.Bounds.Height -gt $screen.Bounds.Width) { 'Portrait' } else { 'Landscape' }
+                display = [ordered]@{
+                    width = $screen.Bounds.Width
+                    height = $screen.Bounds.Height
+                    bits_per_pel = $null
+                    refresh_rate_hz = $null
+                    effective_dpi_x = $null
+                    effective_dpi_y = $null
+                    scale_percent = $null
                     text_scale_percent = [int] $textScalePercent
                 }
             }
         }
 
         return [ordered]@{
-            captured_at      = [DateTimeOffset]::UtcNow.ToString('o')
-            computer_name    = $env:COMPUTERNAME
-            display_backend  = 'System.Windows.Forms.Screen'
+            captured_at = [DateTimeOffset]::UtcNow.ToString('o')
+            computer_name = $env:COMPUTERNAME
+            display_backend = 'System.Windows.Forms.Screen'
             monitor_identity = 'device_name'
-            monitors         = @($monitors)
-            topology         = [ordered]@{
+            monitors = @($monitors)
+            topology = [ordered]@{
                 query_mode = 'Fallback'
                 path_count = 0
-                paths      = @()
+                paths = @()
             }
-            scaling          = [ordered]@{
-                status             = 'Partial'
-                ui_scale_percent   = [int] $uiScalePercent
+            scaling = [ordered]@{
+                status = 'Partial'
+                ui_scale_percent = [int] $uiScalePercent
                 text_scale_percent = [int] $textScalePercent
-                monitors           = @()
+                monitors = @()
             }
-            font_scaling     = [ordered]@{
+            font_scaling = [ordered]@{
                 text_scale_percent = [int] $textScalePercent
             }
-            theme            = $themeState
+            theme = $themeState
         }
     }
 }
@@ -1650,14 +1654,14 @@ function Get-ParsecDisplayCaptureResult {
 
         return New-ParsecResult -Status 'Succeeded' -Message "Captured $Domain state for '$DeviceName'." -Observed $monitor -Outputs @{
             captured_state = $monitor
-            device_name    = $DeviceName
-            domain         = $Domain
+            device_name = $DeviceName
+            domain = $Domain
         }
     }
 
     return New-ParsecResult -Status 'Succeeded' -Message "Captured $Domain state." -Observed $ObservedState -Outputs @{
         captured_state = $ObservedState
-        domain         = $Domain
+        domain = $Domain
     }
 }
 
@@ -1743,14 +1747,14 @@ function Get-ParsecProcessCaptureResult {
     }
 
     return New-ParsecResult -Status 'Succeeded' -Message 'Captured process state.' -Observed @{
-        process_id   = [int] $process.Id
+        process_id = [int] $process.Id
         process_name = [string] $process.ProcessName
-        is_running   = $true
+        is_running = $true
     } -Outputs @{
         captured_state = @{
-            process_id   = [int] $process.Id
+            process_id = [int] $process.Id
             process_name = [string] $process.ProcessName
-            is_running   = $true
+            is_running = $true
         }
     }
 }
@@ -1765,11 +1769,11 @@ function Get-ParsecServiceCaptureResult {
     $service = Get-Service -Name $Arguments.service_name -ErrorAction Stop
     return New-ParsecResult -Status 'Succeeded' -Message "Captured service state for '$($Arguments.service_name)'." -Observed @{
         service_name = [string] $service.Name
-        status       = [string] $service.Status
+        status = [string] $service.Status
     } -Outputs @{
         captured_state = @{
             service_name = [string] $service.Name
-            status       = [string] $service.Status
+            status = [string] $service.Status
         }
     }
 }
@@ -1786,23 +1790,23 @@ function Initialize-ParsecDisplayAdapter {
         GetObservedState = {
             return Get-ParsecDisplayCaptureState
         }
-        SetEnabled      = {
+        SetEnabled = {
             param([hashtable] $Arguments)
             return Set-ParsecDisplayEnabledInternal -Arguments $Arguments
         }
-        SetPrimary      = {
+        SetPrimary = {
             param([hashtable] $Arguments)
             return Set-ParsecDisplayPrimaryInternal -Arguments $Arguments
         }
-        SetResolution   = {
+        SetResolution = {
             param([hashtable] $Arguments)
             return Set-ParsecDisplayResolutionInternal -Arguments $Arguments
         }
-        SetOrientation  = {
+        SetOrientation = {
             param([hashtable] $Arguments)
             return Set-ParsecDisplayOrientationInternal -Arguments $Arguments
         }
-        SetScaling      = {
+        SetScaling = {
             param([hashtable] $Arguments)
             if ($Arguments.ContainsKey('text_scale_percent') -or ($Arguments.ContainsKey('value') -and -not $Arguments.ContainsKey('device_name'))) {
                 if ($Arguments.ContainsKey('text_scale_percent')) {
@@ -1929,11 +1933,11 @@ function Get-ParsecSupportedDisplayModes {
     return @(
         foreach ($mode in $modes) {
             [ordered]@{
-                width            = [int] $mode.Width
-                height           = [int] $mode.Height
-                bits_per_pel     = [int] $mode.BitsPerPel
-                refresh_rate_hz  = [int] $mode.DisplayFrequency
-                orientation      = ConvertTo-ParsecOrientationName -Orientation ([int] $mode.Orientation)
+                width = [int] $mode.Width
+                height = [int] $mode.Height
+                bits_per_pel = [int] $mode.BitsPerPel
+                refresh_rate_hz = [int] $mode.DisplayFrequency
+                orientation = ConvertTo-ParsecOrientationName -Orientation ([int] $mode.Orientation)
             }
         }
     )
@@ -2063,7 +2067,7 @@ function Get-ParsecSnapshotTarget {
     $snapshot = Read-ParsecSnapshotDocument -Name $snapshotName -StateRoot $StateRoot
     return [ordered]@{
         snapshot_name = $snapshotName
-        snapshot      = $snapshot
+        snapshot = $snapshot
     }
 }
 
@@ -2258,6 +2262,11 @@ function New-ParsecIngredientDefinitionFromSchema {
         }
     }
 
+    $readiness = [ordered]@{}
+    if ($Schema.Contains('readiness')) {
+        $readiness = ConvertTo-ParsecPlainObject -InputObject $Schema.readiness
+    }
+
     return New-ParsecIngredientDefinition `
         -Name ([string] $Schema.name) `
         -Kind ([string] $Schema.kind) `
@@ -2270,6 +2279,7 @@ function New-ParsecIngredientDefinitionFromSchema {
         -SuccessSignals @($Schema.success_signals) `
         -FailureSignals @($Schema.failure_signals) `
         -WaitConditions @($Schema.wait_conditions) `
+        -Readiness $readiness `
         -Operations $Operations
 }
 

@@ -2,12 +2,17 @@ name = "display.set-resolution"
 aliases = ["set-resolution"]
 kind = "display"
 description = "Set monitor resolution."
-capabilities = ["capture", "apply", "verify", "reset"]
+capabilities = ["capture", "apply", "wait", "verify", "reset"]
 required_backends = ["DisplayAdapter"]
 safety_class = "ReversibleSystemChange"
 success_signals = []
 failure_signals = []
 wait_conditions = []
+
+[readiness]
+timeout_ms = 4000
+poll_interval_ms = 200
+success_count = 3
 
 [operation_schemas.capture]
 required = []
@@ -26,6 +31,14 @@ height = "integer"
 [operation_schemas.verify]
 required = ["width", "height"]
 [operation_schemas.verify.types]
+device_name = "string"
+screen_id = "integer"
+width = "integer"
+height = "integer"
+
+[operation_schemas.wait]
+required = ["width", "height"]
+[operation_schemas.wait.types]
 device_name = "string"
 screen_id = "integer"
 width = "integer"

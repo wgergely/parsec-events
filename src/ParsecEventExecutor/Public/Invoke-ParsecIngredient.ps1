@@ -16,6 +16,9 @@ function Invoke-ParsecIngredient {
         [string] $TokenId,
 
         [Parameter()]
+        [bool] $Verify = $true,
+
+        [Parameter()]
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)
     )
 
@@ -31,5 +34,5 @@ function Invoke-ParsecIngredient {
         return
     }
 
-    return Invoke-ParsecIngredientCommandInternal -Name $Name -Operation $Operation -Arguments $Arguments -TokenId $TokenId -StateRoot $StateRoot
+    return Invoke-ParsecIngredientCommandInternal -Name $Name -Operation $Operation -Arguments $Arguments -TokenId $TokenId -Verify $Verify -StateRoot $StateRoot
 }

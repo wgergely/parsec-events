@@ -44,5 +44,22 @@ Describe 'Invoke-ParsecRecipe' {
             $result.step_results[0].token_id | Should -Not -BeNullOrEmpty
             $script:IngredientObservedState.monitors[0].bounds.width | Should -Be 1280
         }
+
+        It 'blocks dependent steps when resolution readiness times out' {
+            $stateRoot = Join-Path $TestDrive 'resolution-readiness-blocks'
+            $recipePath = Join-Path $PSScriptRoot 'fixtures\recipes\resolution-readiness-blocks.toml'
+            $definition = Get-ParsecIngredientDefinition -Name 'set-resolution'
+            $definition.Readiness.timeout_ms = 10
+            $definition.Readiness.poll_interval_ms = 1
+            $definition.Readiness.success_count = 2
+            $script:IngredientResolutionObservationLagRemaining = 100
+
+            $result = Invoke-ParsecRecipe -NameOrPath $recipePath -StateRoot $stateRoot -Confirm:$false
+
+            $result.terminal_status | Should -Be 'Failed'
+            $result.step_results[0].status | Should -Be 'Failed'
+            $result.step_results[0].readiness_result.Errors | Should -Contain 'ReadinessTimeout'
+            $result.step_results[1].status | Should -Be 'Blocked'
+        }
     }
 }
