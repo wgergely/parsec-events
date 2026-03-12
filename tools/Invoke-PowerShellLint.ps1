@@ -99,15 +99,8 @@ foreach ($issue in $issues | Sort-Object ScriptPath, Line, Column, RuleName) {
         '<unknown>'
     }
 
-    [Console]::Error.WriteLine(
-        '{0}:{1}:{2} [{3}/{4}] {5}' -f
-        $relativePath,
-        $issue.Line,
-        $issue.Column,
-        $issue.Severity,
-        $issue.RuleName,
-        $issue.Message
-    )
+    $renderedMessage = [string] $issue.Message
+    [Console]::Error.WriteLine("${relativePath}:$($issue.Line):$($issue.Column) [$($issue.Severity)/$($issue.RuleName)] $renderedMessage")
 }
 
 exit 1

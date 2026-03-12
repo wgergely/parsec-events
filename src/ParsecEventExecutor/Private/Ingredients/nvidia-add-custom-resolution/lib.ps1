@@ -102,6 +102,20 @@ function script:Get-ParsecResolutionOrientationClass {
     return 'Neutral'
 }
 
+function script:Normalize-ParsecResolutionOrientationClass {
+    param(
+        [Parameter()]
+        [AllowNull()]
+        [string] $Orientation
+    )
+
+    switch ($Orientation) {
+        'LandscapeFlipped' { return 'Landscape' }
+        'PortraitFlipped' { return 'Portrait' }
+        default { return $Orientation }
+    }
+}
+
 function script:Test-ParsecNvidiaResolutionOrientationCompatibility {
     param(
         [Parameter(Mandatory)]
@@ -109,12 +123,13 @@ function script:Test-ParsecNvidiaResolutionOrientationCompatibility {
     )
 
     $requestedOrientation = Get-ParsecResolutionOrientationClass -Width ([int] $Context.width) -Height ([int] $Context.height)
-    $observedOrientation = if ($Context.target_monitor.Contains('orientation') -and -not [string]::IsNullOrWhiteSpace([string] $Context.target_monitor.orientation)) {
+    $rawObservedOrientation = if ($Context.target_monitor.Contains('orientation') -and -not [string]::IsNullOrWhiteSpace([string] $Context.target_monitor.orientation)) {
         [string] $Context.target_monitor.orientation
     }
     else {
         Get-ParsecResolutionOrientationClass -Width ([int] $Context.target_monitor.bounds.width) -Height ([int] $Context.target_monitor.bounds.height)
     }
+    $observedOrientation = Normalize-ParsecResolutionOrientationClass -Orientation $rawObservedOrientation
 
     if ($requestedOrientation -eq 'Neutral' -or [string]::IsNullOrWhiteSpace($observedOrientation)) {
         return $null
@@ -130,10 +145,32 @@ function script:Test-ParsecNvidiaResolutionOrientationCompatibility {
         } -Observed $Context.target_monitor -Outputs @{
             device_name = $Context.device_name
             requested_orientation = $requestedOrientation
-            observed_orientation = $observedOrientation
+            observed_orientation = $rawObservedOrientation
+            normalized_observed_orientation = $observedOrientation
             current_width = $Context.target_monitor.bounds.width
             current_height = $Context.target_monitor.bounds.height
         } -Errors @('OrientationMismatch')
+    }
+
+    return $null
+}
+
+function script:Get-ParsecNvidiaCustomResolutionProbeFailureContext {
+    param(
+        [Parameter()]
+        $Probe
+    )
+
+    if ($Probe -isnot [System.Collections.IDictionary]) {
+        return $null
+    }
+
+    if ($Probe.Contains('availability') -and $null -ne $Probe.availability -and -not [bool] $Probe.availability.available) {
+        return $Probe
+    }
+
+    if ($Probe.Contains('errors') -and @($Probe.errors).Count -gt 0) {
+        return $Probe
     }
 
     return $null
@@ -297,8 +334,9 @@ function Get-ParsecIngredientOperations {
             param($Arguments, $ExecutionResult, $StateRoot, $RunState, $Definition)
 
             $probe = Get-ParsecNvidiaCustomResolutionProbe -Arguments $Arguments -StateRoot $StateRoot
-            if ($probe -is [System.Collections.IDictionary] -and $probe.Contains('errors') -and @($probe.errors).Count -gt 0) {
-                $context = $probe
+            $failureContext = Get-ParsecNvidiaCustomResolutionProbeFailureContext -Probe $probe
+            if ($null -ne $failureContext) {
+                $context = $failureContext
                 $errorCode = if (-not $context.availability.available) { 'CapabilityUnavailable' } else { $context.errors[0] }
                 return New-ParsecResult -Status 'Failed' -Message $(if ($null -ne $context.message) { $context.message } else { $context.availability.message }) -Requested $Arguments -Observed $context.observed -Outputs @{
                     requested_width = $context.width
@@ -344,8 +382,9 @@ function Get-ParsecIngredientOperations {
             param($Arguments, $ExecutionResult, $StateRoot, $RunState, $Definition)
 
             $probe = Get-ParsecNvidiaCustomResolutionProbe -Arguments $Arguments -StateRoot $StateRoot
-            if ($probe -is [System.Collections.IDictionary] -and $probe.Contains('errors') -and @($probe.errors).Count -gt 0) {
-                $context = $probe
+            $failureContext = Get-ParsecNvidiaCustomResolutionProbeFailureContext -Probe $probe
+            if ($null -ne $failureContext) {
+                $context = $failureContext
                 $errorCode = if (-not $context.availability.available) { 'CapabilityUnavailable' } else { $context.errors[0] }
                 return New-ParsecResult -Status 'Failed' -Message $(if ($null -ne $context.message) { $context.message } else { $context.availability.message }) -Requested $Arguments -Observed $context.observed -Outputs @{
                     requested_width = $context.width

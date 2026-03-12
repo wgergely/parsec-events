@@ -343,6 +343,19 @@ namespace ParsecEventExecutor {
             public int Bottom;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        public struct GUITHREADINFO {
+            public uint cbSize;
+            public uint flags;
+            public IntPtr hwndActive;
+            public IntPtr hwndFocus;
+            public IntPtr hwndCapture;
+            public IntPtr hwndMenuOwner;
+            public IntPtr hwndMoveSize;
+            public IntPtr hwndCaret;
+            public RECT rcCaret;
+        }
+
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
         public struct MONITORINFOEX {
             public int cbSize;
@@ -625,6 +638,12 @@ namespace ParsecEventExecutor {
         private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
         [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool GetGUIThreadInfo(uint idThread, ref GUITHREADINFO lpgui);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetAncestor(IntPtr hWnd, uint gaFlags);
+
+        [DllImport("user32.dll", SetLastError = true)]
         private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
         [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
@@ -665,6 +684,42 @@ namespace ParsecEventExecutor {
 
         private static string AdapterIdToString(LUID value) {
             return value.HighPart.ToString("X8") + ":" + value.LowPart.ToString("X8");
+        }
+
+        private static IntPtr NormalizeTopLevelWindow(IntPtr hWnd) {
+            if (hWnd == IntPtr.Zero) {
+                return IntPtr.Zero;
+            }
+
+            var rootOwner = GetAncestor(hWnd, 3u);
+            return rootOwner != IntPtr.Zero ? rootOwner : hWnd;
+        }
+
+        private static IntPtr ResolveForegroundWindowHandle() {
+            var foregroundWindow = GetForegroundWindow();
+            if (foregroundWindow != IntPtr.Zero) {
+                return NormalizeTopLevelWindow(foregroundWindow);
+            }
+
+            var guiThreadInfo = new GUITHREADINFO();
+            guiThreadInfo.cbSize = (uint)Marshal.SizeOf(typeof(GUITHREADINFO));
+            if (!GetGUIThreadInfo(0u, ref guiThreadInfo)) {
+                return IntPtr.Zero;
+            }
+
+            if (guiThreadInfo.hwndFocus != IntPtr.Zero) {
+                return NormalizeTopLevelWindow(guiThreadInfo.hwndFocus);
+            }
+
+            if (guiThreadInfo.hwndActive != IntPtr.Zero) {
+                return NormalizeTopLevelWindow(guiThreadInfo.hwndActive);
+            }
+
+            if (guiThreadInfo.hwndCaret != IntPtr.Zero) {
+                return NormalizeTopLevelWindow(guiThreadInfo.hwndCaret);
+            }
+
+            return IntPtr.Zero;
         }
 
         private static IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex) {
@@ -924,7 +979,7 @@ namespace ParsecEventExecutor {
         }
 
         public static WindowCapture GetForegroundWindowCapture() {
-            return CaptureWindow(GetForegroundWindow());
+            return CaptureWindow(ResolveForegroundWindowHandle());
         }
 
         public static WindowCapture[] GetTopLevelWindows() {
@@ -2127,10 +2182,10 @@ function Invoke-ParsecWindowCycleInternal {
 
     $activationResults = New-Object System.Collections.ArrayList
     $candidateSequence = @($altTabCandidates | Where-Object {
-        $_ -is [System.Collections.IDictionary] -and
-        $_.Contains('handle') -and
-        [int64] $_.handle -ne $foregroundHandle
-    })
+            $_ -is [System.Collections.IDictionary] -and
+            $_.Contains('handle') -and
+            [int64] $_.handle -ne $foregroundHandle
+        })
     if ($candidateSequence.Count -gt $maxCycles) {
         $candidateSequence = @($candidateSequence | Select-Object -First $maxCycles)
     }

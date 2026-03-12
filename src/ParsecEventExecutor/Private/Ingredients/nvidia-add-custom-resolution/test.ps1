@@ -41,4 +41,35 @@ Context 'nvidia.add-custom-resolution' {
         $apply.Status | Should -Be 'Failed'
         $apply.Errors | Should -Contain 'OrientationMismatch'
     }
+
+    It 'accepts flipped monitor orientations when the orientation class matches' {
+        $script:IngredientObservedState.monitors[0].orientation = 'LandscapeFlipped'
+
+        $apply = Invoke-ParsecIngredientOperation -Name 'nvidia.add-custom-resolution' -Operation 'apply' -Arguments @{
+            width = 2000
+            height = 1125
+        } -RunState @{}
+
+        $apply.Status | Should -Be 'Succeeded'
+        $apply.Errors | Should -BeNullOrEmpty
+    }
+
+    It 'fails wait and verify with capability unavailable when NVIDIA support is absent' {
+        $script:IngredientNvidiaAvailable = $false
+
+        $wait = Invoke-ParsecIngredientOperation -Name 'nvidia.add-custom-resolution' -Operation 'wait' -Arguments @{
+            width = 2000
+            height = 1125
+        } -RunState @{}
+
+        $verify = Invoke-ParsecIngredientOperation -Name 'nvidia.add-custom-resolution' -Operation 'verify' -Arguments @{
+            width = 2000
+            height = 1125
+        } -RunState @{}
+
+        $wait.Status | Should -Be 'Failed'
+        $wait.Errors | Should -Contain 'CapabilityUnavailable'
+        $verify.Status | Should -Be 'Failed'
+        $verify.Errors | Should -Contain 'CapabilityUnavailable'
+    }
 }

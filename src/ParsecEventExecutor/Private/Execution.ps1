@@ -453,6 +453,7 @@ function Invoke-ParsecRecipeSequenceStep {
     }
 
     if ($Step.operation -eq 'apply') {
+        $definition = Get-ParsecIngredientDefinition -Name $Step.ingredient
         $attempt = 0
         $invocation = $null
         do {
@@ -470,7 +471,7 @@ function Invoke-ParsecRecipeSequenceStep {
 
         $finalStatus = [string] $invocation.status
         $compensationInvocation = $null
-        if (($finalStatus -eq 'Failed' -or $finalStatus -eq 'Ambiguous') -and $Step.compensation_policy -eq 'explicit' -and -not [string]::IsNullOrWhiteSpace([string] $invocation.token_id)) {
+        if (($finalStatus -eq 'Failed' -or $finalStatus -eq 'Ambiguous') -and $Step.compensation_policy -eq 'explicit' -and -not [string]::IsNullOrWhiteSpace([string] $invocation.token_id) -and (Test-ParsecIngredientOperationSupported -Definition $definition -Operation 'reset')) {
             $compensationInvocation = Invoke-ParsecIngredientCommandInternal -Name $Step.ingredient -Operation 'reset' -TokenId $invocation.token_id -StateRoot $StateRoot
             if (Test-ParsecSuccessfulStatus -Status $compensationInvocation.status) {
                 $finalStatus = 'Compensated'
