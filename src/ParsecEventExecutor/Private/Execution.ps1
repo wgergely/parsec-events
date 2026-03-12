@@ -553,7 +553,7 @@ function Invoke-ParsecRecipeSequence {
 
     $stateRoot = Initialize-ParsecStateRoot -StateRoot $StateRoot
     $executorState = Get-ParsecExecutorStateDocument -StateRoot $stateRoot
-    $runRecord = [ordered]@{
+    $runRecord = @{
         run_id = New-ParsecRunIdentifier
         recipe_name = $Recipe.name
         recipe_file = $Recipe.path

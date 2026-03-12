@@ -61,5 +61,33 @@ Describe 'Invoke-ParsecRecipe' {
             $result.step_results[0].readiness_result.Errors | Should -Contain 'ReadinessTimeout'
             $result.step_results[1].status | Should -Be 'Blocked'
         }
+
+        It 'skips steps whose mode condition evaluates to false' {
+            $stateRoot = Join-Path $TestDrive 'condition-skips'
+            $recipePath = Join-Path $PSScriptRoot 'fixtures\recipes\condition-skips.toml'
+
+            $result = Invoke-ParsecRecipe -NameOrPath $recipePath -StateRoot $stateRoot -Confirm:$false
+
+            $result.terminal_status | Should -Be 'Succeeded'
+            $result.step_results[0].status | Should -Be 'Skipped'
+            $result.step_results[0].message | Should -Be 'Step condition evaluated to false.'
+            $script:IngredientObservedState.monitors[0].bounds.width | Should -Be 1920
+            $script:IngredientObservedState.monitors[0].bounds.height | Should -Be 1080
+        }
+
+        It 'shares active snapshot state across non-apply sequence steps' {
+            $stateRoot = Join-Path $TestDrive 'snapshot-sequence'
+            $recipePath = Join-Path $PSScriptRoot 'fixtures\recipes\snapshot-sequence.toml'
+
+            $result = Invoke-ParsecRecipe -NameOrPath $recipePath -StateRoot $stateRoot -Confirm:$false
+
+            $result.terminal_status | Should -Be 'Succeeded'
+            $result.step_results[0].status | Should -Be 'Succeeded'
+            $result.step_results[1].status | Should -Be 'Succeeded'
+            $result.step_results[2].status | Should -Be 'Succeeded'
+            $result.step_results[2].operation_result.Outputs.snapshot_name | Should -Be 'desktop-pre-parsec'
+            $script:IngredientObservedState.monitors[0].bounds.width | Should -Be 1920
+            $script:IngredientObservedState.monitors[0].bounds.height | Should -Be 1080
+        }
     }
 }

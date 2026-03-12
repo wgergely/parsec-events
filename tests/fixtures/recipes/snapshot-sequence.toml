@@ -1,0 +1,39 @@
+name = "snapshot-sequence"
+description = "Thin recipe runner fixture that shares the active snapshot between capture and reset steps."
+
+[[steps]]
+id = "capture-snapshot"
+ingredient = "display.snapshot"
+operation = "capture"
+depends_on = []
+verify = false
+compensation_policy = "none"
+retry_count = 0
+retry_delay_ms = 0
+allow_diagnostics = false
+
+[[steps]]
+id = "mutate-resolution"
+ingredient = "set-resolution"
+operation = "apply"
+depends_on = ["capture-snapshot"]
+verify = true
+compensation_policy = "explicit"
+retry_count = 0
+retry_delay_ms = 0
+allow_diagnostics = false
+
+[steps.arguments]
+width = 1280
+height = 720
+
+[[steps]]
+id = "reset-snapshot"
+ingredient = "display.snapshot"
+operation = "reset"
+depends_on = ["mutate-resolution"]
+verify = false
+compensation_policy = "none"
+retry_count = 0
+retry_delay_ms = 0
+allow_diagnostics = false
