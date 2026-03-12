@@ -3,7 +3,7 @@ Import-Module $modulePath -Force
 
 Describe 'Built-in ingredients' {
     InModuleScope ParsecEventExecutor {
-        BeforeAll {
+        BeforeEach {
             . (Join-Path $PSScriptRoot 'IngredientTestSupport.ps1')
             Initialize-ParsecIngredientTestEnvironment
         }

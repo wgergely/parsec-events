@@ -27,7 +27,7 @@ function Initialize-ParsecStateRoot {
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)
     )
 
-    foreach ($relative in @('.', 'snapshots', 'runs', 'logs', 'events')) {
+    foreach ($relative in @('.', 'snapshots', 'runs', 'logs', 'events', 'ingredient-invocations', 'ingredient-tokens')) {
         $path = if ($relative -eq '.') { $StateRoot } else { Join-Path -Path $StateRoot -ChildPath $relative }
         if (-not (Test-Path -LiteralPath $path)) {
             New-Item -ItemType Directory -Path $path -Force | Out-Null

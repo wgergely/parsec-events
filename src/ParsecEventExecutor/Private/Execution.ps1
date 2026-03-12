@@ -22,9 +22,9 @@ function ConvertTo-ParsecRecipe {
 
     return [ordered]@{
         name         = [string] $Document.name
-        description  = [string] $Document.description
-        initial_mode = [string] $Document.initial_mode
-        target_mode  = [string] $Document.target_mode
+        description  = if ($Document.Contains('description')) { [string] $Document.description } else { '' }
+        initial_mode = if ($Document.Contains('initial_mode')) { [string] $Document.initial_mode } else { $null }
+        target_mode  = if ($Document.Contains('target_mode')) { [string] $Document.target_mode } else { $null }
         path         = $Path
         ingredient_definitions = $definitions
         steps        = @($steps)
@@ -344,6 +344,197 @@ function Invoke-ParsecStep {
         message             = if ($null -ne $verificationResult -and $verificationResult.Message) { $verificationResult.Message } else { $operationResult.Message }
         requested_arguments = ConvertTo-ParsecPlainObject -InputObject $Step.arguments
     }
+}
+
+function Resolve-ParsecRecipeSequenceTerminalStatus {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [System.Collections.IDictionary] $RunRecord
+    )
+
+    $statuses = @($RunRecord.step_results | ForEach-Object { $_.status })
+    if ($statuses.Count -eq 0) {
+        return 'Failed'
+    }
+
+    if ($statuses -contains 'Ambiguous') {
+        return 'Ambiguous'
+    }
+
+    if ($statuses -contains 'Failed' -or $statuses -contains 'Blocked') {
+        if ($statuses -contains 'Succeeded' -or $statuses -contains 'Compensated') {
+            return 'PartiallyApplied'
+        }
+
+        return 'Failed'
+    }
+
+    if ($statuses -contains 'Compensated') {
+        return 'Compensated'
+    }
+
+    return 'Succeeded'
+}
+
+function Invoke-ParsecRecipeSequenceStep {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [hashtable] $Step,
+
+        [Parameter(Mandatory)]
+        [System.Collections.IDictionary] $RunRecord,
+
+        [Parameter(Mandatory)]
+        [string] $StateRoot
+    )
+
+    foreach ($dependency in @($Step.depends_on)) {
+        $dependencyResult = Get-ParsecStepResultById -RunState $RunRecord -StepId $dependency
+        if ($null -eq $dependencyResult -or -not (Test-ParsecSuccessfulStatus -Status $dependencyResult.status)) {
+            return [ordered]@{
+                step_id             = $Step.id
+                ingredient          = $Step.ingredient
+                operation           = $Step.operation
+                status              = 'Blocked'
+                invocation_id       = $null
+                token_id            = $null
+                token_path          = $null
+                capture_result      = $null
+                operation_result    = $null
+                execution_result    = $null
+                verification_result = $null
+                compensation_result = $null
+                started_at          = [DateTimeOffset]::UtcNow.ToString('o')
+                completed_at        = [DateTimeOffset]::UtcNow.ToString('o')
+                message             = "Blocked by dependency '$dependency'."
+                requested_arguments = ConvertTo-ParsecPlainObject -InputObject $Step.arguments
+            }
+        }
+    }
+
+    if ($Step.operation -eq 'apply') {
+        $attempt = 0
+        $invocation = $null
+        do {
+            $attempt++
+            $invocation = Invoke-ParsecIngredientCommandInternal -Name $Step.ingredient -Operation 'apply' -Arguments $Step.arguments -Verify $Step.verify -StateRoot $StateRoot
+            if ((Test-ParsecSuccessfulStatus -Status $invocation.status) -or $attempt -gt $Step.retry_count) {
+                break
+            }
+
+            if ($Step.retry_delay_ms -gt 0) {
+                Start-Sleep -Milliseconds $Step.retry_delay_ms
+            }
+        }
+        while ($true)
+
+        $finalStatus = [string] $invocation.status
+        $compensationInvocation = $null
+        if (($finalStatus -eq 'Failed' -or $finalStatus -eq 'Ambiguous') -and $Step.compensation_policy -eq 'explicit' -and -not [string]::IsNullOrWhiteSpace([string] $invocation.token_id)) {
+            $compensationInvocation = Invoke-ParsecIngredientCommandInternal -Name $Step.ingredient -Operation 'reset' -TokenId $invocation.token_id -StateRoot $StateRoot
+            if (Test-ParsecSuccessfulStatus -Status $compensationInvocation.status) {
+                $finalStatus = 'Compensated'
+                $RunRecord.compensation_logs += $compensationInvocation
+            }
+        }
+
+        return [ordered]@{
+            step_id             = $Step.id
+            ingredient          = $invocation.ingredient_name
+            operation           = $Step.operation
+            status              = $finalStatus
+            invocation_id       = $invocation.invocation_id
+            token_id            = $invocation.token_id
+            token_path          = $invocation.token_path
+            capture_result      = $invocation.capture_result
+            operation_result    = $invocation.operation_result
+            execution_result    = $invocation.operation_result
+            verification_result = $invocation.verify_result
+            compensation_result = if ($null -ne $compensationInvocation) { $compensationInvocation.reset_result } else { $null }
+            started_at          = $invocation.started_at
+            completed_at        = $invocation.completed_at
+            message             = if ($null -ne $compensationInvocation) { $compensationInvocation.message } else { $invocation.message }
+            requested_arguments = ConvertTo-ParsecPlainObject -InputObject $Step.arguments
+        }
+    }
+
+    $definition = Get-ParsecIngredientDefinition -Name $Step.ingredient
+    $attempt = 0
+    $operationResult = $null
+    do {
+        $attempt++
+        $operationResult = Invoke-ParsecIngredientOperation -Name $definition.Name -Operation $Step.operation -Arguments $Step.arguments -StateRoot $StateRoot -RunState @{}
+        if ((Test-ParsecSuccessfulStatus -Status $operationResult.Status) -or $attempt -gt $Step.retry_count) {
+            break
+        }
+
+        if ($Step.retry_delay_ms -gt 0) {
+            Start-Sleep -Milliseconds $Step.retry_delay_ms
+        }
+    }
+    while ($true)
+
+    $verificationResult = $null
+    $finalStatus = [string] $operationResult.Status
+    if ($Step.verify -and $Step.operation -ne 'verify' -and (Test-ParsecSuccessfulStatus -Status $operationResult.Status) -and (Test-ParsecIngredientOperationSupported -Definition $definition -Operation 'verify')) {
+        $verificationResult = Invoke-ParsecIngredientOperation -Name $definition.Name -Operation 'verify' -Arguments $Step.arguments -ExecutionResult $operationResult -StateRoot $StateRoot -RunState @{}
+        if ($null -ne $verificationResult -and -not (Test-ParsecSuccessfulStatus -Status $verificationResult.Status)) {
+            $finalStatus = if ($verificationResult.Status -eq 'Ambiguous') { 'Ambiguous' } else { 'Failed' }
+        }
+    }
+
+    return [ordered]@{
+        step_id             = $Step.id
+        ingredient          = $definition.Name
+        operation           = $Step.operation
+        status              = $finalStatus
+        invocation_id       = $null
+        token_id            = $null
+        token_path          = $null
+        capture_result      = $null
+        operation_result    = $operationResult
+        execution_result    = $operationResult
+        verification_result = $verificationResult
+        compensation_result = $null
+        started_at          = [DateTimeOffset]::UtcNow.ToString('o')
+        completed_at        = [DateTimeOffset]::UtcNow.ToString('o')
+        message             = if ($null -ne $verificationResult -and $verificationResult.Message) { $verificationResult.Message } else { $operationResult.Message }
+        requested_arguments = ConvertTo-ParsecPlainObject -InputObject $Step.arguments
+    }
+}
+
+function Invoke-ParsecRecipeSequence {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [hashtable] $Recipe,
+
+        [Parameter()]
+        [string] $StateRoot = (Get-ParsecDefaultStateRoot)
+    )
+
+    $stateRoot = Initialize-ParsecStateRoot -StateRoot $StateRoot
+    $runRecord = [ordered]@{
+        run_id            = New-ParsecRunIdentifier
+        recipe_name       = $Recipe.name
+        recipe_file       = $Recipe.path
+        terminal_status   = 'Running'
+        started_at        = [DateTimeOffset]::UtcNow.ToString('o')
+        completed_at      = $null
+        step_results      = @()
+        compensation_logs = @()
+    }
+
+    foreach ($step in @($Recipe.steps)) {
+        $stepResult = Invoke-ParsecRecipeSequenceStep -Step $step -RunRecord $runRecord -StateRoot $stateRoot
+        $runRecord.step_results += $stepResult
+    }
+
+    $runRecord.terminal_status = Resolve-ParsecRecipeSequenceTerminalStatus -RunRecord $runRecord
+    $runRecord.completed_at = [DateTimeOffset]::UtcNow.ToString('o')
+    return $runRecord
 }
 
 function Invoke-ParsecRecipeInternal {

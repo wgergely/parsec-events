@@ -1,7 +1,5 @@
 name = "command-success"
 description = "Test recipe for successful command execution."
-initial_mode = "DESKTOP"
-target_mode = "DESKTOP"
 
 [[steps]]
 id = "run-command"

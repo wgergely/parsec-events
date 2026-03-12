@@ -1,0 +1,17 @@
+name = "resolution-sequence"
+description = "Thin recipe runner fixture using the standalone resolution ingredient."
+
+[[steps]]
+id = "set-primary-resolution"
+ingredient = "set-resolution"
+operation = "apply"
+depends_on = []
+verify = true
+compensation_policy = "explicit"
+retry_count = 0
+retry_delay_ms = 0
+allow_diagnostics = false
+
+[steps.arguments]
+width = 1280
+height = 720

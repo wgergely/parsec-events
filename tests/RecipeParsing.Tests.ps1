@@ -14,6 +14,8 @@ Describe 'Get-ParsecRecipe' {
         $recipe = Get-ParsecRecipe -NameOrPath $recipePath
 
         $recipe.name | Should -Be 'command-success'
+        $recipe.initial_mode | Should -BeNullOrEmpty
+        $recipe.target_mode | Should -BeNullOrEmpty
         $recipe.steps.Count | Should -Be 1
         $recipe.steps[0].operation | Should -Be 'apply'
         $recipe.steps[0].arguments.arguments.Count | Should -Be 3
@@ -29,6 +31,18 @@ Describe 'Get-ParsecRecipe' {
         $recipe.steps[0].ingredient | Should -Be 'command.invoke'
         $recipe.steps[0].retry_count | Should -Be 2
         $recipe.steps[0].arguments.arguments[2] | Should -Be "Write-Output 'override'"
+    }
+
+    It 'parses a direct no-mode recipe that uses a flat ingredient alias' {
+        $recipePath = Join-Path $PSScriptRoot 'fixtures\recipes\resolution-sequence.toml'
+        $recipe = Get-ParsecRecipe -NameOrPath $recipePath
+
+        $recipe.initial_mode | Should -BeNullOrEmpty
+        $recipe.target_mode | Should -BeNullOrEmpty
+        $recipe.steps.Count | Should -Be 1
+        $recipe.steps[0].ingredient | Should -Be 'set-resolution'
+        $recipe.steps[0].arguments.width | Should -Be 1280
+        $recipe.steps[0].arguments.height | Should -Be 720
     }
 
     It 'parses the mission recipes as mobile preset and snapshot reset flows' {

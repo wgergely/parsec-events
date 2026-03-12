@@ -17,6 +17,9 @@ function New-ParsecIngredientDefinition {
         [string[]] $Capabilities = @(),
 
         [Parameter()]
+        [string[]] $Aliases = @(),
+
+        [Parameter()]
         [string[]] $RequiredBackends = @(),
 
         [Parameter()]
@@ -38,6 +41,7 @@ function New-ParsecIngredientDefinition {
     return [pscustomobject]@{
         PSTypeName       = 'ParsecEventExecutor.IngredientDefinition'
         Name             = $Name
+        Aliases          = @($Aliases)
         Kind             = $Kind
         Description      = $Description
         Capabilities     = @($Capabilities)
@@ -59,7 +63,33 @@ function Register-ParsecIngredient {
     )
 
     $script:ParsecIngredientRegistry[$Definition.Name] = $Definition
+    foreach ($alias in @($Definition.Aliases)) {
+        if ([string]::IsNullOrWhiteSpace([string] $alias)) {
+            continue
+        }
+
+        $script:ParsecIngredientAliasRegistry[[string] $alias] = $Definition.Name
+    }
+
     return $Definition
+}
+
+function Resolve-ParsecIngredientName {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $Name
+    )
+
+    if ($script:ParsecIngredientRegistry.ContainsKey($Name)) {
+        return $Name
+    }
+
+    if ($script:ParsecIngredientAliasRegistry.ContainsKey($Name)) {
+        return [string] $script:ParsecIngredientAliasRegistry[$Name]
+    }
+
+    throw "Ingredient '$Name' is not registered."
 }
 
 function Get-ParsecIngredientDefinition {
@@ -69,11 +99,8 @@ function Get-ParsecIngredientDefinition {
         [string] $Name
     )
 
-    if (-not $script:ParsecIngredientRegistry.ContainsKey($Name)) {
-        throw "Ingredient '$Name' is not registered."
-    }
-
-    return $script:ParsecIngredientRegistry[$Name]
+    $resolvedName = Resolve-ParsecIngredientName -Name $Name
+    return $script:ParsecIngredientRegistry[$resolvedName]
 }
 
 function Test-ParsecArgumentType {
@@ -89,7 +116,16 @@ function Test-ParsecArgumentType {
     switch ($TypeName) {
         'string' { return $Value -is [string] }
         'boolean' { return $Value -is [bool] }
-        'integer' { return $Value -is [int] }
+        'integer' {
+            return (
+                $Value -is [int16] -or
+                $Value -is [int32] -or
+                $Value -is [int64] -or
+                $Value -is [uint16] -or
+                $Value -is [uint32] -or
+                $Value -is [uint64]
+            )
+        }
         'array' { return $Value -is [System.Collections.IEnumerable] -and $Value -isnot [string] }
         'hashtable' { return $Value -is [System.Collections.IDictionary] }
         default { return $true }
@@ -1830,8 +1866,15 @@ function Resolve-ParsecDisplayTargetMonitor {
         [System.Collections.IDictionary] $ObservedState,
 
         [Parameter()]
-        [hashtable] $Arguments = @{}
+        [hashtable] $Arguments = @{},
+
+        [Parameter()]
+        [string] $StateRoot = (Get-ParsecDefaultStateRoot)
     )
+
+    if ($Arguments.ContainsKey('screen_id') -and $null -ne $Arguments.screen_id) {
+        return Resolve-ParsecDisplayMonitorByScreenId -ObservedState $ObservedState -ScreenId ([int] $Arguments.screen_id) -StateRoot $StateRoot
+    }
 
     if ($Arguments.ContainsKey('device_name') -and -not [string]::IsNullOrWhiteSpace([string] $Arguments.device_name)) {
         return Get-ParsecObservedMonitor -ObservedState $ObservedState -DeviceName ([string] $Arguments.device_name)
@@ -1848,7 +1891,10 @@ function Resolve-ParsecDisplayTargetDeviceName {
     [CmdletBinding()]
     param(
         [Parameter()]
-        [hashtable] $Arguments = @{}
+        [hashtable] $Arguments = @{},
+
+        [Parameter()]
+        [string] $StateRoot = (Get-ParsecDefaultStateRoot)
     )
 
     if ($Arguments.ContainsKey('device_name') -and -not [string]::IsNullOrWhiteSpace([string] $Arguments.device_name)) {
@@ -1856,7 +1902,7 @@ function Resolve-ParsecDisplayTargetDeviceName {
     }
 
     $observed = Get-ParsecObservedState
-    $targetMonitor = Resolve-ParsecDisplayTargetMonitor -ObservedState $observed -Arguments $Arguments
+    $targetMonitor = Resolve-ParsecDisplayTargetMonitor -ObservedState $observed -Arguments $Arguments -StateRoot $StateRoot
     if ($null -eq $targetMonitor) {
         throw 'Could not resolve a target display device.'
     }
@@ -1870,6 +1916,13 @@ function Get-ParsecSupportedDisplayModes {
         [Parameter(Mandatory)]
         [string] $DeviceName
     )
+
+    if (
+        (Get-Variable -Name ParsecDisplayAdapter -Scope Script -ErrorAction SilentlyContinue) -and
+        $script:ParsecDisplayAdapter.ContainsKey('GetSupportedModes')
+    ) {
+        return @(& $script:ParsecDisplayAdapter.GetSupportedModes @{ device_name = $DeviceName })
+    }
 
     Initialize-ParsecDisplayInterop
     $modes = @([ParsecEventExecutor.DisplayNative]::GetDisplayModes($DeviceName))
@@ -2209,6 +2262,7 @@ function New-ParsecIngredientDefinitionFromSchema {
         -Name ([string] $Schema.name) `
         -Kind ([string] $Schema.kind) `
         -Description ([string] $Schema.description) `
+        -Aliases $(if ($Schema.Contains('aliases')) { @($Schema.aliases) } else { @() }) `
         -Capabilities @($Schema.capabilities) `
         -RequiredBackends @($Schema.required_backends) `
         -OperationSchemas $operationSchemas `

@@ -3,21 +3,83 @@ function Get-ParsecIngredientOperations {
         capture = {
             param($Arguments, $ExecutionResult, $StateRoot, $RunState, $Definition)
             $observed = Get-ParsecObservedState
-            Get-ParsecDisplayCaptureResult -ObservedState $observed -DeviceName $Arguments.device_name -Domain 'display resolution'
+            $targetMonitor = Resolve-ParsecDisplayTargetMonitor -ObservedState $observed -Arguments $Arguments -StateRoot $StateRoot
+            if ($null -eq $targetMonitor) {
+                return New-ParsecResult -Status 'Failed' -Message 'Target monitor could not be resolved.' -Observed $observed -Errors @('MonitorNotFound')
+            }
+
+            Get-ParsecDisplayCaptureResult -ObservedState $observed -DeviceName ([string] $targetMonitor.device_name) -Domain 'display resolution'
         }
-        apply = {
+        apply   = {
             param($Arguments, $ExecutionResult, $StateRoot, $RunState, $Definition)
-            Invoke-ParsecDisplayAdapter -Method 'SetResolution' -Arguments $Arguments
+            $deviceName = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments -StateRoot $StateRoot
+            $supportedModes = @(Get-ParsecSupportedDisplayModes -DeviceName $deviceName)
+            $supportedModeCount = @($supportedModes).Count
+            $requestedWidth = [int] $Arguments.width
+            $requestedHeight = [int] $Arguments.height
+            $matchingMode = @(
+                $supportedModes | Where-Object {
+                    [int] $_.width -eq $requestedWidth -and
+                    [int] $_.height -eq $requestedHeight
+                } | Select-Object -First 1
+            )
+
+            if ($matchingMode.Count -eq 0) {
+                return New-ParsecResult -Status 'Failed' -Message "Resolution ${requestedWidth}x${requestedHeight} is not available on '$deviceName'." -Requested $Arguments -Outputs @{
+                    device_name            = $deviceName
+                    width                  = $requestedWidth
+                    height                 = $requestedHeight
+                    supported_mode_count   = $supportedModeCount
+                    supported_modes_sample = @($supportedModes | Select-Object -First 10)
+                } -Errors @('UnsupportedResolution')
+            }
+
+            $result = Invoke-ParsecDisplayAdapter -Method 'SetResolution' -Arguments @{
+                device_name = $deviceName
+                width       = $requestedWidth
+                height      = $requestedHeight
+            }
+            $result.Requested = [ordered]@{
+                device_name = $deviceName
+                width       = $requestedWidth
+                height      = $requestedHeight
+            }
+            $result.Outputs = [ordered]@{
+                device_name            = $deviceName
+                width                  = $requestedWidth
+                height                 = $requestedHeight
+                supported_mode_count   = $supportedModeCount
+                supported_modes_sample = @($supportedModes | Select-Object -First 10)
+            }
+            return $result
         }
-        verify = {
+        verify  = {
             param($Arguments, $ExecutionResult, $StateRoot, $RunState, $Definition)
             $observed = Get-ParsecObservedState
-            $monitor = Get-ParsecObservedMonitor -ObservedState $observed -DeviceName $Arguments.device_name
-            if ($null -eq $monitor) { return New-ParsecResult -Status 'Failed' -Message "Monitor '$($Arguments.device_name)' not found." }
-            if ($monitor.bounds.width -ne $Arguments.width -or $monitor.bounds.height -ne $Arguments.height) { return New-ParsecResult -Status 'Failed' -Message "Monitor '$($Arguments.device_name)' resolution mismatch." -Observed $monitor }
-            New-ParsecResult -Status 'Succeeded' -Message 'Monitor resolution matches.' -Observed $monitor
+            $deviceName = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments -StateRoot $StateRoot
+            $monitor = Get-ParsecObservedMonitor -ObservedState $observed -DeviceName $deviceName
+            if ($null -eq $monitor) {
+                return New-ParsecResult -Status 'Failed' -Message "Monitor '$deviceName' not found." -Observed $observed -Errors @('MonitorNotFound')
+            }
+
+            if ($monitor.bounds.width -ne [int] $Arguments.width -or $monitor.bounds.height -ne [int] $Arguments.height) {
+                $supportedModes = @(Get-ParsecSupportedDisplayModes -DeviceName $deviceName)
+                return New-ParsecResult -Status 'Failed' -Message "Monitor '$deviceName' resolution mismatch." -Observed $monitor -Outputs @{
+                    device_name            = $deviceName
+                    width                  = [int] $Arguments.width
+                    height                 = [int] $Arguments.height
+                    supported_mode_count   = @($supportedModes).Count
+                    supported_modes_sample = @($supportedModes | Select-Object -First 10)
+                } -Errors @('ResolutionDrift')
+            }
+
+            New-ParsecResult -Status 'Succeeded' -Message 'Monitor resolution matches.' -Observed $monitor -Outputs @{
+                device_name = $deviceName
+                width       = [int] $Arguments.width
+                height      = [int] $Arguments.height
+            }
         }
-        reset = {
+        reset   = {
             param($Arguments, $ExecutionResult, $StateRoot, $RunState, $Definition)
             $capturedMonitor = Get-ParsecDisplayResetMonitorState -Arguments $Arguments -ExecutionResult $ExecutionResult
             if ($null -eq $capturedMonitor -or -not $capturedMonitor.Contains('bounds')) {

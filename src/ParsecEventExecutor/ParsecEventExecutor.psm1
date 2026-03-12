@@ -8,6 +8,7 @@ $privateLoadOrder = @(
     'Toml.ps1',
     'State.ps1',
     'IngredientRuntime.ps1',
+    'IngredientInvocation.ps1',
     'Execution.ps1'
 )
 
@@ -21,6 +22,10 @@ Get-ChildItem -Path $publicRoot -Filter '*.ps1' -File | Sort-Object Name | ForEa
 
 if (-not (Get-Variable -Name ParsecIngredientRegistry -Scope Script -ErrorAction SilentlyContinue)) {
     $script:ParsecIngredientRegistry = @{}
+}
+
+if (-not (Get-Variable -Name ParsecIngredientAliasRegistry -Scope Script -ErrorAction SilentlyContinue)) {
+    $script:ParsecIngredientAliasRegistry = @{}
 }
 
 if (-not (Get-Variable -Name ParsecStatusSuccessSet -Scope Script -ErrorAction SilentlyContinue)) {

@@ -1,7 +1,5 @@
 name = "failure-blocks"
 description = "Test recipe showing dependency-gated failure."
-initial_mode = "DESKTOP"
-target_mode = "MOBILE"
 
 [[steps]]
 id = "failing-command"

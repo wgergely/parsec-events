@@ -2,7 +2,7 @@ $modulePath = Join-Path $PSScriptRoot '..\src\ParsecEventExecutor\ParsecEventExe
 Import-Module $modulePath -Force
 
 Describe 'Invoke-ParsecRecipe' {
-    It 'executes a successful command recipe and writes runtime state' {
+    It 'executes a successful command recipe through the thin sequencer' {
         $stateRoot = Join-Path $TestDrive 'state-success'
         $recipePath = Join-Path $PSScriptRoot 'fixtures\recipes\command-success.toml'
 
@@ -10,15 +10,9 @@ Describe 'Invoke-ParsecRecipe' {
 
         $result.terminal_status | Should -Be 'Succeeded'
         $result.step_results[0].status | Should -Be 'Succeeded'
-        (Test-Path (Join-Path $stateRoot 'executor-state.json')) | Should -BeTrue
-
-        $executorStateDocument = Get-Content -LiteralPath (Join-Path $stateRoot 'executor-state.json') -Raw | ConvertFrom-Json -Depth 100
-        $runStateDocument = Get-Content -LiteralPath (Join-Path $stateRoot ('runs/{0}.json' -f $result.run_id)) -Raw | ConvertFrom-Json -Depth 100
-        $eventFiles = Get-ChildItem -Path (Join-Path $stateRoot 'events') -File
-
-        $executorStateDocument.document_type | Should -Be 'executor-state'
-        $runStateDocument.document_type | Should -Be 'run-state'
-        $eventFiles.Count | Should -BeGreaterThan 0
+        $result.step_results[0].invocation_id | Should -Not -BeNullOrEmpty
+        (Test-Path (Join-Path $stateRoot 'executor-state.json')) | Should -BeFalse
+        (Get-ChildItem -Path (Join-Path $stateRoot 'ingredient-invocations') -File).Count | Should -Be 1
     }
 
     It 'blocks dependent steps after a failure' {
@@ -30,5 +24,25 @@ Describe 'Invoke-ParsecRecipe' {
         $result.terminal_status | Should -Be 'Failed'
         $result.step_results[0].status | Should -Be 'Failed'
         $result.step_results[1].status | Should -Be 'Blocked'
+    }
+
+    InModuleScope ParsecEventExecutor {
+        BeforeEach {
+            . (Join-Path $PSScriptRoot 'IngredientTestSupport.ps1')
+            Initialize-ParsecIngredientTestEnvironment
+        }
+
+        It 'executes a no-mode resolution recipe through the standalone ingredient pipeline' {
+            $stateRoot = Join-Path $TestDrive 'resolution-sequence'
+            $recipePath = Join-Path $PSScriptRoot 'fixtures\recipes\resolution-sequence.toml'
+
+            $result = Invoke-ParsecRecipe -NameOrPath $recipePath -StateRoot $stateRoot -Confirm:$false
+
+            $result.recipe_name | Should -Be 'resolution-sequence'
+            $result.terminal_status | Should -Be 'Succeeded'
+            $result.step_results[0].ingredient | Should -Be 'display.set-resolution'
+            $result.step_results[0].token_id | Should -Not -BeNullOrEmpty
+            $script:IngredientObservedState.monitors[0].bounds.width | Should -Be 1280
+        }
     }
 }
