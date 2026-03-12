@@ -19,6 +19,23 @@ function Set-ParsecIngredientObservedResolution {
     $script:IngredientObservedState.monitors[0].topology.target_mode.height = $Height
 }
 
+function Set-ParsecIngredientObservedPosition {
+    param(
+        [Parameter(Mandatory)]
+        [int] $X,
+
+        [Parameter(Mandatory)]
+        [int] $Y
+    )
+
+    $script:IngredientObservedState.monitors[0].bounds.x = $X
+    $script:IngredientObservedState.monitors[0].bounds.y = $Y
+    $script:IngredientObservedState.monitors[0].working_area.x = $X
+    $script:IngredientObservedState.monitors[0].working_area.y = $Y
+    $script:IngredientObservedState.monitors[0].topology.source_mode.position_x = $X
+    $script:IngredientObservedState.monitors[0].topology.source_mode.position_y = $Y
+}
+
 function Add-ParsecIngredientSupportedMode {
     param(
         [Parameter(Mandatory)]
@@ -249,6 +266,16 @@ function Initialize-ParsecIngredientTestEnvironment {
         SetEnabled = {
             param($Arguments)
             $script:IngredientObservedState.monitors[0].enabled = [bool] $Arguments.enabled
+            if ($Arguments.ContainsKey('bounds') -and $Arguments.bounds -is [System.Collections.IDictionary]) {
+                if ($Arguments.bounds.Contains('x')) {
+                    Set-ParsecIngredientObservedPosition -X ([int] $Arguments.bounds.x) -Y ([int] $Arguments.bounds.y)
+                }
+
+                if ($Arguments.bounds.Contains('width') -and $Arguments.bounds.Contains('height') -and $Arguments.enabled) {
+                    Set-ParsecIngredientObservedResolution -Width ([int] $Arguments.bounds.width) -Height ([int] $Arguments.bounds.height)
+                }
+            }
+
             New-ParsecResult -Status 'Succeeded' -Message 'enabled' -Requested $Arguments
         }
         SetPrimary = {
@@ -370,6 +397,10 @@ function Initialize-ParsecIngredientTestEnvironment {
             if ($existing.Count -eq 0) {
                 $script:IngredientNvidiaCustomResolutions[$displayIdKey] += $customResolution
             }
+
+            Set-ParsecIngredientObservedPosition -X 640 -Y 360
+            Set-ParsecIngredientObservedResolution -Width ([int] $customResolution.width) -Height ([int] $customResolution.height)
+            $script:IngredientObservedState.monitors[0].display.refresh_rate_hz = [int] [Math]::Round([double] $customResolution.refresh_rate_hz)
 
             $script:IngredientNvidiaPendingSupportedMode = [ordered]@{
                 width = [int] $customResolution.width

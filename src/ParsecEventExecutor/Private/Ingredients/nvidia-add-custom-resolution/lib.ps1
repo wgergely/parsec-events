@@ -30,9 +30,6 @@ function script:Resolve-ParsecNvidiaCustomResolutionContext {
     $refreshRateHz = if ($Arguments.ContainsKey('refresh_rate_hz') -and $null -ne $Arguments.refresh_rate_hz) {
         [int] $Arguments.refresh_rate_hz
     }
-    elseif ($targetMonitor.Contains('display') -and $targetMonitor.display.Contains('refresh_rate_hz')) {
-        [int] $targetMonitor.display.refresh_rate_hz
-    }
     else {
         60
     }
@@ -83,6 +80,63 @@ function script:Resolve-ParsecNvidiaCustomResolutionContext {
         errors = @()
         message = $null
     }
+}
+
+function script:Get-ParsecResolutionOrientationClass {
+    param(
+        [Parameter(Mandatory)]
+        [int] $Width,
+
+        [Parameter(Mandatory)]
+        [int] $Height
+    )
+
+    if ($Width -gt $Height) {
+        return 'Landscape'
+    }
+
+    if ($Height -gt $Width) {
+        return 'Portrait'
+    }
+
+    return 'Neutral'
+}
+
+function script:Test-ParsecNvidiaResolutionOrientationCompatibility {
+    param(
+        [Parameter(Mandatory)]
+        [System.Collections.IDictionary] $Context
+    )
+
+    $requestedOrientation = Get-ParsecResolutionOrientationClass -Width ([int] $Context.width) -Height ([int] $Context.height)
+    $observedOrientation = if ($Context.target_monitor.Contains('orientation') -and -not [string]::IsNullOrWhiteSpace([string] $Context.target_monitor.orientation)) {
+        [string] $Context.target_monitor.orientation
+    }
+    else {
+        Get-ParsecResolutionOrientationClass -Width ([int] $Context.target_monitor.bounds.width) -Height ([int] $Context.target_monitor.bounds.height)
+    }
+
+    if ($requestedOrientation -eq 'Neutral' -or [string]::IsNullOrWhiteSpace($observedOrientation)) {
+        return $null
+    }
+
+    if ($requestedOrientation -ne $observedOrientation) {
+        return New-ParsecResult -Status 'Failed' -Message ("Requested custom resolution {0}x{1} is '{2}', but monitor '{3}' is currently '{4}'." -f $Context.width, $Context.height, $requestedOrientation, $Context.device_name, $observedOrientation) -Requested @{
+            device_name = $Context.device_name
+            width = $Context.width
+            height = $Context.height
+            refresh_rate_hz = $Context.refresh_rate_hz
+            bits_per_pel = $Context.bits_per_pel
+        } -Observed $Context.target_monitor -Outputs @{
+            device_name = $Context.device_name
+            requested_orientation = $requestedOrientation
+            observed_orientation = $observedOrientation
+            current_width = $Context.target_monitor.bounds.width
+            current_height = $Context.target_monitor.bounds.height
+        } -Errors @('OrientationMismatch')
+    }
+
+    return $null
 }
 
 function script:Get-ParsecNvidiaCustomResolutionMatches {
@@ -165,6 +219,11 @@ function Get-ParsecIngredientOperations {
                 } -Errors @($context.errors)
             }
 
+            $orientationCompatibility = Test-ParsecNvidiaResolutionOrientationCompatibility -Context $context
+            if ($null -ne $orientationCompatibility) {
+                return $orientationCompatibility
+            }
+
             $existingCustomModes = @(
                 Invoke-ParsecNvidiaAdapter -Method 'GetCustomResolutions' -Arguments @{
                     display_id = [uint32] $context.display_target.display_id
@@ -188,6 +247,7 @@ function Get-ParsecIngredientOperations {
                 }
             }
 
+            $topologyState = Get-ParsecDisplayTopologyCaptureState -ObservedState $context.observed
             $result = Invoke-ParsecNvidiaAdapter -Method 'AddCustomResolution' -Arguments @{
                 device_name = $context.device_name
                 normalized_display_name = $context.display_target.normalized_display_name
@@ -198,6 +258,7 @@ function Get-ParsecIngredientOperations {
                 bits_per_pel = $context.bits_per_pel
                 library_path = $context.display_target.library_path
             }
+            $topologyRestore = Invoke-ParsecDisplayTopologyReset -TopologyState $topologyState -SnapshotName 'nvidia-custom-resolution-restore'
             $result.Requested = [ordered]@{
                 device_name = $context.device_name
                 normalized_display_name = $context.display_target.normalized_display_name
@@ -218,12 +279,18 @@ function Get-ParsecIngredientOperations {
                 bits_per_pel = $context.bits_per_pel
                 already_present = $false
                 library_path = $context.display_target.library_path
+                topology_restore = ConvertTo-ParsecPlainObject -InputObject $topologyRestore
             }
             foreach ($key in @($result.Outputs.Keys)) {
                 $outputs[$key] = $result.Outputs[$key]
             }
 
             $result.Outputs = $outputs
+            if (-not (Test-ParsecSuccessfulStatus -Status $topologyRestore.Status)) {
+                $result.Status = 'Failed'
+                $result.Message = "Custom resolution attempt completed but topology restore failed: $($topologyRestore.Message)"
+                $result.Errors = @($result.Errors + 'TopologyRestoreFailed')
+            }
             return $result
         }
         wait = {

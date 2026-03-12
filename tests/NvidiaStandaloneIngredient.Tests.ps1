@@ -13,7 +13,7 @@ Describe 'NVIDIA standalone ingredient surface' {
 
             $result = Invoke-ParsecIngredient -Name 'nvidia.add-custom-resolution' -Arguments @{
                 width = 2000
-                height = 3000
+                height = 1125
             } -StateRoot $stateRoot -Confirm:$false
 
             $result.ingredient_name | Should -Be 'nvidia.add-custom-resolution'
@@ -21,6 +21,9 @@ Describe 'NVIDIA standalone ingredient surface' {
             $result.token_id | Should -BeNullOrEmpty
             $result.readiness_result.Status | Should -Be 'Succeeded'
             $result.verify_result.Status | Should -Be 'Succeeded'
+            $result.operation_result.Outputs.topology_restore.Status | Should -Be 'Succeeded'
+            $script:IngredientObservedState.monitors[0].bounds.width | Should -Be 1920
+            $script:IngredientObservedState.monitors[0].bounds.x | Should -Be 0
         }
 
         It 'waits until the new custom resolution appears in supported display modes' {
@@ -33,7 +36,7 @@ Describe 'NVIDIA standalone ingredient surface' {
 
             $result = Invoke-ParsecIngredient -Name 'nvidia.add-custom-resolution' -Arguments @{
                 width = 2000
-                height = 3000
+                height = 1125
             } -StateRoot $stateRoot -Confirm:$false
 
             $result.status | Should -Be 'Succeeded'
@@ -52,12 +55,24 @@ Describe 'NVIDIA standalone ingredient surface' {
 
             $result = Invoke-ParsecIngredient -Name 'nvidia.add-custom-resolution' -Arguments @{
                 width = 2000
-                height = 3000
+                height = 1125
             } -StateRoot $stateRoot -Confirm:$false
 
             $result.status | Should -Be 'Failed'
             $result.readiness_result.Errors | Should -Contain 'ReadinessTimeout'
             $result.verify_result | Should -BeNullOrEmpty
+        }
+
+        It 'fails before NVAPI when the requested orientation does not match the active monitor orientation' {
+            $stateRoot = Join-Path $TestDrive 'nvidia-orientation-mismatch'
+
+            $result = Invoke-ParsecIngredient -Name 'nvidia.add-custom-resolution' -Arguments @{
+                width = 1125
+                height = 2000
+            } -StateRoot $stateRoot -Confirm:$false
+
+            $result.status | Should -Be 'Failed'
+            $result.operation_result.Errors | Should -Contain 'OrientationMismatch'
         }
     }
 }

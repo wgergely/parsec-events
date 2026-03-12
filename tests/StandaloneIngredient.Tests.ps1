@@ -218,6 +218,37 @@ Describe 'Standalone ingredient surface' {
             $result.verify_result | Should -BeNullOrEmpty
         }
 
+        It 'captures and restores persisted topology snapshots explicitly' {
+            $stateRoot = Join-Path $TestDrive 'persist-topology'
+
+            $capture = Invoke-ParsecIngredient -Name 'persist-topology' -Operation 'capture' -Arguments @{
+                snapshot_name = 'topology-standalone'
+            } -StateRoot $stateRoot -Confirm:$false
+
+            $script:IngredientObservedState.monitors[0].bounds.x = 480
+            $script:IngredientObservedState.monitors[0].bounds.y = 220
+            $script:IngredientObservedState.monitors[0].bounds.width = 1280
+            $script:IngredientObservedState.monitors[0].bounds.height = 720
+            $script:IngredientObservedState.monitors[0].display.width = 1280
+            $script:IngredientObservedState.monitors[0].display.height = 720
+            $script:IngredientObservedState.monitors[0].orientation = 'Portrait'
+
+            $reset = Invoke-ParsecIngredientOperation -Name 'display.persist-topology' -Operation 'reset' -Arguments @{
+                snapshot_name = 'topology-standalone'
+            } -StateRoot $stateRoot
+
+            $verify = Invoke-ParsecIngredientOperation -Name 'display.persist-topology' -Operation 'verify' -Arguments @{
+                snapshot_name = 'topology-standalone'
+            } -StateRoot $stateRoot
+
+            $capture.status | Should -Be 'Succeeded'
+            $reset.status | Should -Be 'Succeeded'
+            $verify.status | Should -Be 'Succeeded'
+            $script:IngredientObservedState.monitors[0].bounds.x | Should -Be 0
+            $script:IngredientObservedState.monitors[0].bounds.width | Should -Be 1920
+            $script:IngredientObservedState.monitors[0].orientation | Should -Be 'Landscape'
+        }
+
         It 'ignores a caller supplied token id for apply when the ingredient does not capture state' {
             $stateRoot = Join-Path $TestDrive 'apply-ignores-token'
 

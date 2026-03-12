@@ -51,9 +51,10 @@ function Get-TargetFiles {
         [string[]]$CandidatePath
     )
 
-    if ($CandidatePath.Count -gt 0) {
+    if (@($CandidatePath).Count -gt 0) {
         return @(
             $CandidatePath |
+                Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
                 ForEach-Object {
                     Resolve-PowerShellFile -Candidate $_ -RepositoryRoot $repoRoot -AllowedExtension $extensions
                 } |

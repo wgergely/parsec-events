@@ -975,18 +975,18 @@ function Invoke-ParsecApplyDisplayMode {
 
     $testResult = [ParsecEventExecutor.DisplayNative]::ApplyDeviceMode($DeviceName, $Mode, [uint32] ([ParsecEventExecutor.DisplayNative]::CDS_TEST -bor $Flags))
     if ($testResult -ne [ParsecEventExecutor.DisplayNative]::DISP_CHANGE_SUCCESSFUL) {
-        return New-ParsecDisplayChangeFailureResult -Action "$Action:test" -Code $testResult -Requested $Requested
+        return New-ParsecDisplayChangeFailureResult -Action "${Action}:test" -Code $testResult -Requested $Requested
     }
 
     $stageFlags = [ParsecEventExecutor.DisplayNative]::CDS_UPDATEREGISTRY -bor [ParsecEventExecutor.DisplayNative]::CDS_NORESET -bor $Flags
     $stageResult = [ParsecEventExecutor.DisplayNative]::ApplyDeviceMode($DeviceName, $Mode, [uint32] $stageFlags)
     if ($stageResult -ne [ParsecEventExecutor.DisplayNative]::DISP_CHANGE_SUCCESSFUL) {
-        return New-ParsecDisplayChangeFailureResult -Action "$Action:stage" -Code $stageResult -Requested $Requested
+        return New-ParsecDisplayChangeFailureResult -Action "${Action}:stage" -Code $stageResult -Requested $Requested
     }
 
     $commitResult = [ParsecEventExecutor.DisplayNative]::ApplyPendingDisplayChanges()
     if ($commitResult -ne [ParsecEventExecutor.DisplayNative]::DISP_CHANGE_SUCCESSFUL) {
-        return New-ParsecDisplayChangeFailureResult -Action "$Action:commit" -Code $commitResult -Requested $Requested
+        return New-ParsecDisplayChangeFailureResult -Action "${Action}:commit" -Code $commitResult -Requested $Requested
     }
 
     return New-ParsecResult -Status 'Succeeded' -Message "Display change '$Action' applied." -Requested $Requested -Outputs @{
@@ -1111,7 +1111,7 @@ function Set-ParsecDisplayPrimaryInternal {
     $mode.dmPositionY = 0
     $mode.dmFields = $mode.dmFields -bor [ParsecEventExecutor.DisplayNative]::DM_POSITION
 
-    $result = Invoke-ParsecApplyDisplayMode -DeviceName $deviceName -Mode $mode -Flags [ParsecEventExecutor.DisplayNative]::CDS_SET_PRIMARY -Action 'SetPrimary' -Requested $Arguments
+    $result = Invoke-ParsecApplyDisplayMode -DeviceName $deviceName -Mode $mode -Flags ([int] [ParsecEventExecutor.DisplayNative]::CDS_SET_PRIMARY) -Action 'SetPrimary' -Requested $Arguments
     if ($result.Status -eq 'Succeeded') {
         $result.Message = "Monitor '$deviceName' set as primary."
     }
@@ -1665,6 +1665,226 @@ function Get-ParsecDisplayCaptureResult {
     }
 }
 
+function Get-ParsecDisplayTopologyCaptureState {
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        [System.Collections.IDictionary] $ObservedState = $(Get-ParsecObservedState)
+    )
+
+    $monitors = foreach ($monitor in @($ObservedState.monitors)) {
+        [ordered]@{
+            device_name = [string] $monitor.device_name
+            source_name = if ($monitor.Contains('source_name')) { [string] $monitor.source_name } else { $null }
+            friendly_name = if ($monitor.Contains('friendly_name')) { [string] $monitor.friendly_name } else { $null }
+            monitor_device_path = if ($monitor.Contains('monitor_device_path')) { [string] $monitor.monitor_device_path } else { $null }
+            adapter_device_path = if ($monitor.Contains('adapter_device_path')) { [string] $monitor.adapter_device_path } else { $null }
+            adapter_id = if ($monitor.Contains('adapter_id')) { [string] $monitor.adapter_id } else { $null }
+            source_id = if ($monitor.Contains('source_id')) { [int] $monitor.source_id } else { $null }
+            target_id = if ($monitor.Contains('target_id')) { [int] $monitor.target_id } else { $null }
+            is_primary = [bool] $monitor.is_primary
+            enabled = [bool] $monitor.enabled
+            target_available = if ($monitor.Contains('target_available')) { [bool] $monitor.target_available } else { $null }
+            bounds = if ($monitor.Contains('bounds')) {
+                [ordered]@{
+                    x = $monitor.bounds.x
+                    y = $monitor.bounds.y
+                    width = $monitor.bounds.width
+                    height = $monitor.bounds.height
+                }
+            }
+            else {
+                $null
+            }
+            orientation = if ($monitor.Contains('orientation')) { [string] $monitor.orientation } else { $null }
+            identity = if ($monitor.Contains('identity')) {
+                ConvertTo-ParsecPlainObject -InputObject $monitor.identity
+            }
+            else {
+                $null
+            }
+            topology = if ($monitor.Contains('topology')) {
+                ConvertTo-ParsecPlainObject -InputObject $monitor.topology
+            }
+            else {
+                $null
+            }
+            display = if ($monitor.Contains('display')) {
+                [ordered]@{
+                    width = $monitor.display.width
+                    height = $monitor.display.height
+                    bits_per_pel = $monitor.display.bits_per_pel
+                    refresh_rate_hz = $monitor.display.refresh_rate_hz
+                }
+            }
+            else {
+                $null
+            }
+        }
+    }
+
+    return [ordered]@{
+        captured_at = if ($ObservedState.Contains('captured_at')) { [string] $ObservedState.captured_at } else { [DateTimeOffset]::UtcNow.ToString('o') }
+        computer_name = if ($ObservedState.Contains('computer_name')) { [string] $ObservedState.computer_name } else { $env:COMPUTERNAME }
+        display_backend = if ($ObservedState.Contains('display_backend')) { [string] $ObservedState.display_backend } else { $null }
+        monitor_identity = if ($ObservedState.Contains('monitor_identity')) { [string] $ObservedState.monitor_identity } else { $null }
+        monitors = @($monitors)
+        topology = if ($ObservedState.Contains('topology')) {
+            ConvertTo-ParsecPlainObject -InputObject $ObservedState.topology
+        }
+        else {
+            [ordered]@{
+                query_mode = 'Unknown'
+                path_count = 0
+                paths = @()
+            }
+        }
+    }
+}
+
+function Invoke-ParsecDisplayTopologyReset {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [System.Collections.IDictionary] $TopologyState,
+
+        [Parameter()]
+        [string] $SnapshotName = ''
+    )
+
+    $actions = New-Object System.Collections.Generic.List[object]
+    foreach ($monitor in @($TopologyState.monitors)) {
+        $isEnabled = [bool] $monitor.enabled
+        $targetAvailable = if ($monitor.Contains('target_available') -and $null -ne $monitor.target_available) {
+            [bool] $monitor.target_available
+        }
+        else {
+            $true
+        }
+
+        if (-not $isEnabled -and -not $targetAvailable) {
+            continue
+        }
+
+        $enableArguments = @{
+            device_name = [string] $monitor.device_name
+            enabled = $isEnabled
+        }
+        if ($monitor.Contains('bounds') -and $monitor.bounds -is [System.Collections.IDictionary]) {
+            $enableArguments.bounds = ConvertTo-ParsecPlainObject -InputObject $monitor.bounds
+        }
+
+        $actions.Add((Invoke-ParsecDisplayAdapter -Method 'SetEnabled' -Arguments $enableArguments))
+    }
+
+    foreach ($monitor in @($TopologyState.monitors)) {
+        $isEnabled = [bool] $monitor.enabled
+        $targetAvailable = if ($monitor.Contains('target_available') -and $null -ne $monitor.target_available) {
+            [bool] $monitor.target_available
+        }
+        else {
+            $true
+        }
+
+        if ($isEnabled -and $targetAvailable -and $monitor.Contains('orientation') -and -not [string]::IsNullOrWhiteSpace([string] $monitor.orientation) -and $monitor.orientation -ne 'Unknown') {
+            $actions.Add((Invoke-ParsecDisplayAdapter -Method 'SetOrientation' -Arguments @{
+                        device_name = [string] $monitor.device_name
+                        orientation = [string] $monitor.orientation
+                    }))
+        }
+    }
+
+    foreach ($monitor in @($TopologyState.monitors)) {
+        $isEnabled = [bool] $monitor.enabled
+        $targetAvailable = if ($monitor.Contains('target_available') -and $null -ne $monitor.target_available) {
+            [bool] $monitor.target_available
+        }
+        else {
+            $true
+        }
+
+        if ($isEnabled -and $targetAvailable -and $monitor.Contains('is_primary') -and [bool] $monitor.is_primary) {
+            $actions.Add((Invoke-ParsecDisplayAdapter -Method 'SetPrimary' -Arguments @{
+                        device_name = [string] $monitor.device_name
+                    }))
+        }
+    }
+
+    $actionResults = @($actions | Where-Object { $null -ne $_ } | ForEach-Object { $_ })
+    if ($actionResults.Count -ne $actions.Count) {
+        return New-ParsecResult -Status 'Failed' -Message 'Display topology restore produced an incomplete action result set.' -Outputs @{
+            snapshot_name = $SnapshotName
+            actions = $actionResults
+        } -Errors @('ResetFailed')
+    }
+
+    $failures = @($actionResults | Where-Object { -not (Test-ParsecSuccessfulStatus -Status $_.Status) })
+    if ($failures.Count -gt 0) {
+        return New-ParsecResult -Status 'Failed' -Message $failures[0].Message -Outputs @{
+            snapshot_name = $SnapshotName
+            actions = $actionResults
+        } -Errors @('ResetFailed')
+    }
+
+    return New-ParsecResult -Status 'Succeeded' -Message 'Display topology restored.' -Outputs @{
+        snapshot_name = $SnapshotName
+        actions = $actionResults
+    }
+}
+
+function Compare-ParsecDisplayTopologyState {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [hashtable] $TargetState,
+
+        [Parameter(Mandatory)]
+        [hashtable] $ObservedState
+    )
+
+    $mismatches = New-Object System.Collections.Generic.List[string]
+    foreach ($targetMonitor in @($TargetState.monitors)) {
+        $observedMonitor = Get-ParsecObservedMonitor -ObservedState $ObservedState -DeviceName ([string] $targetMonitor.device_name)
+        if ($null -eq $observedMonitor) {
+            $mismatches.Add("Monitor '$($targetMonitor.device_name)' not found.")
+            continue
+        }
+
+        if ([bool] $targetMonitor.enabled -ne [bool] $observedMonitor.enabled) {
+            $mismatches.Add("Monitor '$($targetMonitor.device_name)' enabled state mismatch.")
+        }
+
+        if ([bool] $targetMonitor.is_primary -ne [bool] $observedMonitor.is_primary) {
+            $mismatches.Add("Monitor '$($targetMonitor.device_name)' primary state mismatch.")
+        }
+
+        if ($targetMonitor.Contains('bounds') -and $targetMonitor.bounds -is [System.Collections.IDictionary]) {
+            if ($targetMonitor.bounds.x -ne $observedMonitor.bounds.x -or $targetMonitor.bounds.y -ne $observedMonitor.bounds.y) {
+                $mismatches.Add("Monitor '$($targetMonitor.device_name)' position mismatch.")
+            }
+
+            if ($targetMonitor.bounds.width -ne $observedMonitor.bounds.width -or $targetMonitor.bounds.height -ne $observedMonitor.bounds.height) {
+                $mismatches.Add("Monitor '$($targetMonitor.device_name)' resolution mismatch.")
+            }
+        }
+
+        if ($targetMonitor.Contains('orientation') -and -not [string]::IsNullOrWhiteSpace([string] $targetMonitor.orientation) -and $targetMonitor.orientation -ne 'Unknown' -and $targetMonitor.orientation -ne $observedMonitor.orientation) {
+            $mismatches.Add("Monitor '$($targetMonitor.device_name)' orientation mismatch.")
+        }
+    }
+
+    if ($mismatches.Count -gt 0) {
+        return New-ParsecResult -Status 'Failed' -Message ($mismatches -join ' ') -Observed $ObservedState -Outputs @{
+            mismatches = @($mismatches)
+            target_state = $TargetState
+        }
+    }
+
+    return New-ParsecResult -Status 'Succeeded' -Message 'Observed display topology matches the target topology.' -Observed $ObservedState -Outputs @{
+        target_state = $TargetState
+    }
+}
+
 function Get-ParsecCapturedStateFromResult {
     [CmdletBinding()]
     param(
@@ -2123,29 +2343,10 @@ function Invoke-ParsecSnapshotReset {
         [System.Collections.IDictionary] $SnapshotDocument
     )
 
+    $topologyResult = Invoke-ParsecDisplayTopologyReset -TopologyState (Get-ParsecDisplayTopologyCaptureState -ObservedState $SnapshotDocument.display) -SnapshotName ([string] $SnapshotDocument.name)
     $actions = New-Object System.Collections.Generic.List[object]
-    foreach ($monitor in @($SnapshotDocument.display.monitors)) {
-        if ($monitor.Contains('enabled')) {
-            $actions.Add((Invoke-ParsecDisplayAdapter -Method 'SetEnabled' -Arguments @{ device_name = $monitor.device_name; enabled = [bool] $monitor.enabled }))
-        }
-    }
-
-    foreach ($monitor in @($SnapshotDocument.display.monitors)) {
-        if ($monitor.Contains('bounds')) {
-            $actions.Add((Invoke-ParsecDisplayAdapter -Method 'SetResolution' -Arguments @{ device_name = $monitor.device_name; width = [int] $monitor.bounds.width; height = [int] $monitor.bounds.height }))
-        }
-    }
-
-    foreach ($monitor in @($SnapshotDocument.display.monitors)) {
-        if ($monitor.Contains('orientation') -and $monitor.orientation -ne 'Unknown') {
-            $actions.Add((Invoke-ParsecDisplayAdapter -Method 'SetOrientation' -Arguments @{ device_name = $monitor.device_name; orientation = $monitor.orientation }))
-        }
-    }
-
-    foreach ($monitor in @($SnapshotDocument.display.monitors)) {
-        if ($monitor.Contains('is_primary') -and [bool] $monitor.is_primary) {
-            $actions.Add((Invoke-ParsecDisplayAdapter -Method 'SetPrimary' -Arguments @{ device_name = $monitor.device_name }))
-        }
+    foreach ($actionResult in @($topologyResult.Outputs.actions)) {
+        $actions.Add($actionResult)
     }
 
     if ($SnapshotDocument.display.Contains('font_scaling') -and $SnapshotDocument.display.font_scaling.Contains('text_scale_percent')) {
