@@ -33,6 +33,13 @@ namespace ParsecEventExecutor {
     }
 
     [StructLayout(LayoutKind.Sequential, Pack = 8)]
+    internal struct NV_TIMING_FLAG {
+        public uint interlaceAndReserved;
+        public uint formatId;
+        public uint scaling;
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 8)]
     internal struct NV_TIMINGEXT {
         public uint flag;
         public ushort rr;
@@ -69,7 +76,7 @@ namespace ParsecEventExecutor {
         public uint width;
         public uint height;
         public float rr;
-        public uint flag;
+        public NV_TIMING_FLAG flag;
         public int type;
     }
 
@@ -293,7 +300,7 @@ namespace ParsecEventExecutor {
                 width = width,
                 height = height,
                 rr = refreshRateHz,
-                flag = 0,
+                flag = new NV_TIMING_FLAG(),
                 type = NV_TIMING_OVERRIDE_AUTO
             };
 
@@ -367,14 +374,14 @@ function ConvertTo-ParsecNvidiaDisplayName {
     )
 
     if ($DeviceName.StartsWith('\\.\')) {
-        return ('\\' + $DeviceName.Substring(4))
-    }
-
-    if ($DeviceName.StartsWith('\\')) {
         return $DeviceName
     }
 
-    return ('\\' + $DeviceName.TrimStart('\'))
+    if ($DeviceName.StartsWith('\\')) {
+        return ('\\.\' + $DeviceName.TrimStart('\'))
+    }
+
+    return ('\\.\' + $DeviceName.TrimStart('\'))
 }
 
 function Get-ParsecNvidiaBackendAvailability {

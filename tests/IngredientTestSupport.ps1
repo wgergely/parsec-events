@@ -323,7 +323,7 @@ function Initialize-ParsecIngredientTestEnvironment {
 
             [ordered]@{
                 device_name = $deviceName
-                normalized_display_name = ('\\' + $deviceName.Substring(4))
+                normalized_display_name = $deviceName
                 display_id = [uint32] $script:IngredientNvidiaDisplayIds[$deviceName]
                 library_path = $script:IngredientNvidiaLibraryPath
                 backend = 'TestNvidiaAdapter'

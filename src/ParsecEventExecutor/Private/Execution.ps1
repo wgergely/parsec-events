@@ -385,6 +385,10 @@ function Resolve-ParsecRecipeSequenceTerminalStatus {
         return 'Compensated'
     }
 
+    if ($statuses -contains 'SucceededWithDrift') {
+        return 'SucceededWithDrift'
+    }
+
     return 'Succeeded'
 }
 

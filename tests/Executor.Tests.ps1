@@ -2,6 +2,18 @@ $modulePath = Join-Path $PSScriptRoot '..\src\ParsecEventExecutor\ParsecEventExe
 Import-Module $modulePath -Force
 
 Describe 'Invoke-ParsecRecipe' {
+    InModuleScope ParsecEventExecutor {
+        It 'preserves drift in the sequence terminal status summary' {
+            $runRecord = @{
+                step_results = @(
+                    @{ status = 'SucceededWithDrift' }
+                )
+            }
+
+            Resolve-ParsecRecipeSequenceTerminalStatus -RunRecord $runRecord | Should -Be 'SucceededWithDrift'
+        }
+    }
+
     It 'executes a successful command recipe through the thin sequencer' {
         $stateRoot = Join-Path $TestDrive 'state-success'
         $recipePath = Join-Path $PSScriptRoot 'fixtures\recipes\command-success.toml'

@@ -593,6 +593,7 @@ function Invoke-ParsecIngredientCommandInternal {
     $resetResult = $null
     $resolvedTargetIdentity = $null
     $finalTokenId = $TokenId
+    $persistApplyToken = $false
     $tokenPath = $null
     $requestedArguments = ConvertTo-ParsecPlainObject -InputObject $Arguments
     $finalStatus = 'Failed'
@@ -626,6 +627,7 @@ function Invoke-ParsecIngredientCommandInternal {
                     updated_at = [DateTimeOffset]::UtcNow.ToString('o')
                 }
                 $tokenPath = Save-ParsecIngredientTokenDocument -TokenDocument $tokenDocument -StateRoot $stateRoot
+                $persistApplyToken = $true
             }
 
             $operationResult = Invoke-ParsecIngredientOperation -Name $definition.Name -Operation 'apply' -Arguments $Arguments -StateRoot $stateRoot -RunState @{}
@@ -645,13 +647,16 @@ function Invoke-ParsecIngredientCommandInternal {
                 }
             }
 
-            if ($finalTokenId) {
+            if ($persistApplyToken -and $finalTokenId) {
                 $tokenDocument = Read-ParsecIngredientTokenDocument -TokenId $finalTokenId -StateRoot $stateRoot
                 $tokenDocument.apply_result = ConvertTo-ParsecPlainObject -InputObject $operationResult
                 $tokenDocument.readiness_result = ConvertTo-ParsecPlainObject -InputObject $readinessResult
                 $tokenDocument.verify_result = ConvertTo-ParsecPlainObject -InputObject $verificationResult
                 $tokenDocument.apply_status = $finalStatus
                 $tokenPath = Save-ParsecIngredientTokenDocument -TokenDocument $tokenDocument -StateRoot $stateRoot
+            }
+            elseif (-not $persistApplyToken) {
+                $finalTokenId = $null
             }
         }
         'capture' {

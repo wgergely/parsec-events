@@ -217,5 +217,20 @@ Describe 'Standalone ingredient surface' {
             $result.status | Should -Be 'Succeeded'
             $result.verify_result | Should -BeNullOrEmpty
         }
+
+        It 'ignores a caller supplied token id for apply when the ingredient does not capture state' {
+            $stateRoot = Join-Path $TestDrive 'apply-ignores-token'
+
+            $result = Invoke-ParsecIngredient -Name 'nvidia-add-custom-resolution' -Arguments @{
+                width = 1600
+                height = 900
+            } -TokenId 'caller-token' -Verify:$false -StateRoot $stateRoot -Confirm:$false
+
+            $result.status | Should -Be 'Succeeded'
+            $result.token_id | Should -BeNullOrEmpty
+            $result.token_path | Should -BeNullOrEmpty
+            $result.operation_result.Outputs.width | Should -Be 1600
+            $result.operation_result.Outputs.height | Should -Be 900
+        }
     }
 }
