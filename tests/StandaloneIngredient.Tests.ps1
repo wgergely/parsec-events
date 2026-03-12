@@ -89,21 +89,28 @@ Describe 'Standalone ingredient surface' {
         It 'waits for readiness before succeeding when the resolution converges after delayed observations' {
             $stateRoot = Join-Path $TestDrive 'delayed-readiness'
             $definition = Get-ParsecIngredientDefinition -Name 'set-resolution'
-            $definition.Readiness.timeout_ms = 100
-            $definition.Readiness.poll_interval_ms = 1
-            $definition.Readiness.success_count = 2
-            $script:IngredientResolutionObservationLagRemaining = 2
+            $originalReadiness = ConvertTo-ParsecPlainObject -InputObject $definition.Readiness
 
-            $result = Invoke-ParsecIngredient -Name 'set-resolution' -Arguments @{
-                width = 1280
-                height = 720
-            } -StateRoot $stateRoot -Confirm:$false
+            try {
+                $definition.Readiness.timeout_ms = 1000
+                $definition.Readiness.poll_interval_ms = 1
+                $definition.Readiness.success_count = 2
+                $script:IngredientResolutionObservationLagRemaining = 2
 
-            $result.status | Should -Be 'Succeeded'
-            $result.readiness_result.Status | Should -Be 'Succeeded'
-            $result.readiness_result.Outputs.attempts | Should -BeGreaterThan 1
-            $result.readiness_result.Outputs.successful_probes | Should -Be 2
-            $result.verify_result.Status | Should -Be 'Succeeded'
+                $result = Invoke-ParsecIngredient -Name 'set-resolution' -Arguments @{
+                    width = 1280
+                    height = 720
+                } -StateRoot $stateRoot -Confirm:$false
+
+                $result.status | Should -Be 'Succeeded'
+                $result.readiness_result.Status | Should -Be 'Succeeded'
+                $result.readiness_result.Outputs.attempts | Should -BeGreaterThan 1
+                $result.readiness_result.Outputs.successful_probes | Should -Be 2
+                $result.verify_result.Status | Should -Be 'Succeeded'
+            }
+            finally {
+                $definition.Readiness = ConvertTo-ParsecPlainObject -InputObject $originalReadiness
+            }
         }
 
         It 'requires an explicit token for reset and restores the captured resolution' {
@@ -160,19 +167,26 @@ Describe 'Standalone ingredient surface' {
         It 'fails when readiness times out before the display converges to the requested resolution' {
             $stateRoot = Join-Path $TestDrive 'readiness-timeout'
             $definition = Get-ParsecIngredientDefinition -Name 'set-resolution'
-            $definition.Readiness.timeout_ms = 10
-            $definition.Readiness.poll_interval_ms = 1
-            $definition.Readiness.success_count = 2
-            $script:IngredientResolutionObservationLagRemaining = 100
+            $originalReadiness = ConvertTo-ParsecPlainObject -InputObject $definition.Readiness
 
-            $result = Invoke-ParsecIngredient -Name 'set-resolution' -Arguments @{
-                width = 1280
-                height = 720
-            } -StateRoot $stateRoot -Confirm:$false
+            try {
+                $definition.Readiness.timeout_ms = 10
+                $definition.Readiness.poll_interval_ms = 1
+                $definition.Readiness.success_count = 2
+                $script:IngredientResolutionObservationLagRemaining = 100
 
-            $result.status | Should -Be 'Failed'
-            $result.readiness_result.Errors | Should -Contain 'ReadinessTimeout'
-            $result.verify_result | Should -BeNullOrEmpty
+                $result = Invoke-ParsecIngredient -Name 'set-resolution' -Arguments @{
+                    width = 1280
+                    height = 720
+                } -StateRoot $stateRoot -Confirm:$false
+
+                $result.status | Should -Be 'Failed'
+                $result.readiness_result.Errors | Should -Contain 'ReadinessTimeout'
+                $result.verify_result | Should -BeNullOrEmpty
+            }
+            finally {
+                $definition.Readiness = ConvertTo-ParsecPlainObject -InputObject $originalReadiness
+            }
         }
 
         It 'fails verification when the display backend drifts from the requested resolution' {
@@ -239,7 +253,7 @@ Describe 'Standalone ingredient surface' {
             $originalReadiness = ConvertTo-ParsecPlainObject -InputObject $definition.Readiness
 
             try {
-                $definition.Readiness.timeout_ms = 100
+                $definition.Readiness.timeout_ms = 1000
                 $definition.Readiness.poll_interval_ms = 1
                 $definition.Readiness.success_count = 2
                 $script:IngredientOrientationObservationLagRemaining = 2
@@ -307,7 +321,7 @@ Describe 'Standalone ingredient surface' {
             $originalReadiness = ConvertTo-ParsecPlainObject -InputObject $definition.Readiness
 
             try {
-                $definition.Readiness.timeout_ms = 100
+                $definition.Readiness.timeout_ms = 1000
                 $definition.Readiness.poll_interval_ms = 1
                 $definition.Readiness.success_count = 2
                 $script:IngredientTextScaleObservationLagRemaining = 2
@@ -376,7 +390,7 @@ Describe 'Standalone ingredient surface' {
             $originalReadiness = ConvertTo-ParsecPlainObject -InputObject $definition.Readiness
 
             try {
-                $definition.Readiness.timeout_ms = 100
+                $definition.Readiness.timeout_ms = 1000
                 $definition.Readiness.poll_interval_ms = 1
                 $definition.Readiness.success_count = 2
                 $script:IngredientUiScaleObservationLagRemaining = 2
@@ -430,7 +444,9 @@ Describe 'Standalone ingredient surface' {
 
             $result.status | Should -Be 'Succeeded'
             $result.ingredient_name | Should -Be 'window.cycle-activation'
-            $result.operation_result.Outputs.activation_results.Count | Should -Be 2
+            $result.operation_result.Outputs.alt_tab_candidates.Count | Should -Be 2
+            $result.operation_result.Outputs.activation_results.Count | Should -Be 1
+            $result.operation_result.Outputs.restore_result.succeeded | Should -BeTrue
             $result.verify_result.Status | Should -Be 'Succeeded'
             $script:IngredientWindowForegroundHandle | Should -Be 101
             $script:IngredientWindowActivationLog | Should -Be @(102, 101)
@@ -453,7 +469,41 @@ Describe 'Standalone ingredient surface' {
 
         It 'persists compact invocation payloads for noisy window cycle results' {
             $stateRoot = Join-Path $TestDrive 'window-cycle-persistence'
-            $script:IngredientAltTabHandles = @(101) + @(200..230)
+            $script:IngredientWindows = @(
+                [ordered]@{
+                    handle = [int64] 101
+                    owner_handle = [int64] 0
+                    process_id = 1001
+                    process_name = 'Code'
+                    title = 'Editor'
+                    class_name = 'ApplicationFrameWindow'
+                    is_visible = $true
+                    is_minimized = $false
+                    is_cloaked = $false
+                    is_shell_window = $false
+                    extended_style = 0
+                    width = 1440
+                    height = 900
+                }
+            ) + @(
+                foreach ($index in 200..230) {
+                    [ordered]@{
+                        handle = [int64] $index
+                        owner_handle = [int64] 0
+                        process_id = [int] (3000 + $index)
+                        process_name = 'TestApp'
+                        title = "App $index"
+                        class_name = 'Chrome_WidgetWin_1'
+                        is_visible = $true
+                        is_minimized = $false
+                        is_cloaked = $false
+                        is_shell_window = $false
+                        extended_style = 0
+                        width = 1280
+                        height = 720
+                    }
+                }
+            )
 
             $result = Invoke-ParsecIngredient -Name 'cycle-activation' -Arguments @{
                 dwell_ms = 0

@@ -191,6 +191,7 @@ function Initialize-ParsecIngredientTestEnvironment {
             handle = [int64] 101
             owner_handle = [int64] 0
             process_id = 1001
+            process_name = 'Code'
             title = 'Editor'
             class_name = 'ApplicationFrameWindow'
             is_visible = $true
@@ -198,11 +199,14 @@ function Initialize-ParsecIngredientTestEnvironment {
             is_cloaked = $false
             is_shell_window = $false
             extended_style = 0
+            width = 1440
+            height = 900
         },
         [ordered]@{
             handle = [int64] 102
             owner_handle = [int64] 0
             process_id = 1002
+            process_name = 'chrome'
             title = 'Browser'
             class_name = 'Chrome_WidgetWin_1'
             is_visible = $true
@@ -210,11 +214,14 @@ function Initialize-ParsecIngredientTestEnvironment {
             is_cloaked = $false
             is_shell_window = $false
             extended_style = 0
+            width = 1280
+            height = 720
         },
         [ordered]@{
             handle = [int64] 103
             owner_handle = [int64] 0
             process_id = 1003
+            process_name = 'UtilityHost'
             title = 'Hidden Utility'
             class_name = 'ToolWindow'
             is_visible = $false
@@ -222,6 +229,8 @@ function Initialize-ParsecIngredientTestEnvironment {
             is_cloaked = $false
             is_shell_window = $false
             extended_style = 0
+            width = 320
+            height = 120
         }
     )
     $script:IngredientSupportedModes = @(
