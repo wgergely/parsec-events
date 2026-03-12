@@ -5,7 +5,7 @@ function Get-ParsecIngredientOperations {
             $observed = Get-ParsecObservedState
             $primary = @($observed.monitors) | Where-Object { $_.is_primary } | Select-Object -First 1
             $outputs = [ordered]@{ captured_state = [ordered]@{ primary_monitor = $primary } }
-            if ($Arguments.ContainsKey('device_name')) { $outputs.captured_state.requested_monitor = Get-ParsecObservedMonitor -ObservedState $observed -DeviceName $Arguments.device_name }
+            if ($Arguments.Contains('device_name')) { $outputs.captured_state.requested_monitor = Get-ParsecObservedMonitor -ObservedState $observed -DeviceName $Arguments.device_name }
             New-ParsecResult -Status 'Succeeded' -Message 'Captured primary monitor state.' -Observed $outputs.captured_state -Outputs $outputs
         }
         apply = {

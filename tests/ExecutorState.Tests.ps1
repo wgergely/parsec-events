@@ -45,7 +45,19 @@ Describe 'Executor state entrypoints' {
                 }
                 SetThemeState = {
                     param($Arguments)
-                    $themeState = if ($Arguments.ContainsKey('theme_state')) { $Arguments.theme_state } else { [ordered]@{ mode = $Arguments.mode; app_mode = $Arguments.app_mode; system_mode = $Arguments.system_mode } }
+                    $themeState = if ($Arguments.ContainsKey('theme_state')) {
+                        $Arguments.theme_state
+                    }
+                    else {
+                        $mode = if ($Arguments.ContainsKey('mode')) { [string] $Arguments.mode } else { 'Custom' }
+                        $appMode = if ($Arguments.ContainsKey('app_mode')) { [string] $Arguments.app_mode } elseif ($mode -in @('Dark', 'Light')) { $mode } else { 'Light' }
+                        $systemMode = if ($Arguments.ContainsKey('system_mode')) { [string] $Arguments.system_mode } elseif ($mode -in @('Dark', 'Light')) { $mode } else { 'Light' }
+                        [ordered]@{
+                            mode        = $mode
+                            app_mode    = $appMode
+                            system_mode = $systemMode
+                        }
+                    }
                     $script:ExecutorThemeState = $themeState
                     $script:ExecutorObservedState.theme = $themeState
                     New-ParsecResult -Status 'Succeeded' -Message 'theme' -Observed $themeState -Outputs @{ theme_state = $themeState }

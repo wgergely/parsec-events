@@ -16,7 +16,7 @@ function Get-ParsecIngredientOperations {
             $supportedModes = @(Get-ParsecSupportedDisplayModes -DeviceName $deviceName)
             $requestedWidth = [int] $Arguments.width
             $requestedHeight = [int] $Arguments.height
-            $requestedOrientation = if ($Arguments.ContainsKey('orientation')) { [string] $Arguments.orientation } else { $null }
+            $requestedOrientation = if ($Arguments.Contains('orientation')) { [string] $Arguments.orientation } else { $null }
             $matchingMode = @($supportedModes | Where-Object {
                 $_.width -eq $requestedWidth -and
                 $_.height -eq $requestedHeight -and
@@ -68,7 +68,7 @@ function Get-ParsecIngredientOperations {
                 return New-ParsecResult -Status 'Failed' -Message "Monitor '$deviceName' resolution mismatch." -Observed $monitor
             }
 
-            if ($Arguments.ContainsKey('orientation') -and $monitor.orientation -ne [string] $Arguments.orientation) {
+            if ($Arguments.Contains('orientation') -and $monitor.orientation -ne [string] $Arguments.orientation) {
                 return New-ParsecResult -Status 'Failed' -Message "Monitor '$deviceName' orientation mismatch." -Observed $monitor
             }
 
