@@ -198,6 +198,8 @@ function Initialize-ParsecIngredientTestEnvironment {
             is_minimized = $false
             is_cloaked = $false
             is_shell_window = $false
+            is_on_input_desktop = $true
+            is_on_current_virtual_desktop = $true
             extended_style = 0
             width = 1440
             height = 900
@@ -213,6 +215,8 @@ function Initialize-ParsecIngredientTestEnvironment {
             is_minimized = $false
             is_cloaked = $false
             is_shell_window = $false
+            is_on_input_desktop = $true
+            is_on_current_virtual_desktop = $true
             extended_style = 0
             width = 1280
             height = 720
@@ -228,6 +232,8 @@ function Initialize-ParsecIngredientTestEnvironment {
             is_minimized = $false
             is_cloaked = $false
             is_shell_window = $false
+            is_on_input_desktop = $true
+            is_on_current_virtual_desktop = $true
             extended_style = 0
             width = 320
             height = 120

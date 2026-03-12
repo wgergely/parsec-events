@@ -281,12 +281,30 @@ namespace ParsecEventExecutor {
         public bool IsMinimized { get; set; }
         public bool IsCloaked { get; set; }
         public bool IsShellWindow { get; set; }
+        public bool IsOnInputDesktop { get; set; }
+        public bool IsOnCurrentVirtualDesktop { get; set; }
         public long ExtendedStyle { get; set; }
         public int Width { get; set; }
         public int Height { get; set; }
     }
 
+    [ComImport]
+    [Guid("A5CD92FF-29BE-454C-8D04-D82879FB3F1B")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    internal interface IVirtualDesktopManager {
+        [PreserveSig]
+        int IsWindowOnCurrentVirtualDesktop(IntPtr topLevelWindow, out bool onCurrentDesktop);
+
+        [PreserveSig]
+        int GetWindowDesktopId(IntPtr topLevelWindow, out Guid desktopId);
+
+        [PreserveSig]
+        int MoveWindowToDesktop(IntPtr topLevelWindow, [MarshalAs(UnmanagedType.LPStruct)] Guid desktopId);
+    }
+
     public static class DisplayNative {
+        private const uint DESKTOP_READOBJECTS = 0x0001;
+        private const uint DESKTOP_ENUMERATE = 0x0040;
         private const int ENUM_CURRENT_SETTINGS = -1;
         private const int ENUM_REGISTRY_SETTINGS = -2;
         private const int MDT_EFFECTIVE_DPI = 0;
@@ -305,6 +323,8 @@ namespace ParsecEventExecutor {
         private static readonly uint DISPLAYCONFIG_DEVICE_INFO_GET_DPI_SCALE = unchecked((uint)-3);
         private static readonly uint DISPLAYCONFIG_DEVICE_INFO_SET_DPI_SCALE = unchecked((uint)-4);
         private const uint DISPLAYCONFIG_PATH_MODE_IDX_INVALID = 0xffffffff;
+        private static readonly Guid CLSID_VirtualDesktopManager = new Guid("AA509086-5CA9-4C25-8F95-589D3C07B48A");
+        private static readonly IVirtualDesktopManager VirtualDesktopManager = CreateVirtualDesktopManager();
         public const int DM_POSITION = 0x00000020;
         public const int DM_DISPLAYORIENTATION = 0x00000080;
         public const int DM_BITSPERPEL = 0x00040000;
@@ -577,6 +597,15 @@ namespace ParsecEventExecutor {
         [DllImport("user32.dll")]
         private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
 
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr OpenInputDesktop(uint dwFlags, bool fInherit, uint dwDesiredAccess);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool CloseDesktop(IntPtr hDesktop);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool EnumDesktopWindows(IntPtr hDesktop, EnumWindowsProc lpfn, IntPtr lParam);
+
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
 
@@ -684,6 +713,29 @@ namespace ParsecEventExecutor {
 
         private static string AdapterIdToString(LUID value) {
             return value.HighPart.ToString("X8") + ":" + value.LowPart.ToString("X8");
+        }
+
+        private static IVirtualDesktopManager CreateVirtualDesktopManager() {
+            try {
+                return (IVirtualDesktopManager)Activator.CreateInstance(Type.GetTypeFromCLSID(CLSID_VirtualDesktopManager));
+            }
+            catch {
+                return null;
+            }
+        }
+
+        private static bool IsWindowOnCurrentVirtualDesktop(IntPtr hWnd) {
+            if (VirtualDesktopManager == null || hWnd == IntPtr.Zero) {
+                return true;
+            }
+
+            try {
+                bool onCurrentDesktop;
+                return VirtualDesktopManager.IsWindowOnCurrentVirtualDesktop(hWnd, out onCurrentDesktop) == 0 ? onCurrentDesktop : true;
+            }
+            catch {
+                return true;
+            }
         }
 
         private static IntPtr NormalizeTopLevelWindow(IntPtr hWnd) {
@@ -802,6 +854,8 @@ namespace ParsecEventExecutor {
                 IsMinimized = IsIconic(hWnd),
                 IsCloaked = isCloaked,
                 IsShellWindow = shellWindow != IntPtr.Zero && hWnd == shellWindow,
+                IsOnInputDesktop = true,
+                IsOnCurrentVirtualDesktop = IsWindowOnCurrentVirtualDesktop(hWnd),
                 ExtendedStyle = GetWindowLongPtr(hWnd, -20).ToInt64(),
                 Width = Math.Max(windowRect.Right - windowRect.Left, 0),
                 Height = Math.Max(windowRect.Bottom - windowRect.Top, 0)
@@ -984,14 +1038,32 @@ namespace ParsecEventExecutor {
 
         public static WindowCapture[] GetTopLevelWindows() {
             var windows = new List<WindowCapture>();
-            EnumWindows(delegate (IntPtr hWnd, IntPtr lParam) {
-                var capture = CaptureWindow(hWnd);
-                if (capture != null) {
-                    windows.Add(capture);
-                }
+            var inputDesktop = OpenInputDesktop(0u, false, DESKTOP_READOBJECTS | DESKTOP_ENUMERATE);
+            if (inputDesktop != IntPtr.Zero) {
+                try {
+                    EnumDesktopWindows(inputDesktop, delegate (IntPtr hWnd, IntPtr lParam) {
+                        var capture = CaptureWindow(hWnd);
+                        if (capture != null) {
+                            windows.Add(capture);
+                        }
 
-                return true;
-            }, IntPtr.Zero);
+                        return true;
+                    }, IntPtr.Zero);
+                }
+                finally {
+                    CloseDesktop(inputDesktop);
+                }
+            }
+            else {
+                EnumWindows(delegate (IntPtr hWnd, IntPtr lParam) {
+                    var capture = CaptureWindow(hWnd);
+                    if (capture != null) {
+                        windows.Add(capture);
+                    }
+
+                    return true;
+                }, IntPtr.Zero);
+            }
 
             return windows.ToArray();
         }
@@ -2062,6 +2134,14 @@ function Test-ParsecWindowActivationCandidate {
     }
 
     if ($Window.Contains('is_cloaked') -and [bool] $Window.is_cloaked) {
+        return $false
+    }
+
+    if ($Window.Contains('is_on_input_desktop') -and -not [bool] $Window.is_on_input_desktop) {
+        return $false
+    }
+
+    if ($Window.Contains('is_on_current_virtual_desktop') -and -not [bool] $Window.is_on_current_virtual_desktop) {
         return $false
     }
 

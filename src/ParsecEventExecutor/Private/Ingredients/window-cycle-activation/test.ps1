@@ -25,6 +25,8 @@ Context 'window.cycle-activation' {
                 is_minimized = $false
                 is_cloaked = $false
                 is_shell_window = $false
+                is_on_input_desktop = $true
+                is_on_current_virtual_desktop = $true
                 extended_style = 0
                 width = 1280
                 height = 720
@@ -40,6 +42,8 @@ Context 'window.cycle-activation' {
                 is_minimized = $false
                 is_cloaked = $false
                 is_shell_window = $false
+                is_on_input_desktop = $true
+                is_on_current_virtual_desktop = $true
                 extended_style = 0
                 width = 600
                 height = 500
@@ -55,9 +59,28 @@ Context 'window.cycle-activation' {
                 is_minimized = $false
                 is_cloaked = $false
                 is_shell_window = $false
+                is_on_input_desktop = $true
+                is_on_current_virtual_desktop = $true
                 extended_style = 0
                 width = 32
                 height = 32
+            },
+            [ordered]@{
+                handle = [int64] 107
+                owner_handle = [int64] 0
+                process_id = 1007
+                process_name = 'DetachedApp'
+                title = 'Other Desktop'
+                class_name = 'Chrome_WidgetWin_1'
+                is_visible = $true
+                is_minimized = $false
+                is_cloaked = $false
+                is_shell_window = $false
+                is_on_input_desktop = $true
+                is_on_current_virtual_desktop = $false
+                extended_style = 0
+                width = 1280
+                height = 720
             }
         )
 
