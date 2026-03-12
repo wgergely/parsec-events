@@ -1,11 +1,12 @@
 name = "return-desktop"
-description = "Mission recipe placeholder for switching back into DESKTOP mode after user approval."
+description = "Restore the transient desktop snapshot captured before the mobile recipe ran."
 initial_mode = "MOBILE"
 target_mode = "DESKTOP"
 
 [[steps]]
-id = "apply-desktop-profile"
-ingredient = "profile.apply"
+id = "restore-desktop-snapshot"
+ingredient = "display.snapshot"
+operation = "reset"
 depends_on = []
 verify = true
 compensation_policy = "none"
@@ -14,4 +15,4 @@ retry_delay_ms = 0
 allow_diagnostics = false
 
 [steps.arguments]
-profile_name = "DESKTOP"
+snapshot_name = "desktop-pre-parsec"

@@ -6,6 +6,7 @@ target_mode = "MOBILE"
 [[steps]]
 id = "failing-command"
 ingredient = "command.invoke"
+operation = "apply"
 depends_on = []
 verify = true
 compensation_policy = "none"
@@ -20,6 +21,7 @@ arguments = ["-NoProfile", "-Command", "Write-Error 'boom'; exit 3"]
 [[steps]]
 id = "blocked-command"
 ingredient = "command.invoke"
+operation = "apply"
 depends_on = ["failing-command"]
 verify = true
 compensation_policy = "none"

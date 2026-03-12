@@ -1,121 +1,124 @@
-# Implementation Plan Status
+# Implementation Status
 
-## Current shipped surface
+## Topic
 
-The shipped PowerShell module lives in `src/ParsecEventExecutor`.
+Recipe-authored mobile preset execution with transient desktop snapshot restore.
 
-Exported commands:
+## Current Architecture
+
+The live implementation is recipe-first and snapshot-driven.
+
+Authored configuration:
+
+- TOML recipe files in `recipes/`
+
+Machine-written runtime state:
+
+- JSON under `%LOCALAPPDATA%\ParsecEventExecutor`
+- `snapshots/`
+- `runs/`
+- `logs/`
+- `events/`
+- `executor-state.json`
+
+The repository no longer treats `DESKTOP` or `MOBILE` as authored JSON profile files. The normal desktop state is captured at runtime as a transient snapshot before the mobile recipe runs, then restored from that snapshot on disconnect.
+
+## Current Command Surface
+
+The PowerShell module in `src/ParsecEventExecutor` currently exports:
 
 - `Invoke-ParsecRecipe`
 - `Get-ParsecRecipe`
 - `Get-ParsecIngredient`
+- `Save-ParsecSnapshot`
+- `Test-ParsecSnapshot`
 - `Save-ParsecProfile`
 - `Test-ParsecProfile`
 - `Get-ParsecExecutorState`
 - `Start-ParsecExecutor`
 
-`Capture-ParsecProfile` is exported as an alias of `Save-ParsecProfile`.
+Aliases:
 
-The current architecture is a local recipe executor, not a live Parsec daemon. Recipes are TOML files parsed into ordered steps. Steps support dependency gating, optional verification, retries, basic conditions, and explicit compensation hooks.
+- `Capture-ParsecSnapshot`
+- `Capture-ParsecProfile`
 
-Run results and local executor state are persisted as JSON under `%LOCALAPPDATA%\ParsecEventExecutor` in:
+`Save-ParsecProfile` and `Test-ParsecProfile` remain compatibility shims over snapshot behavior. The canonical surface is snapshot-oriented, not profile-file-oriented.
 
-- `profiles/`
-- `runs/`
-- `logs/`
-- `events/`
+## Recipe and Ingredient Model
 
-Implemented now:
+Recipes are declarative TOML documents parsed into ordered steps.
 
-- recipe parsing and execution
-- ingredient registry and argument validation
-- executor-state persistence and run-state persistence
-- profile capture to JSON
-- profile verification and approval gating
-- built-in ingredient families for `display.*`, `profile.*`, `process.*`, `service.*`, and `command.invoke`
-- manual event dispatch through `Start-ParsecExecutor`
+Each step now dispatches:
 
-`Start-ParsecExecutor` currently supports:
+- `ingredient`
+- `operation`
+- `arguments`
+- `depends_on`
+- `verify`
+- retry settings
+- compensation policy
 
-- `SwitchToMobile`
-- `SwitchToDesktop`
-- `VerifyOnly`
-- `Reconcile`
+The ingredient contract is operation-based in `src/ParsecEventExecutor/Private/Ingredients.ps1`. Ingredients declare manifests with capabilities and supported operations such as:
 
-## Deliberate placeholders and current limits
+- `apply`
+- `capture`
+- `reset`
+- `verify`
 
-The repository recipes are placeholders only:
+Built-in ingredient families currently cover:
 
-- `recipes/enter-mobile.toml`
-- `recipes/return-desktop.toml`
+- `display.*`
+- `process.*`
+- `service.*`
+- `command.invoke`
 
-Each recipe currently contains a single `profile.apply` step against `MOBILE` or `DESKTOP`.
+## Mission Recipe Behavior
 
-Approval-gated placeholders are explicit in:
+`recipes/enter-mobile.toml` currently does one verified thing:
 
-- `profiles/MOBILE.json`
-- `profiles/DESKTOP.json`
+- capture `desktop-pre-parsec` through `display.snapshot` using the `capture` operation
 
-Both profiles still carry `approved = false` and `approval_required` data, so they must be treated as scaffolding rather than finalized mode definitions.
+`recipes/return-desktop.toml` currently does one verified thing:
 
-Display mutation backends are not wired yet. The default adapter can observe screens through `System.Windows.Forms.Screen`, but these operations currently return `CapabilityUnavailable` until a concrete backend is implemented:
+- restore `desktop-pre-parsec` through `display.snapshot` using the `reset` operation
 
-- `SetEnabled`
-- `SetPrimary`
-- `SetResolution`
-- `SetOrientation`
-- `SetScaling`
+This means the executor now models the correct mission flow:
 
-`process_actions`, `service_actions`, and `command_actions` are persisted in profile documents, but `profile.apply` does not execute them automatically. Any real process, service, or command behavior still needs explicit recipe steps using `process.*`, `service.*`, or `command.invoke`.
+1. Capture the live desktop state before the Parsec/mobile transition.
+2. Apply mobile-oriented ingredient steps when they are authored into the mobile recipe.
+3. Restore the captured desktop snapshot on return.
 
-## Test status
+## Verified Runtime Behavior
 
-Tests are written in Pester v5 style and currently cover:
+Implemented and verified now:
 
 - TOML recipe parsing
-- dependency-gated executor behavior
-- approval-gated placeholder recipes
-- command invocation
-- process start and compensation
-- service ingredient contract behavior
-- profile capture and verification
+- dependency-gated step execution
+- operation-based ingredient dispatch
+- transient snapshot capture
+- transient snapshot restore
+- executor-state and run-state persistence
+- manual event routing through `Start-ParsecExecutor`
 
-Run the suite with:
+Verification status on March 11, 2026:
+
+- `Invoke-Pester` passes `14` tests
+- `Invoke-ScriptAnalyzer` passes with `PSScriptAnalyzerSettings.psd1`
+
+Run verification with:
 
 ```powershell
-& 'C:\Program Files\PowerShell\7\pwsh.exe' -NoProfile -Command "& { Import-Module Pester -MinimumVersion 5.0 -Force; $config = New-PesterConfiguration; $config.Run.Path = 'tests'; Invoke-Pester -Configuration $config }"
+& 'C:\Program Files\PowerShell\7\pwsh.exe' -NoProfile -Command "Invoke-Pester -Path 'tests' -Output Detailed"
+& 'C:\Program Files\PowerShell\7\pwsh.exe' -NoProfile -Command "Invoke-ScriptAnalyzer -Path 'Y:\code\parsec-events-worktrees\main' -Recurse -Settings 'Y:\code\parsec-events-worktrees\main\PSScriptAnalyzerSettings.psd1'"
 ```
 
-Current result on March 11, 2026: 11 tests passed, 0 failed.
+## Remaining Gaps
 
-## Approval input required next
+Not implemented yet:
 
-Concrete `MOBILE` and `DESKTOP` recipes must not be filled in until the following approval data is supplied:
+- real display mutation through a `DisplayConfig` backend
+- concrete mobile display/process/service/command steps in `recipes/enter-mobile.toml`
+- daemon hosting beyond the manual entrypoint
+- Parsec log tailing and event ingestion
 
-- `active_monitors`
-- `disabled_monitors`
-- `primary_monitor`
-- `resolution_per_monitor`
-- `orientation_per_monitor`
-- `refresh_rate_policy`
-- `dpi_and_text_scaling`
-- `process_actions`
-- `service_actions`
-- `command_actions`
-- `unsupported_setting_policy`
-
-Concrete `display.monitors` entries are also required for each approved monitor. Each entry must include:
-
-- `device_name`
-- `enabled`
-- optional `is_primary`
-- `bounds.width`
-- `bounds.height`
-- optional `orientation`
-- optional `display.scaling.value`
-
-`refresh_rate_policy` and `unsupported_setting_policy` are captured as required approval decisions, but they are not consumed by runtime code yet. `process_actions`, `service_actions`, and `command_actions` also still require recipe design work after approval.
-
-## Immediate next step
-
-Once the approval data is complete, replace the placeholder `profile.apply`-only recipes with explicit, ordered `MOBILE` and `DESKTOP` steps that match the approved monitor topology, scaling, orientation, and ancillary process or service actions.
+The default mobile recipe is still a safe scaffold. It captures the transient desktop snapshot but does not yet encode the actual mobile monitor, orientation, scaling, process, or service actions.

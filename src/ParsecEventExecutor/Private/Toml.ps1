@@ -35,14 +35,14 @@ function Split-ParsecTomlPath {
         [string] $Path
     )
 
-    return [string[]] ($Path.Split('.', [System.StringSplitOptions]::RemoveEmptyEntries))
+    return ,([string[]] ($Path.Split('.', [System.StringSplitOptions]::RemoveEmptyEntries)))
 }
 
 function Get-ParsecTomlContext {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
-        [hashtable] $Document,
+        [System.Collections.IDictionary] $Document,
 
         [Parameter(Mandatory)]
         [string[]] $Segments,

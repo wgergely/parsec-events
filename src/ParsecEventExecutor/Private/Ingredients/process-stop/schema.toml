@@ -1,0 +1,28 @@
+name = "process.stop"
+kind = "process"
+description = "Stop a running process."
+capabilities = ["capture", "apply", "verify"]
+required_backends = ["Process"]
+safety_class = "ExternalProcess"
+success_signals = []
+failure_signals = []
+wait_conditions = []
+
+[operation_schemas.capture]
+required = []
+[operation_schemas.capture.types]
+process_id = "integer"
+process_name = "string"
+file_path = "string"
+
+[operation_schemas.apply]
+required = []
+[operation_schemas.apply.types]
+process_id = "integer"
+process_name = "string"
+
+[operation_schemas.verify]
+required = []
+[operation_schemas.verify.types]
+process_id = "integer"
+process_name = "string"

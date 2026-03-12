@@ -1,0 +1,36 @@
+name = "system.set-theme"
+kind = "system"
+description = "Set Windows application and system theme mode."
+capabilities = ["capture", "apply", "verify", "reset"]
+required_backends = ["PersonalizationAdapter"]
+safety_class = "ReversibleSystemChange"
+success_signals = []
+failure_signals = []
+wait_conditions = []
+
+[operation_schemas.capture]
+required = []
+
+[operation_schemas.apply]
+required = []
+[operation_schemas.apply.types]
+mode = "string"
+app_mode = "string"
+system_mode = "string"
+theme_state = "hashtable"
+
+[operation_schemas.verify]
+required = []
+[operation_schemas.verify.types]
+mode = "string"
+app_mode = "string"
+system_mode = "string"
+
+[operation_schemas.reset]
+required = []
+[operation_schemas.reset.types]
+captured_state = "hashtable"
+mode = "string"
+app_mode = "string"
+system_mode = "string"
+theme_state = "hashtable"

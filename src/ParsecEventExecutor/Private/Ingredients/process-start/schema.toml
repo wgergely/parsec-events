@@ -1,0 +1,36 @@
+name = "process.start"
+kind = "process"
+description = "Start a process and capture its id."
+capabilities = ["capture", "apply", "verify", "reset"]
+required_backends = ["Process"]
+safety_class = "ExternalProcess"
+success_signals = []
+failure_signals = []
+wait_conditions = []
+
+[operation_schemas.capture]
+required = []
+[operation_schemas.capture.types]
+process_id = "integer"
+process_name = "string"
+file_path = "string"
+
+[operation_schemas.apply]
+required = ["file_path"]
+[operation_schemas.apply.types]
+file_path = "string"
+arguments = "array"
+
+[operation_schemas.verify]
+required = []
+[operation_schemas.verify.types]
+process_id = "integer"
+process_name = "string"
+file_path = "string"
+
+[operation_schemas.reset]
+required = []
+[operation_schemas.reset.types]
+process_id = "integer"
+process_name = "string"
+file_path = "string"

@@ -1,3 +1,16 @@
+function Test-ParsecSnapshot {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $Name,
+
+        [Parameter()]
+        [string] $StateRoot = (Get-ParsecDefaultStateRoot)
+    )
+
+    return Invoke-ParsecIngredientOperation -Name 'display.snapshot' -Operation 'verify' -Arguments @{ snapshot_name = $Name } -StateRoot $StateRoot -RunState @{}
+}
+
 function Test-ParsecProfile {
     [CmdletBinding()]
     param(
@@ -8,6 +21,5 @@ function Test-ParsecProfile {
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)
     )
 
-    $storedProfile = Read-ParsecProfileDocument -Name $Name -StateRoot $StateRoot
-    return Invoke-ParsecIngredientVerify -Name 'profile.apply' -Arguments @{ profile_name = $Name } -ExecutionResult (New-ParsecResult -Status 'Succeeded' -Outputs @{ profile = $storedProfile }) -StateRoot $StateRoot -RunState @{}
+    return Test-ParsecSnapshot -Name $Name -StateRoot $StateRoot
 }

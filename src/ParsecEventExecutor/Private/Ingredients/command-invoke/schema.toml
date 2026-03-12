@@ -1,0 +1,15 @@
+name = "command.invoke"
+kind = "command"
+description = "Run an external command and capture stdout, stderr, and exit code."
+capabilities = ["apply"]
+required_backends = ["Process"]
+safety_class = "ExternalProcess"
+success_signals = []
+failure_signals = []
+wait_conditions = []
+
+[operation_schemas.apply]
+required = ["file_path"]
+[operation_schemas.apply.types]
+file_path = "string"
+arguments = "array"

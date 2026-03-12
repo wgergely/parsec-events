@@ -1,0 +1,37 @@
+name = "display.ensure-resolution"
+kind = "display"
+description = "Ensure a target resolution exists or can be applied for a display."
+capabilities = ["capture", "apply", "verify", "reset"]
+required_backends = ["DisplayAdapter"]
+safety_class = "ReversibleSystemChange"
+success_signals = ["resolution-present", "resolution-applied"]
+failure_signals = ["monitor-not-found", "resolution-unavailable"]
+wait_conditions = []
+
+[operation_schemas.capture]
+required = []
+[operation_schemas.capture.types]
+device_name = "string"
+
+[operation_schemas.apply]
+required = ["width", "height"]
+[operation_schemas.apply.types]
+device_name = "string"
+width = "integer"
+height = "integer"
+orientation = "string"
+
+[operation_schemas.verify]
+required = ["width", "height"]
+[operation_schemas.verify.types]
+device_name = "string"
+width = "integer"
+height = "integer"
+
+[operation_schemas.reset]
+required = []
+[operation_schemas.reset.types]
+device_name = "string"
+width = "integer"
+height = "integer"
+captured_state = "hashtable"

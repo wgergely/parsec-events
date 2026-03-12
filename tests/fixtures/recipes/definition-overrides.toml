@@ -1,0 +1,22 @@
+name = "definition-overrides"
+description = "Exercise recipe ingredient definitions and step overrides."
+initial_mode = "DESKTOP"
+target_mode = "MOBILE"
+
+[ingredient_definitions.base-command]
+ingredient = "command.invoke"
+operation = "apply"
+verify = false
+retry_count = 2
+retry_delay_ms = 50
+
+[ingredient_definitions.base-command.arguments]
+file_path = "C:\\Program Files\\PowerShell\\7\\pwsh.exe"
+arguments = ["-NoProfile", "-Command", "Write-Output 'base'"]
+
+[[steps]]
+id = "run-overridden-command"
+definition = "base-command"
+
+[steps.arguments]
+arguments = ["-NoProfile", "-Command", "Write-Output 'override'"]

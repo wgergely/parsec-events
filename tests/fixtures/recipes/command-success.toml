@@ -6,6 +6,7 @@ target_mode = "DESKTOP"
 [[steps]]
 id = "run-command"
 ingredient = "command.invoke"
+operation = "apply"
 depends_on = []
 verify = true
 compensation_policy = "none"

@@ -1,0 +1,29 @@
+name = "service.start"
+kind = "service"
+description = "Start a Windows service."
+capabilities = ["capture", "apply", "verify", "reset"]
+required_backends = ["ServiceControlManager"]
+safety_class = "ReversibleSystemChange"
+success_signals = []
+failure_signals = []
+wait_conditions = []
+
+[operation_schemas.capture]
+required = ["service_name"]
+[operation_schemas.capture.types]
+service_name = "string"
+
+[operation_schemas.apply]
+required = ["service_name"]
+[operation_schemas.apply.types]
+service_name = "string"
+
+[operation_schemas.verify]
+required = ["service_name"]
+[operation_schemas.verify.types]
+service_name = "string"
+
+[operation_schemas.reset]
+required = ["service_name"]
+[operation_schemas.reset.types]
+service_name = "string"

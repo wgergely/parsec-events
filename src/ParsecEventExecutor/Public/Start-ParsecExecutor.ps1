@@ -24,14 +24,18 @@ function Start-ParsecExecutor {
             }
         }
         'Reconcile' {
-            $state = Get-ParsecExecutorStateDocument -StateRoot $StateRoot
+            $state = Get-ParsecRecoveryStatus -StateRoot $StateRoot
             return [pscustomobject]@{
-                event_name     = $EventName
-                desired_mode   = $state.desired_mode
-                actual_mode    = $state.actual_mode
-                last_good_mode = $state.last_good_mode
-                status         = if ($state.desired_mode -and $state.desired_mode -ne $state.actual_mode) { 'NeedsIntervention' } else { 'Converged' }
-                timestamp      = [DateTimeOffset]::UtcNow.ToString('o')
+                event_name      = $EventName
+                desired_mode    = $state.desired_mode
+                actual_mode     = $state.actual_mode
+                last_good_mode  = $state.last_good_mode
+                active_snapshot = $state.active_snapshot
+                issues          = @($state.issues)
+                recoverable     = [bool] $state.recoverable
+                recovery_candidate = $state.recovery_candidate
+                status          = $state.status
+                timestamp       = [DateTimeOffset]::UtcNow.ToString('o')
             }
         }
     }

@@ -1,0 +1,24 @@
+name = "service.stop"
+kind = "service"
+description = "Stop a Windows service."
+capabilities = ["capture", "apply", "verify"]
+required_backends = ["ServiceControlManager"]
+safety_class = "ReversibleSystemChange"
+success_signals = []
+failure_signals = []
+wait_conditions = []
+
+[operation_schemas.capture]
+required = ["service_name"]
+[operation_schemas.capture.types]
+service_name = "string"
+
+[operation_schemas.apply]
+required = ["service_name"]
+[operation_schemas.apply.types]
+service_name = "string"
+
+[operation_schemas.verify]
+required = ["service_name"]
+[operation_schemas.verify.types]
+service_name = "string"

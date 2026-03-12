@@ -1,11 +1,52 @@
 name = "enter-mobile"
-description = "Mission recipe placeholder for switching into MOBILE mode after user approval."
+description = "Capture the current desktop state, then apply the mobile preset using reusable ingredient definitions."
 initial_mode = "DESKTOP"
 target_mode = "MOBILE"
 
+[ingredient_definitions.mobile-resolution]
+ingredient = "display.ensure-resolution"
+operation = "apply"
+verify = true
+compensation_policy = "explicit"
+retry_count = 1
+retry_delay_ms = 250
+
+[ingredient_definitions.mobile-resolution.arguments]
+width = 2000
+height = 3000
+orientation = "Portrait"
+
+[ingredient_definitions.mobile-ui-scaling]
+ingredient = "display.set-scaling"
+operation = "apply"
+verify = true
+compensation_policy = "explicit"
+
+[ingredient_definitions.mobile-ui-scaling.arguments]
+ui_scale_percent = 300
+
+[ingredient_definitions.mobile-text-scaling]
+ingredient = "display.set-scaling"
+operation = "apply"
+verify = true
+compensation_policy = "explicit"
+
+[ingredient_definitions.mobile-text-scaling.arguments]
+text_scale_percent = 125
+
+[ingredient_definitions.mobile-light-theme]
+ingredient = "system.set-theme"
+operation = "apply"
+verify = true
+compensation_policy = "explicit"
+
+[ingredient_definitions.mobile-light-theme.arguments]
+mode = "Light"
+
 [[steps]]
-id = "apply-mobile-profile"
-ingredient = "profile.apply"
+id = "capture-desktop-snapshot"
+ingredient = "display.snapshot"
+operation = "capture"
 depends_on = []
 verify = true
 compensation_policy = "none"
@@ -14,4 +55,24 @@ retry_delay_ms = 0
 allow_diagnostics = false
 
 [steps.arguments]
-profile_name = "MOBILE"
+snapshot_name = "desktop-pre-parsec"
+
+[[steps]]
+id = "ensure-mobile-resolution"
+definition = "mobile-resolution"
+depends_on = ["capture-desktop-snapshot"]
+
+[[steps]]
+id = "set-mobile-ui-scaling"
+definition = "mobile-ui-scaling"
+depends_on = ["ensure-mobile-resolution"]
+
+[[steps]]
+id = "set-mobile-text-scaling"
+definition = "mobile-text-scaling"
+depends_on = ["set-mobile-ui-scaling"]
+
+[[steps]]
+id = "set-mobile-light-theme"
+definition = "mobile-light-theme"
+depends_on = ["set-mobile-text-scaling"]

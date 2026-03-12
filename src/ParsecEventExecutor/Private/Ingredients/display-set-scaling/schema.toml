@@ -1,0 +1,42 @@
+name = "display.set-scaling"
+kind = "display"
+description = "Set display or font scaling."
+capabilities = ["capture", "apply", "verify", "reset"]
+required_backends = ["DisplayAdapter", "PersonalizationAdapter"]
+safety_class = "ReversibleSystemChange"
+success_signals = []
+failure_signals = []
+wait_conditions = []
+
+[operation_schemas.capture]
+required = []
+[operation_schemas.capture.types]
+device_name = "string"
+
+[operation_schemas.apply]
+required = []
+[operation_schemas.apply.types]
+value = "integer"
+scale_percent = "integer"
+ui_scale_percent = "integer"
+device_name = "string"
+text_scale_percent = "integer"
+
+[operation_schemas.verify]
+required = []
+[operation_schemas.verify.types]
+value = "integer"
+scale_percent = "integer"
+ui_scale_percent = "integer"
+device_name = "string"
+text_scale_percent = "integer"
+
+[operation_schemas.reset]
+required = []
+[operation_schemas.reset.types]
+device_name = "string"
+value = "integer"
+scale_percent = "integer"
+ui_scale_percent = "integer"
+text_scale_percent = "integer"
+captured_state = "hashtable"

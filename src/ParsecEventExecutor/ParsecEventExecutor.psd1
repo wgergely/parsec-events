@@ -11,14 +11,17 @@
         'Invoke-ParsecRecipe',
         'Get-ParsecRecipe',
         'Get-ParsecIngredient',
+        'Save-ParsecSnapshot',
+        'Test-ParsecSnapshot',
         'Save-ParsecProfile',
         'Test-ParsecProfile',
         'Get-ParsecExecutorState',
+        'Repair-ParsecExecutorState',
         'Start-ParsecExecutor'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()
-    AliasesToExport   = @('Capture-ParsecProfile')
+    AliasesToExport   = @('Capture-ParsecSnapshot', 'Capture-ParsecProfile')
     PrivateData       = @{
         PSData = @{
             Tags       = @('parsec', 'powershell', 'recipes', 'windows')

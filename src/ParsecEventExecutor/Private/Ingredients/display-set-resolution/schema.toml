@@ -1,0 +1,36 @@
+name = "display.set-resolution"
+kind = "display"
+description = "Set monitor resolution."
+capabilities = ["capture", "apply", "verify", "reset"]
+required_backends = ["DisplayAdapter"]
+safety_class = "ReversibleSystemChange"
+success_signals = []
+failure_signals = []
+wait_conditions = []
+
+[operation_schemas.capture]
+required = ["device_name"]
+[operation_schemas.capture.types]
+device_name = "string"
+
+[operation_schemas.apply]
+required = ["device_name", "width", "height"]
+[operation_schemas.apply.types]
+device_name = "string"
+width = "integer"
+height = "integer"
+
+[operation_schemas.verify]
+required = ["device_name", "width", "height"]
+[operation_schemas.verify.types]
+device_name = "string"
+width = "integer"
+height = "integer"
+
+[operation_schemas.reset]
+required = []
+[operation_schemas.reset.types]
+device_name = "string"
+width = "integer"
+height = "integer"
+captured_state = "hashtable"

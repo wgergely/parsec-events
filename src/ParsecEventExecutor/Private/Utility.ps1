@@ -27,7 +27,7 @@ function Initialize-ParsecStateRoot {
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)
     )
 
-    foreach ($relative in @('.', 'profiles', 'runs', 'logs', 'events')) {
+    foreach ($relative in @('.', 'snapshots', 'runs', 'logs', 'events')) {
         $path = if ($relative -eq '.') { $StateRoot } else { Join-Path -Path $StateRoot -ChildPath $relative }
         if (-not (Test-Path -LiteralPath $path)) {
             New-Item -ItemType Directory -Path $path -Force | Out-Null
@@ -49,6 +49,37 @@ function ConvertTo-ParsecPlainObject {
         return $null
     }
 
+    $baseObject = if ($InputObject -is [psobject] -and $null -ne $InputObject.PSObject) {
+        $InputObject.PSObject.BaseObject
+    }
+    else {
+        $InputObject
+    }
+
+    if (
+        $baseObject -is [string] -or
+        $baseObject -is [char] -or
+        $baseObject -is [bool] -or
+        $baseObject -is [byte] -or
+        $baseObject -is [sbyte] -or
+        $baseObject -is [int16] -or
+        $baseObject -is [uint16] -or
+        $baseObject -is [int32] -or
+        $baseObject -is [uint32] -or
+        $baseObject -is [int64] -or
+        $baseObject -is [uint64] -or
+        $baseObject -is [single] -or
+        $baseObject -is [double] -or
+        $baseObject -is [decimal] -or
+        $baseObject -is [datetime] -or
+        $baseObject -is [datetimeoffset] -or
+        $baseObject -is [timespan] -or
+        $baseObject -is [guid] -or
+        $baseObject -is [uri]
+    ) {
+        return $baseObject
+    }
+
     if ($InputObject -is [System.Collections.IDictionary]) {
         $output = [ordered]@{}
         foreach ($key in $InputObject.Keys) {
@@ -63,7 +94,7 @@ function ConvertTo-ParsecPlainObject {
             ConvertTo-ParsecPlainObject -InputObject $item
         }
 
-        return @($values)
+        return ,@($values)
     }
 
     if ($InputObject -is [psobject] -and $null -ne $InputObject.PSObject -and @($InputObject.PSObject.Properties).Count -gt 0) {
@@ -113,8 +144,124 @@ function Write-ParsecJsonFile {
 
     $plain = ConvertTo-ParsecPlainObject -InputObject $InputObject
     $json = $plain | ConvertTo-Json -Depth 100
-    Set-Content -LiteralPath $Path -Value $json -Encoding UTF8
+    $fileName = Split-Path -Path $Path -Leaf
+    $tempPath = Join-Path -Path $directory -ChildPath ('.{0}.{1}.tmp' -f $fileName, [guid]::NewGuid().Guid)
+    $backupPath = Join-Path -Path $directory -ChildPath ('.{0}.bak' -f $fileName)
+    $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+    [System.IO.File]::WriteAllText($tempPath, $json, $utf8NoBom)
+
+    if (Test-Path -LiteralPath $Path) {
+        [System.IO.File]::Replace($tempPath, $Path, $backupPath, $true)
+        if (Test-Path -LiteralPath $backupPath) {
+            Remove-Item -LiteralPath $backupPath -Force -ErrorAction SilentlyContinue
+        }
+    }
+    else {
+        [System.IO.File]::Move($tempPath, $Path)
+    }
+
     return $Path
+}
+
+function New-ParsecStateEnvelope {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $DocumentType,
+
+        [Parameter(Mandatory)]
+        $Payload
+    )
+
+    return [ordered]@{
+        schema_version = 1
+        document_type  = $DocumentType
+        written_at     = [DateTimeOffset]::UtcNow.ToString('o')
+        payload        = ConvertTo-ParsecPlainObject -InputObject $Payload
+    }
+}
+
+function Test-ParsecStateEnvelope {
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        $Document
+    )
+
+    return $Document -is [System.Collections.IDictionary] -and $Document.Contains('document_type') -and $Document.Contains('payload')
+}
+
+function Read-ParsecStateDocument {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $Path,
+
+        [Parameter()]
+        [string] $ExpectedDocumentType
+    )
+
+    $document = Read-ParsecJsonFile -Path $Path
+    if ($null -eq $document) {
+        return $null
+    }
+
+    $plain = ConvertTo-ParsecPlainObject -InputObject $document
+    if (-not (Test-ParsecStateEnvelope -Document $plain)) {
+        return $plain
+    }
+
+    if ($ExpectedDocumentType -and $plain.document_type -ne $ExpectedDocumentType) {
+        throw "State document '$Path' has type '$($plain.document_type)' but expected '$ExpectedDocumentType'."
+    }
+
+    return [ordered]@{
+        envelope = $plain
+        payload  = ConvertTo-ParsecPlainObject -InputObject $plain.payload
+    }
+}
+
+function Write-ParsecStateDocument {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $Path,
+
+        [Parameter(Mandatory)]
+        [string] $DocumentType,
+
+        [Parameter(Mandatory)]
+        $Payload
+    )
+
+    $envelope = New-ParsecStateEnvelope -DocumentType $DocumentType -Payload $Payload
+    Write-ParsecJsonFile -Path $Path -InputObject $envelope | Out-Null
+    return $Path
+}
+
+function Write-ParsecEventRecord {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $EventType,
+
+        [Parameter(Mandatory)]
+        [hashtable] $Payload,
+
+        [Parameter()]
+        [string] $StateRoot = (Get-ParsecDefaultStateRoot)
+    )
+
+    $stateRoot = Initialize-ParsecStateRoot -StateRoot $StateRoot
+    if (-not (Get-Variable -Name ParsecEventSequence -Scope Script -ErrorAction SilentlyContinue)) {
+        $script:ParsecEventSequence = 0
+    }
+
+    $script:ParsecEventSequence++
+    $timestamp = [DateTimeOffset]::UtcNow.ToString('yyyyMMddTHHmmssfffffffZ')
+    $path = Join-Path -Path $stateRoot -ChildPath ("events/{0}-{1:D8}-{2}.json" -f $timestamp, [int] $script:ParsecEventSequence, [guid]::NewGuid().Guid)
+    Write-ParsecStateDocument -Path $path -DocumentType $EventType -Payload $Payload | Out-Null
+    return $path
 }
 
 function New-ParsecResult {
@@ -196,7 +343,7 @@ function Resolve-ParsecRecipePath {
     throw "Recipe '$NameOrPath' could not be found."
 }
 
-function Get-ParsecProfileDocumentPath {
+function Get-ParsecSnapshotDocumentPath {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
@@ -207,7 +354,38 @@ function Get-ParsecProfileDocumentPath {
     )
 
     $stateRoot = Initialize-ParsecStateRoot -StateRoot $StateRoot
-    return Join-Path -Path $stateRoot -ChildPath ("profiles/{0}.json" -f $Name)
+    return Join-Path -Path $stateRoot -ChildPath ("snapshots/{0}.json" -f $Name)
+}
+
+function Resolve-ParsecSnapshotPath {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $Name,
+
+        [Parameter()]
+        [string] $StateRoot = (Get-ParsecDefaultStateRoot)
+    )
+
+    $stateCandidate = Get-ParsecSnapshotDocumentPath -Name $Name -StateRoot $StateRoot
+    if (Test-Path -LiteralPath $stateCandidate) {
+        return $stateCandidate
+    }
+
+    throw "Snapshot '$Name' could not be found."
+}
+
+function Get-ParsecProfileDocumentPath {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $Name,
+
+        [Parameter()]
+        [string] $StateRoot = (Get-ParsecDefaultStateRoot)
+    )
+
+    return Get-ParsecSnapshotDocumentPath -Name $Name -StateRoot $StateRoot
 }
 
 function Resolve-ParsecProfilePath {
@@ -220,15 +398,5 @@ function Resolve-ParsecProfilePath {
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)
     )
 
-    $stateCandidate = Get-ParsecProfileDocumentPath -Name $Name -StateRoot $StateRoot
-    if (Test-Path -LiteralPath $stateCandidate) {
-        return $stateCandidate
-    }
-
-    $repoCandidate = Join-Path -Path (Get-ParsecRepositoryRoot) -ChildPath ("profiles/{0}.json" -f $Name)
-    if (Test-Path -LiteralPath $repoCandidate) {
-        return (Resolve-Path -LiteralPath $repoCandidate).Path
-    }
-
-    throw "Profile '$Name' could not be found."
+    return Resolve-ParsecSnapshotPath -Name $Name -StateRoot $StateRoot
 }
