@@ -51,9 +51,10 @@ function Get-TargetFiles {
         [string[]]$CandidatePath
     )
 
-    if ($CandidatePath.Count -gt 0) {
+    if (@($CandidatePath).Count -gt 0) {
         return @(
             $CandidatePath |
+                Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
                 ForEach-Object {
                     Resolve-PowerShellFile -Candidate $_ -RepositoryRoot $repoRoot -AllowedExtension $extensions
                 } |
@@ -84,7 +85,12 @@ $changedFiles = [System.Collections.Generic.List[string]]::new()
 
 foreach ($target in $targets) {
     $original = [System.IO.File]::ReadAllText($target)
-    $formatted = Invoke-Formatter -ScriptDefinition $original -Settings $settingsPath
+    $lineEnding = if ($original.Contains("`r`n")) { "`r`n" } else { "`n" }
+    $normalizedOriginal = [System.Text.RegularExpressions.Regex]::Replace($original, "\r\n|\n|\r", "`n")
+    $formatted = Invoke-Formatter -ScriptDefinition $normalizedOriginal -Settings $settingsPath
+    if ($lineEnding -eq "`r`n") {
+        $formatted = $formatted -replace "`n", "`r`n"
+    }
 
     if ($formatted -cne $original) {
         [System.IO.File]::WriteAllText($target, $formatted, $utf8NoBom)

@@ -191,11 +191,20 @@ function Initialize-ParsecIngredientTestEnvironment {
             app_mode = 'Dark'
             system_mode = 'Dark'
         }
+        wallpaper = [ordered]@{
+            path = 'C:\wallpapers\parsec-test.jpg'
+            wallpaper_style = '10'
+            tile_wallpaper = '0'
+            background_color = '0 0 0'
+        }
     }
 
     $script:ParsecPersonalizationAdapter = @{
         GetThemeState = {
             return ConvertTo-ParsecPlainObject -InputObject $script:IngredientObservedState.theme
+        }
+        GetWallpaperState = {
+            return ConvertTo-ParsecPlainObject -InputObject $script:IngredientObservedState.wallpaper
         }
         SetThemeState = {
             param($Arguments)
@@ -216,6 +225,24 @@ function Initialize-ParsecIngredientTestEnvironment {
 
             $script:IngredientObservedState.theme = $themeState
             New-ParsecResult -Status 'Succeeded' -Message 'theme' -Observed $themeState -Outputs @{ theme_state = $themeState }
+        }
+        SetWallpaperState = {
+            param($Arguments)
+
+            $wallpaperState = if ($Arguments.ContainsKey('wallpaper_state')) {
+                ConvertTo-ParsecPlainObject -InputObject $Arguments.wallpaper_state
+            }
+            else {
+                [ordered]@{
+                    path = if ($Arguments.ContainsKey('path')) { [string] $Arguments.path } else { '' }
+                    wallpaper_style = if ($Arguments.ContainsKey('wallpaper_style')) { [string] $Arguments.wallpaper_style } else { '' }
+                    tile_wallpaper = if ($Arguments.ContainsKey('tile_wallpaper')) { [string] $Arguments.tile_wallpaper } else { '' }
+                    background_color = if ($Arguments.ContainsKey('background_color')) { [string] $Arguments.background_color } else { '' }
+                }
+            }
+
+            $script:IngredientObservedState.wallpaper = $wallpaperState
+            New-ParsecResult -Status 'Succeeded' -Message 'wallpaper' -Observed $wallpaperState -Outputs @{ wallpaper_state = $wallpaperState }
         }
         SetTextScale = {
             param($Arguments)

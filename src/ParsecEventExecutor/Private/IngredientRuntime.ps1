@@ -209,6 +209,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace ParsecEventExecutor {
     public sealed class MonitorCapture {
@@ -309,6 +310,10 @@ namespace ParsecEventExecutor {
         public const int DMDO_90 = 1;
         public const int DMDO_180 = 2;
         public const int DMDO_270 = 3;
+        public const int SPI_SETDESKWALLPAPER = 0x0014;
+        public const int SPI_GETDESKWALLPAPER = 0x0073;
+        public const int SPIF_UPDATEINIFILE = 0x0001;
+        public const int SPIF_SENDCHANGE = 0x0002;
 
         [StructLayout(LayoutKind.Sequential)]
         public struct RECT {
@@ -521,6 +526,12 @@ namespace ParsecEventExecutor {
         [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         private static extern IntPtr SendNotifyMessage(IntPtr hWnd, uint Msg, IntPtr wParam, string lParam);
 
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern bool SystemParametersInfo(uint uiAction, uint uiParam, StringBuilder pvParam, uint fWinIni);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern bool SystemParametersInfo(uint uiAction, uint uiParam, string pvParam, uint fWinIni);
+
         [DllImport("user32.dll")]
         private static extern int GetDisplayConfigBufferSizes(uint flags, out uint numPathArrayElements, out uint numModeInfoArrayElements);
 
@@ -597,6 +608,21 @@ namespace ParsecEventExecutor {
 
         public static void BroadcastSettingChange(string area) {
             SendNotifyMessage(new IntPtr(0xffff), 0x001A, IntPtr.Zero, area);
+        }
+
+        public static string GetDesktopWallpaperPath() {
+            var buffer = new StringBuilder(260);
+            if (!SystemParametersInfo(SPI_GETDESKWALLPAPER, (uint)buffer.Capacity, buffer, 0)) {
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "SystemParametersInfo(SPI_GETDESKWALLPAPER) failed.");
+            }
+
+            return buffer.ToString();
+        }
+
+        public static void SetDesktopWallpaper(string path) {
+            if (!SystemParametersInfo(SPI_SETDESKWALLPAPER, 0, path ?? string.Empty, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE)) {
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "SystemParametersInfo(SPI_SETDESKWALLPAPER) failed.");
+            }
         }
 
         public static DisplayPathCapture[] GetDisplayConfigPaths() {
@@ -1154,6 +1180,62 @@ function Get-ParsecThemeState {
     }
 }
 
+function Get-ParsecWallpaperState {
+    [CmdletBinding()]
+    param()
+
+    $desktopPath = 'HKCU:\Control Panel\Desktop'
+    $colorsPath = 'HKCU:\Control Panel\Colors'
+    $wallpaperPath = ''
+    $wallpaperStyle = ''
+    $tileWallpaper = ''
+    $backgroundColor = ''
+
+    try {
+        $wallpaperPath = [ParsecEventExecutor.DisplayNative]::GetDesktopWallpaperPath()
+    }
+    catch {
+        Write-Verbose 'Desktop wallpaper path could not be queried through SystemParametersInfo. Falling back to registry.'
+    }
+
+    if ([string]::IsNullOrWhiteSpace($wallpaperPath)) {
+        try {
+            $wallpaperPath = [string] (Get-ItemPropertyValue -Path $desktopPath -Name 'WallPaper' -ErrorAction Stop)
+        }
+        catch {
+            $wallpaperPath = ''
+        }
+    }
+
+    try {
+        $wallpaperStyle = [string] (Get-ItemPropertyValue -Path $desktopPath -Name 'WallpaperStyle' -ErrorAction Stop)
+    }
+    catch {
+        $wallpaperStyle = ''
+    }
+
+    try {
+        $tileWallpaper = [string] (Get-ItemPropertyValue -Path $desktopPath -Name 'TileWallpaper' -ErrorAction Stop)
+    }
+    catch {
+        $tileWallpaper = ''
+    }
+
+    try {
+        $backgroundColor = [string] (Get-ItemPropertyValue -Path $colorsPath -Name 'Background' -ErrorAction Stop)
+    }
+    catch {
+        $backgroundColor = ''
+    }
+
+    return [ordered]@{
+        path = $wallpaperPath
+        wallpaper_style = $wallpaperStyle
+        tile_wallpaper = $tileWallpaper
+        background_color = $backgroundColor
+    }
+}
+
 function Initialize-ParsecPersonalizationInterop {
     [CmdletBinding()]
     param()
@@ -1215,6 +1297,88 @@ function Set-ParsecThemeStateInternal {
     $state = Get-ParsecThemeState
     return New-ParsecResult -Status 'Succeeded' -Message ("Theme set to app={0}, system={1}." -f $state.app_mode, $state.system_mode) -Observed $state -Outputs @{
         theme_state = $state
+    }
+}
+
+function Set-ParsecWallpaperStateInternal {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [hashtable] $Arguments
+    )
+
+    $wallpaperState = if ($Arguments.ContainsKey('wallpaper_state') -and $Arguments.wallpaper_state -is [System.Collections.IDictionary]) {
+        ConvertTo-ParsecPlainObject -InputObject $Arguments.wallpaper_state
+    }
+    else {
+        $null
+    }
+
+    $wallpaperPath = if ($Arguments.ContainsKey('path')) {
+        [string] $Arguments.path
+    }
+    elseif ($null -ne $wallpaperState -and $wallpaperState.Contains('path')) {
+        [string] $wallpaperState.path
+    }
+    else {
+        ''
+    }
+
+    $wallpaperStyle = if ($Arguments.ContainsKey('wallpaper_style')) {
+        [string] $Arguments.wallpaper_style
+    }
+    elseif ($null -ne $wallpaperState -and $wallpaperState.Contains('wallpaper_style')) {
+        [string] $wallpaperState.wallpaper_style
+    }
+    else {
+        ''
+    }
+
+    $tileWallpaper = if ($Arguments.ContainsKey('tile_wallpaper')) {
+        [string] $Arguments.tile_wallpaper
+    }
+    elseif ($null -ne $wallpaperState -and $wallpaperState.Contains('tile_wallpaper')) {
+        [string] $wallpaperState.tile_wallpaper
+    }
+    else {
+        ''
+    }
+
+    $backgroundColor = if ($Arguments.ContainsKey('background_color')) {
+        [string] $Arguments.background_color
+    }
+    elseif ($null -ne $wallpaperState -and $wallpaperState.Contains('background_color')) {
+        [string] $wallpaperState.background_color
+    }
+    else {
+        ''
+    }
+
+    $desktopPath = 'HKCU:\Control Panel\Desktop'
+    $colorsPath = 'HKCU:\Control Panel\Colors'
+    if (-not (Test-Path -LiteralPath $desktopPath)) {
+        New-Item -Path $desktopPath -Force | Out-Null
+    }
+
+    if (-not (Test-Path -LiteralPath $colorsPath)) {
+        New-Item -Path $colorsPath -Force | Out-Null
+    }
+
+    New-ItemProperty -Path $desktopPath -Name 'WallpaperStyle' -Value $wallpaperStyle -PropertyType String -Force | Out-Null
+    New-ItemProperty -Path $desktopPath -Name 'TileWallpaper' -Value $tileWallpaper -PropertyType String -Force | Out-Null
+    New-ItemProperty -Path $desktopPath -Name 'WallPaper' -Value $wallpaperPath -PropertyType String -Force | Out-Null
+    if (-not [string]::IsNullOrWhiteSpace($backgroundColor)) {
+        New-ItemProperty -Path $colorsPath -Name 'Background' -Value $backgroundColor -PropertyType String -Force | Out-Null
+    }
+
+    Initialize-ParsecPersonalizationInterop
+    [ParsecEventExecutor.DisplayNative]::SetDesktopWallpaper($wallpaperPath)
+    [ParsecEventExecutor.DisplayNative]::BroadcastSettingChange('Control Panel\Desktop')
+    [ParsecEventExecutor.DisplayNative]::BroadcastSettingChange('Environment')
+
+    $state = Get-ParsecWallpaperState
+    return New-ParsecResult -Status 'Succeeded' -Message 'Wallpaper state restored.' -Observed $state -Outputs @{
+        wallpaper_state = $state
     }
 }
 
@@ -1320,9 +1484,16 @@ function Initialize-ParsecPersonalizationAdapter {
         GetThemeState = {
             return Get-ParsecThemeState
         }
+        GetWallpaperState = {
+            return Get-ParsecWallpaperState
+        }
         SetThemeState = {
             param([hashtable] $Arguments)
             return Set-ParsecThemeStateInternal -Arguments $Arguments
+        }
+        SetWallpaperState = {
+            param([hashtable] $Arguments)
+            return Set-ParsecWallpaperStateInternal -Arguments $Arguments
         }
         SetTextScale = {
             param([hashtable] $Arguments)
@@ -1378,6 +1549,7 @@ function Get-ParsecDisplayCaptureState {
         $textScalePercent = Get-ParsecTextScalePercent
         $uiScalePercent = Get-ParsecUiScalePercent
         $themeState = Invoke-ParsecPersonalizationAdapter -Method 'GetThemeState'
+        $wallpaperState = Invoke-ParsecPersonalizationAdapter -Method 'GetWallpaperState'
         $nativeMonitorIndex = @{}
         foreach ($monitor in @($nativeMonitors)) {
             $nativeMonitorIndex[[string] $monitor.DeviceName] = $monitor
@@ -1569,6 +1741,7 @@ function Get-ParsecDisplayCaptureState {
                 text_scale_percent = [int] $textScalePercent
             }
             theme = $themeState
+            wallpaper = $wallpaperState
         }
     }
     catch {
@@ -1577,6 +1750,7 @@ function Get-ParsecDisplayCaptureState {
         $textScalePercent = Get-ParsecTextScalePercent
         $uiScalePercent = Get-ParsecUiScalePercent
         $themeState = Invoke-ParsecPersonalizationAdapter -Method 'GetThemeState'
+        $wallpaperState = Invoke-ParsecPersonalizationAdapter -Method 'GetWallpaperState'
         $monitors = foreach ($screen in $screens) {
             [ordered]@{
                 device_name = $screen.DeviceName
@@ -1629,6 +1803,7 @@ function Get-ParsecDisplayCaptureState {
                 text_scale_percent = [int] $textScalePercent
             }
             theme = $themeState
+            wallpaper = $wallpaperState
         }
     }
 }
@@ -2355,6 +2530,10 @@ function Invoke-ParsecSnapshotReset {
 
     if ($SnapshotDocument.display.Contains('theme')) {
         $actions.Add((Invoke-ParsecPersonalizationAdapter -Method 'SetThemeState' -Arguments @{ theme_state = $SnapshotDocument.display.theme }))
+    }
+
+    if ($SnapshotDocument.display.Contains('wallpaper')) {
+        $actions.Add((Invoke-ParsecPersonalizationAdapter -Method 'SetWallpaperState' -Arguments @{ wallpaper_state = $SnapshotDocument.display.wallpaper }))
     }
 
     $actionResults = @($actions | ForEach-Object { $_ })
