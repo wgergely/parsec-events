@@ -425,11 +425,12 @@ Describe 'Standalone ingredient surface' {
 
             $result = Invoke-ParsecIngredient -Name 'cycle-activation' -Arguments @{
                 dwell_ms = 0
+                max_cycles = 4
             } -StateRoot $stateRoot -Confirm:$false
 
             $result.status | Should -Be 'Succeeded'
             $result.ingredient_name | Should -Be 'window.cycle-activation'
-            $result.operation_result.Outputs.activation_results.Count | Should -Be 1
+            $result.operation_result.Outputs.activation_results.Count | Should -Be 2
             $result.verify_result.Status | Should -Be 'Succeeded'
             $script:IngredientWindowForegroundHandle | Should -Be 101
             $script:IngredientWindowActivationLog | Should -Be @(102, 101)
@@ -440,6 +441,7 @@ Describe 'Standalone ingredient surface' {
 
             $apply = Invoke-ParsecIngredient -Name 'cycle-activation' -Arguments @{
                 dwell_ms = 0
+                max_cycles = 4
             } -StateRoot $stateRoot -Confirm:$false
 
             $script:IngredientWindowForegroundHandle = 102
@@ -447,6 +449,23 @@ Describe 'Standalone ingredient surface' {
 
             $reset.status | Should -Be 'Succeeded'
             $script:IngredientWindowForegroundHandle | Should -Be 101
+        }
+
+        It 'persists compact invocation payloads for noisy window cycle results' {
+            $stateRoot = Join-Path $TestDrive 'window-cycle-persistence'
+            $script:IngredientAltTabHandles = @(101) + @(200..230)
+
+            $result = Invoke-ParsecIngredient -Name 'cycle-activation' -Arguments @{
+                dwell_ms = 0
+                max_cycles = 30
+            } -StateRoot $stateRoot -Confirm:$false
+
+            $invocationDocument = Get-Content -LiteralPath $result.invocation_path -Raw | ConvertFrom-Json -Depth 100
+            $persistedActivationResults = $invocationDocument.payload.operation_result.Outputs.activation_results
+
+            $persistedActivationResults.truncated | Should -BeTrue
+            $persistedActivationResults.total_count | Should -Be 30
+            @($persistedActivationResults.sample).Count | Should -Be 20
         }
 
         It 'captures and restores persisted topology snapshots explicitly' {

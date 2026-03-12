@@ -1,2 +1,5 @@
 temp/
 tmp/
+.codex-state/
+.codex-live/
+.codex-tools/

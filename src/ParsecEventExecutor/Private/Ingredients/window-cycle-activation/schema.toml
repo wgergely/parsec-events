@@ -16,7 +16,7 @@ required = []
 required = []
 [operation_schemas.apply.types]
 dwell_ms = "integer"
-include_minimized = "boolean"
+max_cycles = "integer"
 
 [operation_schemas.verify]
 required = []

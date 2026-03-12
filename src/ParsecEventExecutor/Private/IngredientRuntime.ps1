@@ -272,6 +272,7 @@ namespace ParsecEventExecutor {
 
     public sealed class WindowCapture {
         public long Handle { get; set; }
+        public long OwnerHandle { get; set; }
         public uint ProcessId { get; set; }
         public string Title { get; set; }
         public string ClassName { get; set; }
@@ -566,6 +567,30 @@ namespace ParsecEventExecutor {
         [DllImport("user32.dll")]
         private static extern IntPtr GetShellWindow();
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct INPUT {
+            public uint type;
+            public INPUTUNION U;
+        }
+
+        [StructLayout(LayoutKind.Explicit)]
+        private struct INPUTUNION {
+            [FieldOffset(0)]
+            public KEYBDINPUT ki;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct KEYBDINPUT {
+            public ushort wVk;
+            public ushort wScan;
+            public uint dwFlags;
+            public uint time;
+            public IntPtr dwExtraInfo;
+        }
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+
         [DllImport("user32.dll")]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
 
@@ -582,7 +607,7 @@ namespace ParsecEventExecutor {
         private static extern bool IsIconic(IntPtr hWnd);
 
         [DllImport("user32.dll")]
-        private static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
+        private static extern IntPtr GetWindow(IntPtr hWnd, uint uCmd);
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         private static extern int GetWindowTextLengthW(IntPtr hWnd);
@@ -691,6 +716,7 @@ namespace ParsecEventExecutor {
 
             return new WindowCapture {
                 Handle = hWnd.ToInt64(),
+                OwnerHandle = GetWindow(hWnd, 4u).ToInt64(),
                 ProcessId = processId,
                 Title = title ?? string.Empty,
                 ClassName = GetWindowClassName(hWnd),
@@ -890,14 +916,23 @@ namespace ParsecEventExecutor {
             return windows.ToArray();
         }
 
+        public static bool StepAltTab() {
+            var inputs = new INPUT[] {
+                new INPUT { type = 1u, U = new INPUTUNION { ki = new KEYBDINPUT { wVk = 0x12 } } },
+                new INPUT { type = 1u, U = new INPUTUNION { ki = new KEYBDINPUT { wVk = 0x09 } } },
+                new INPUT { type = 1u, U = new INPUTUNION { ki = new KEYBDINPUT { wVk = 0x09, dwFlags = 0x0002u } } },
+                new INPUT { type = 1u, U = new INPUTUNION { ki = new KEYBDINPUT { wVk = 0x12, dwFlags = 0x0002u } } }
+            };
+
+            return SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(INPUT))) == inputs.Length;
+        }
+
         public static bool ActivateWindow(long handle, bool restoreIfMinimized) {
             var hWnd = new IntPtr(handle);
             if (!IsWindow(hWnd)) {
                 return false;
             }
 
-            ShowWindowAsync(hWnd, restoreIfMinimized ? 9 : 5);
-            BringWindowToTop(hWnd);
             return SetForegroundWindow(hWnd);
         }
 
@@ -1945,6 +1980,38 @@ function Test-ParsecWindowActivationCandidate {
         return $false
     }
 
+    $title = if ($Window.Contains('title')) { [string] $Window.title } else { '' }
+    if ([string]::IsNullOrWhiteSpace($title)) {
+        return $false
+    }
+
+    $className = if ($Window.Contains('class_name')) { [string] $Window.class_name } else { '' }
+    if ($className -in @('IME', 'tooltips_class32', 'SysShadow', 'ForegroundStaging', 'ThumbnailDeviceHelperWnd', 'PseudoConsoleWindow')) {
+        return $false
+    }
+
+    $extendedStyle = if ($Window.Contains('extended_style') -and $null -ne $Window.extended_style) { [int64] $Window.extended_style } else { 0 }
+    $ownerHandle = if ($Window.Contains('owner_handle') -and $null -ne $Window.owner_handle) { [int64] $Window.owner_handle } else { 0 }
+    $hasAppWindowStyle = ($extendedStyle -band 0x40000) -ne 0
+    $hasToolWindowStyle = ($extendedStyle -band 0x80) -ne 0
+    $hasNoActivateStyle = ($extendedStyle -band 0x08000000) -ne 0
+
+    if (($extendedStyle -band 0x80) -ne 0) {
+        return $false
+    }
+
+    if ($hasNoActivateStyle) {
+        return $false
+    }
+
+    if ($ownerHandle -ne 0 -and -not $hasAppWindowStyle) {
+        return $false
+    }
+
+    if ($hasToolWindowStyle) {
+        return $false
+    }
+
     return $true
 }
 
@@ -1960,63 +2027,62 @@ function Invoke-ParsecWindowCycleInternal {
         throw 'dwell_ms must be zero or greater.'
     }
 
-    $includeMinimized = if ($Arguments.ContainsKey('include_minimized')) { [bool] $Arguments.include_minimized } else { $false }
+    $maxCycles = if ($Arguments.ContainsKey('max_cycles')) { [int] $Arguments.max_cycles } else { 30 }
+    if ($maxCycles -lt 1) {
+        throw 'max_cycles must be one or greater.'
+    }
+
     $captureState = Get-ParsecWindowCaptureState
-    $foregroundWindow = if ($captureState.Contains('foreground_window')) { $captureState.foreground_window } else { $null }
-    $foregroundHandle = if ($null -ne $foregroundWindow -and $foregroundWindow.Contains('handle') -and $null -ne $foregroundWindow.handle) { [int64] $foregroundWindow.handle } else { 0 }
-    $candidates = @(
-        foreach ($window in @($captureState.windows)) {
-            if (-not ($window -is [System.Collections.IDictionary])) {
-                continue
-            }
-
-            if (-not (Test-ParsecWindowActivationCandidate -Window $window -IncludeMinimized:$includeMinimized)) {
-                continue
-            }
-
-            if ([int64] $window.handle -eq $foregroundHandle) {
-                continue
-            }
-
-            ConvertTo-ParsecPlainObject -InputObject $window
-        }
-    )
+    $foregroundWindow = if ($captureState.Contains('foreground_window')) { ConvertTo-ParsecPlainObject -InputObject $captureState.foreground_window } else { $null }
+    $foregroundHandle = if ($foregroundWindow -is [System.Collections.IDictionary] -and $foregroundWindow.Contains('handle') -and $null -ne $foregroundWindow.handle) { [int64] $foregroundWindow.handle } else { 0 }
+    if ($foregroundHandle -eq 0) {
+        return New-ParsecResult -Status 'Failed' -Message 'Could not capture the current foreground window.' -Errors @('MissingForegroundWindow')
+    }
 
     $activationResults = New-Object System.Collections.ArrayList
-    foreach ($window in $candidates) {
-        $activation = Invoke-ParsecWindowAdapter -Method 'ActivateWindow' -Arguments @{
-            handle = [int64] $window.handle
-            restore_if_minimized = $includeMinimized
+    $loopReturned = $false
+    $seenDifferentWindow = $false
+    for ($cycle = 1; $cycle -le $maxCycles; $cycle++) {
+        $stepResult = Invoke-ParsecWindowAdapter -Method 'StepAltTab' -Arguments @{}
+        $currentForeground = Invoke-ParsecWindowAdapter -Method 'GetForegroundWindowInfo'
+        $stepRecord = [ordered]@{
+            cycle = $cycle
+            step = ConvertTo-ParsecPlainObject -InputObject $stepResult
+            foreground_window = ConvertTo-ParsecPlainObject -InputObject $currentForeground
         }
-        [void] $activationResults.Add((ConvertTo-ParsecPlainObject -InputObject $activation))
+        [void] $activationResults.Add($stepRecord)
         if ($dwellMilliseconds -gt 0) {
             Start-Sleep -Milliseconds $dwellMilliseconds
         }
-    }
 
-    $restoredForeground = $null
-    if ($foregroundHandle -ne 0) {
-        $restoredForeground = Invoke-ParsecWindowAdapter -Method 'ActivateWindow' -Arguments @{
-            handle = $foregroundHandle
-            restore_if_minimized = $true
+        $currentHandle = if ($null -ne $currentForeground -and $currentForeground.handle) { [int64] $currentForeground.handle } else { 0 }
+        if ($currentHandle -ne 0 -and $currentHandle -ne $foregroundHandle) {
+            $seenDifferentWindow = $true
+        }
+
+        if ($seenDifferentWindow -and $currentHandle -eq $foregroundHandle) {
+            $loopReturned = $true
+            break
         }
     }
 
-    return New-ParsecResult -Status 'Succeeded' -Message 'Activation cycle completed.' -Observed @{
+    $status = if ($loopReturned) { 'Succeeded' } else { 'Failed' }
+    $message = if ($loopReturned) { 'Alt-Tab cycle completed and returned to the original foreground window.' } else { 'Alt-Tab cycle did not return to the original foreground window within the configured limit.' }
+    $errors = if ($loopReturned) { @() } else { @('AltTabCycleIncomplete') }
+
+    return New-ParsecResult -Status $status -Message $message -Observed @{
         original_foreground_handle = $foregroundHandle
-        candidate_count = @($candidates).Count
-        activated_count = @($activationResults | Where-Object { $_.succeeded }).Count
+        cycle_count = @($activationResults).Count
+        loop_returned = $loopReturned
     } -Outputs @{
         captured_state = @{
             foreground_window = $foregroundWindow
         }
         original_foreground_window = $foregroundWindow
         activation_results = @($activationResults)
-        attempted_windows = @($candidates)
         dwell_ms = $dwellMilliseconds
-        include_minimized = $includeMinimized
-        restore_result = ConvertTo-ParsecPlainObject -InputObject $restoredForeground
-    }
+        max_cycles = $maxCycles
+    } -Errors $errors
 }
 
 function Restore-ParsecWindowForegroundInternal {
@@ -2076,6 +2142,13 @@ function Initialize-ParsecWindowAdapter {
         GetTopLevelWindows = {
             Initialize-ParsecDisplayInterop
             return @([ParsecEventExecutor.DisplayNative]::GetTopLevelWindows()) | ForEach-Object { ConvertTo-ParsecPlainObject -InputObject $_ }
+        }
+        StepAltTab = {
+            Initialize-ParsecDisplayInterop
+            $succeeded = [bool] [ParsecEventExecutor.DisplayNative]::StepAltTab()
+            return [ordered]@{
+                succeeded = $succeeded
+            }
         }
         ActivateWindow = {
             param([hashtable] $Arguments)

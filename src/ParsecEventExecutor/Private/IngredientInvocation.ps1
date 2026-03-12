@@ -23,7 +23,8 @@ function Save-ParsecIngredientInvocationDocument {
     )
 
     $path = Get-ParsecIngredientInvocationDocumentPath -InvocationId $InvocationDocument.invocation_id -StateRoot $StateRoot
-    Write-ParsecStateDocument -Path $path -DocumentType 'ingredient-invocation' -Payload $InvocationDocument | Out-Null
+    $persistedDocument = Compress-ParsecIngredientInvocationDocumentForPersistence -InvocationDocument $InvocationDocument
+    Write-ParsecStateDocument -Path $path -DocumentType 'ingredient-invocation' -Payload $persistedDocument | Out-Null
     return $path
 }
 
@@ -53,8 +54,128 @@ function Save-ParsecIngredientTokenDocument {
 
     $TokenDocument.updated_at = [DateTimeOffset]::UtcNow.ToString('o')
     $path = Get-ParsecIngredientTokenDocumentPath -TokenId $TokenDocument.token_id -StateRoot $StateRoot
-    Write-ParsecStateDocument -Path $path -DocumentType 'ingredient-token' -Payload $TokenDocument | Out-Null
+    $persistedDocument = Compress-ParsecIngredientTokenDocumentForPersistence -TokenDocument $TokenDocument
+    Write-ParsecStateDocument -Path $path -DocumentType 'ingredient-token' -Payload $persistedDocument | Out-Null
     return $path
+}
+
+function Compress-ParsecPersistenceValue {
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        $Value,
+
+        [Parameter()]
+        [int] $MaxItems = 20,
+
+        [Parameter()]
+        [int] $MaxStringLength = 512
+    )
+
+    if ($null -eq $Value) {
+        return $null
+    }
+
+    if ($Value -is [string]) {
+        if ($Value.Length -le $MaxStringLength) {
+            return $Value
+        }
+
+        return [ordered]@{
+            truncated = $true
+            original_length = $Value.Length
+            preview = $Value.Substring(0, $MaxStringLength)
+        }
+    }
+
+    if ($Value -is [System.Collections.IDictionary]) {
+        $compressed = [ordered]@{}
+        foreach ($key in @($Value.Keys)) {
+            $compressed[$key] = Compress-ParsecPersistenceValue -Value $Value[$key] -MaxItems $MaxItems -MaxStringLength $MaxStringLength
+        }
+
+        return $compressed
+    }
+
+    if ($Value -is [System.Collections.IEnumerable] -and $Value -isnot [string]) {
+        $items = @($Value)
+        if ($items.Count -le $MaxItems) {
+            return @($items | ForEach-Object { Compress-ParsecPersistenceValue -Value $_ -MaxItems $MaxItems -MaxStringLength $MaxStringLength })
+        }
+
+        return [ordered]@{
+            truncated = $true
+            total_count = $items.Count
+            sample = @($items | Select-Object -First $MaxItems | ForEach-Object { Compress-ParsecPersistenceValue -Value $_ -MaxItems $MaxItems -MaxStringLength $MaxStringLength })
+        }
+    }
+
+    return $Value
+}
+
+function Compress-ParsecResultForPersistence {
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        $Result
+    )
+
+    if ($null -eq $Result) {
+        return $null
+    }
+
+    $plain = ConvertTo-ParsecPlainObject -InputObject $Result
+    if ($plain -isnot [System.Collections.IDictionary]) {
+        return $plain
+    }
+
+    $compressed = [ordered]@{}
+    foreach ($key in @($plain.Keys)) {
+        switch ([string] $key) {
+            'Observed' { $compressed[$key] = Compress-ParsecPersistenceValue -Value $plain[$key] }
+            'Outputs' { $compressed[$key] = Compress-ParsecPersistenceValue -Value $plain[$key] }
+            'Requested' { $compressed[$key] = Compress-ParsecPersistenceValue -Value $plain[$key] }
+            'Warnings' { $compressed[$key] = Compress-ParsecPersistenceValue -Value $plain[$key] }
+            'Errors' { $compressed[$key] = Compress-ParsecPersistenceValue -Value $plain[$key] }
+            default { $compressed[$key] = $plain[$key] }
+        }
+    }
+
+    return $compressed
+}
+
+function Compress-ParsecIngredientInvocationDocumentForPersistence {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [System.Collections.IDictionary] $InvocationDocument
+    )
+
+    $compressed = ConvertTo-ParsecPlainObject -InputObject $InvocationDocument
+    foreach ($key in @('capture_result', 'operation_result', 'readiness_result', 'verify_result', 'reset_result')) {
+        if ($compressed.Contains($key)) {
+            $compressed[$key] = Compress-ParsecResultForPersistence -Result $compressed[$key]
+        }
+    }
+
+    return $compressed
+}
+
+function Compress-ParsecIngredientTokenDocumentForPersistence {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [System.Collections.IDictionary] $TokenDocument
+    )
+
+    $compressed = ConvertTo-ParsecPlainObject -InputObject $TokenDocument
+    foreach ($key in @('capture_result', 'apply_result', 'readiness_result', 'verify_result', 'reset_result')) {
+        if ($compressed.Contains($key)) {
+            $compressed[$key] = Compress-ParsecResultForPersistence -Result $compressed[$key]
+        }
+    }
+
+    return $compressed
 }
 
 function Read-ParsecIngredientTokenDocument {

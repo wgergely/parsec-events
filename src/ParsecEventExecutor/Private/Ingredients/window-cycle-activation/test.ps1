@@ -4,11 +4,11 @@ Context 'window.cycle-activation' {
         $capture.Status | Should -Be 'Succeeded'
         $capture.Outputs.captured_state.foreground_window.handle | Should -Be 101
 
-        $apply = Invoke-ParsecIngredientOperation -Name 'window.cycle-activation' -Operation 'apply' -Arguments @{ dwell_ms = 0 } -RunState @{}
+        $apply = Invoke-ParsecIngredientOperation -Name 'window.cycle-activation' -Operation 'apply' -Arguments @{ dwell_ms = 0; max_cycles = 4 } -RunState @{}
         $apply.Status | Should -Be 'Succeeded'
-        $apply.Outputs.restore_result.succeeded | Should -BeTrue
+        $apply.Observed.loop_returned | Should -BeTrue
         $script:IngredientWindowForegroundHandle | Should -Be 101
-        $script:IngredientWindowActivationLog | Should -Contain 102
+        $script:IngredientWindowActivationLog | Should -Be @(102, 101)
     }
 
     It 'fails verification when the original foreground window is not restored' {

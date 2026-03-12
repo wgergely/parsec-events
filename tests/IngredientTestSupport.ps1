@@ -185,9 +185,11 @@ function Initialize-ParsecIngredientTestEnvironment {
     $script:IngredientWindowActivationLog = @()
     $script:IngredientWindowActivationDeniedHandles = @()
     $script:IngredientWindowForegroundHandle = 101
+    $script:IngredientAltTabHandles = @([int64] 101, [int64] 102)
     $script:IngredientWindows = @(
         [ordered]@{
             handle = [int64] 101
+            owner_handle = [int64] 0
             process_id = 1001
             title = 'Editor'
             class_name = 'ApplicationFrameWindow'
@@ -199,6 +201,7 @@ function Initialize-ParsecIngredientTestEnvironment {
         },
         [ordered]@{
             handle = [int64] 102
+            owner_handle = [int64] 0
             process_id = 1002
             title = 'Browser'
             class_name = 'Chrome_WidgetWin_1'
@@ -210,6 +213,7 @@ function Initialize-ParsecIngredientTestEnvironment {
         },
         [ordered]@{
             handle = [int64] 103
+            owner_handle = [int64] 0
             process_id = 1003
             title = 'Hidden Utility'
             class_name = 'ToolWindow'
@@ -639,6 +643,24 @@ function Initialize-ParsecIngredientTestEnvironment {
         }
         GetTopLevelWindows = {
             return @($script:IngredientWindows | ForEach-Object { ConvertTo-ParsecPlainObject -InputObject $_ })
+        }
+        StepAltTab = {
+            $currentIndex = [Array]::IndexOf($script:IngredientAltTabHandles, [int64] $script:IngredientWindowForegroundHandle)
+            if ($currentIndex -lt 0 -or $script:IngredientAltTabHandles.Count -eq 0) {
+                return [ordered]@{
+                    succeeded = $false
+                    handle = $script:IngredientWindowForegroundHandle
+                }
+            }
+
+            $nextIndex = ($currentIndex + 1) % $script:IngredientAltTabHandles.Count
+            $nextHandle = [int64] $script:IngredientAltTabHandles[$nextIndex]
+            $script:IngredientWindowForegroundHandle = $nextHandle
+            $script:IngredientWindowActivationLog += $nextHandle
+            return [ordered]@{
+                succeeded = $true
+                handle = $nextHandle
+            }
         }
         ActivateWindow = {
             param($Arguments)
