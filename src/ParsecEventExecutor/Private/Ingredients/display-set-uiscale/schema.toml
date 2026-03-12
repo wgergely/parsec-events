@@ -1,0 +1,55 @@
+name = "display.set-uiscale"
+aliases = ["set-uiscale"]
+kind = "display"
+description = "Set UI scaling."
+capabilities = ["capture", "apply", "wait", "verify", "reset"]
+required_backends = ["PersonalizationAdapter"]
+safety_class = "ReversibleSystemChange"
+success_signals = []
+failure_signals = []
+wait_conditions = []
+
+[readiness]
+timeout_ms = 4000
+poll_interval_ms = 200
+success_count = 2
+
+[operation_schemas.capture]
+required = []
+
+[operation_schemas.apply]
+required = []
+[operation_schemas.apply.types]
+ui_scale_percent = "integer"
+scale_percent = "integer"
+value = "integer"
+screen_id = "integer"
+device_name = "string"
+
+[operation_schemas.wait]
+required = []
+[operation_schemas.wait.types]
+ui_scale_percent = "integer"
+scale_percent = "integer"
+value = "integer"
+screen_id = "integer"
+device_name = "string"
+
+[operation_schemas.verify]
+required = []
+[operation_schemas.verify.types]
+ui_scale_percent = "integer"
+scale_percent = "integer"
+value = "integer"
+screen_id = "integer"
+device_name = "string"
+
+[operation_schemas.reset]
+required = []
+[operation_schemas.reset.types]
+ui_scale_percent = "integer"
+scale_percent = "integer"
+value = "integer"
+captured_state = "hashtable"
+screen_id = "integer"
+device_name = "string"

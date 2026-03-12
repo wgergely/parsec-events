@@ -64,6 +64,24 @@ Describe 'Get-ParsecRecipe' {
         $recipe.steps[0].arguments.orientation | Should -Be 'Portrait'
     }
 
+    It 'parses a direct text-scale recipe that uses the flat alias' {
+        $recipePath = Join-Path $PSScriptRoot 'fixtures\recipes\textscale-sequence.toml'
+        $recipe = Get-ParsecRecipe -NameOrPath $recipePath
+
+        $recipe.steps.Count | Should -Be 1
+        $recipe.steps[0].ingredient | Should -Be 'set-textscale'
+        $recipe.steps[0].arguments.text_scale_percent | Should -Be 150
+    }
+
+    It 'parses a direct ui-scale recipe that uses the flat alias' {
+        $recipePath = Join-Path $PSScriptRoot 'fixtures\recipes\uiscale-sequence.toml'
+        $recipe = Get-ParsecRecipe -NameOrPath $recipePath
+
+        $recipe.steps.Count | Should -Be 1
+        $recipe.steps[0].ingredient | Should -Be 'set-uiscale'
+        $recipe.steps[0].arguments.ui_scale_percent | Should -Be 125
+    }
+
     It 'parses the mission recipes as mobile preset and snapshot reset flows' {
         $mobile = Get-ParsecRecipe -NameOrPath 'enter-mobile'
         $desktop = Get-ParsecRecipe -NameOrPath 'return-desktop'

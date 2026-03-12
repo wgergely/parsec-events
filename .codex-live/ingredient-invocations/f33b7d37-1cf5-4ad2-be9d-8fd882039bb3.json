@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "document_type": "ingredient-invocation",
+  "written_at": "2026-03-12T15:39:02.9318051+00:00",
+  "payload": {
+    "reset_result": null,
+    "invocation_id": "f33b7d37-1cf5-4ad2-be9d-8fd882039bb3",
+    "readiness_result": null,
+    "status": "Succeeded",
+    "completed_at": "2026-03-12T15:39:02.9220278+00:00",
+    "started_at": "2026-03-12T15:39:02.1825630+00:00",
+    "verify_result": null,
+    "resolved_target_identity": null,
+    "capture_result": null,
+    "requested_arguments": {},
+    "token_path": null,
+    "ingredient_name": "display.set-uiscale",
+    "token_id": "",
+    "operation_result": {
+      "Status": "Succeeded",
+      "Message": "Captured UI scaling state.",
+      "Requested": {},
+      "Observed": {
+        "ui_scale_percent": 100
+      },
+      "Outputs": {
+        "captured_state": {
+          "ui_scale_percent": 100
+        }
+      },
+      "Warnings": [],
+      "Errors": [],
+      "CanCompensate": false,
+      "Timestamp": "2026-03-12T15:39:02.9084256+00:00"
+    },
+    "message": "Captured UI scaling state.",
+    "operation": "capture",
+    "requested_name": "set-uiscale"
+  }
+}

@@ -270,6 +270,18 @@ namespace ParsecEventExecutor {
         public int Orientation { get; set; }
     }
 
+    public sealed class WindowCapture {
+        public long Handle { get; set; }
+        public uint ProcessId { get; set; }
+        public string Title { get; set; }
+        public string ClassName { get; set; }
+        public bool IsVisible { get; set; }
+        public bool IsMinimized { get; set; }
+        public bool IsCloaked { get; set; }
+        public bool IsShellWindow { get; set; }
+        public long ExtendedStyle { get; set; }
+    }
+
     public static class DisplayNative {
         private const int ENUM_CURRENT_SETTINGS = -1;
         private const int ENUM_REGISTRY_SETTINGS = -2;
@@ -277,6 +289,7 @@ namespace ParsecEventExecutor {
         private const int CCHDEVICENAME = 32;
         private const int CCHFORMNAME = 32;
         private const uint QDC_ALL_PATHS = 0x00000001;
+        private const uint QDC_ONLY_ACTIVE_PATHS = 0x00000002;
         private const uint QDC_VIRTUAL_MODE_AWARE = 0x00000010;
         private const uint QDC_VIRTUAL_REFRESH_RATE_AWARE = 0x00000040;
         private const uint DISPLAYCONFIG_PATH_ACTIVE = 0x00000001;
@@ -285,6 +298,8 @@ namespace ParsecEventExecutor {
         private const uint DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME = 1;
         private const uint DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME = 2;
         private const uint DISPLAYCONFIG_DEVICE_INFO_GET_ADAPTER_NAME = 4;
+        private static readonly uint DISPLAYCONFIG_DEVICE_INFO_GET_DPI_SCALE = unchecked((uint)-3);
+        private static readonly uint DISPLAYCONFIG_DEVICE_INFO_SET_DPI_SCALE = unchecked((uint)-4);
         private const uint DISPLAYCONFIG_PATH_MODE_IDX_INVALID = 0xffffffff;
         public const int DM_POSITION = 0x00000020;
         public const int DM_DISPLAYORIENTATION = 0x00000080;
@@ -314,6 +329,7 @@ namespace ParsecEventExecutor {
         public const int SPI_GETDESKWALLPAPER = 0x0073;
         public const int SPIF_UPDATEINIFILE = 0x0001;
         public const int SPIF_SENDCHANGE = 0x0002;
+        private static readonly uint[] DpiScaleValues = new uint[] { 100, 125, 150, 175, 200, 225, 250, 300, 350, 400, 450, 500 };
 
         [StructLayout(LayoutKind.Sequential)]
         public struct RECT {
@@ -472,6 +488,20 @@ namespace ParsecEventExecutor {
             public uint id;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        public struct DISPLAYCONFIG_SOURCE_DPI_SCALE_GET {
+            public DISPLAYCONFIG_DEVICE_INFO_HEADER header;
+            public int minScaleRel;
+            public int curScaleRel;
+            public int maxScaleRel;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct DISPLAYCONFIG_SOURCE_DPI_SCALE_SET {
+            public DISPLAYCONFIG_DEVICE_INFO_HEADER header;
+            public int scaleRel;
+        }
+
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
         public struct DISPLAYCONFIG_SOURCE_DEVICE_NAME {
             public DISPLAYCONFIG_DEVICE_INFO_HEADER header;
@@ -501,6 +531,7 @@ namespace ParsecEventExecutor {
         }
 
         private delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData);
+        private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
         [DllImport("user32.dll")]
         private static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
@@ -524,7 +555,55 @@ namespace ParsecEventExecutor {
         private static extern int GetDpiForMonitor(IntPtr hmonitor, int dpiType, out uint dpiX, out uint dpiY);
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        private static extern IntPtr SendNotifyMessage(IntPtr hWnd, uint Msg, IntPtr wParam, string lParam);
+        private static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, IntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out IntPtr lpdwResult);
+
+        [DllImport("user32.dll")]
+        private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetShellWindow();
+
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool BringWindowToTop(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsWindowVisible(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsIconic(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern int GetWindowTextLengthW(IntPtr hWnd);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern int GetWindowTextW(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern int GetClassNameW(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+
+        [DllImport("user32.dll")]
+        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
+        private static extern IntPtr GetWindowLongPtr64(IntPtr hWnd, int nIndex);
+
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongW", SetLastError = true)]
+        private static extern IntPtr GetWindowLongPtr32(IntPtr hWnd, int nIndex);
+
+        [DllImport("dwmapi.dll", PreserveSig = true)]
+        private static extern int DwmGetWindowAttribute(IntPtr hWnd, uint dwAttribute, out int pvAttribute, int cbAttribute);
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         private static extern bool SystemParametersInfo(uint uiAction, uint uiParam, StringBuilder pvParam, uint fWinIni);
@@ -547,8 +626,80 @@ namespace ParsecEventExecutor {
         [DllImport("user32.dll")]
         private static extern int DisplayConfigGetDeviceInfo(ref DISPLAYCONFIG_ADAPTER_NAME requestPacket);
 
+        [DllImport("user32.dll")]
+        private static extern int DisplayConfigGetDeviceInfo(ref DISPLAYCONFIG_SOURCE_DPI_SCALE_GET requestPacket);
+
+        [DllImport("user32.dll")]
+        private static extern int DisplayConfigSetDeviceInfo(ref DISPLAYCONFIG_SOURCE_DPI_SCALE_SET setPacket);
+
         private static string AdapterIdToString(LUID value) {
             return value.HighPart.ToString("X8") + ":" + value.LowPart.ToString("X8");
+        }
+
+        private static IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex) {
+            return IntPtr.Size == 8 ? GetWindowLongPtr64(hWnd, nIndex) : GetWindowLongPtr32(hWnd, nIndex);
+        }
+
+        private static bool TryGetWindowTitle(IntPtr hWnd, out string title) {
+            title = string.Empty;
+            var length = GetWindowTextLengthW(hWnd);
+            if (length <= 0) {
+                return false;
+            }
+
+            var builder = new StringBuilder(length + 1);
+            if (GetWindowTextW(hWnd, builder, builder.Capacity) <= 0) {
+                return false;
+            }
+
+            title = builder.ToString();
+            return true;
+        }
+
+        private static string GetWindowClassName(IntPtr hWnd) {
+            var builder = new StringBuilder(256);
+            return GetClassNameW(hWnd, builder, builder.Capacity) > 0 ? builder.ToString() : string.Empty;
+        }
+
+        private static bool TryGetIsCloaked(IntPtr hWnd, out bool cloaked) {
+            cloaked = false;
+            try {
+                int value = 0;
+                if (DwmGetWindowAttribute(hWnd, 14u, out value, Marshal.SizeOf(typeof(int))) == 0) {
+                    cloaked = value != 0;
+                    return true;
+                }
+            }
+            catch {
+            }
+
+            return false;
+        }
+
+        private static WindowCapture CaptureWindow(IntPtr hWnd) {
+            if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) {
+                return null;
+            }
+
+            string title;
+            TryGetWindowTitle(hWnd, out title);
+            uint processId;
+            GetWindowThreadProcessId(hWnd, out processId);
+            bool isCloaked;
+            TryGetIsCloaked(hWnd, out isCloaked);
+            var shellWindow = GetShellWindow();
+
+            return new WindowCapture {
+                Handle = hWnd.ToInt64(),
+                ProcessId = processId,
+                Title = title ?? string.Empty,
+                ClassName = GetWindowClassName(hWnd),
+                IsVisible = IsWindowVisible(hWnd),
+                IsMinimized = IsIconic(hWnd),
+                IsCloaked = isCloaked,
+                IsShellWindow = shellWindow != IntPtr.Zero && hWnd == shellWindow,
+                ExtendedStyle = GetWindowLongPtr(hWnd, -20).ToInt64()
+            };
         }
 
         private static DISPLAYCONFIG_MODE_INFO? FindModeInfo(DISPLAYCONFIG_MODE_INFO[] modes, LUID adapterId, uint id, uint infoType, uint modeInfoIdx) {
@@ -600,6 +751,112 @@ namespace ParsecEventExecutor {
             return DisplayConfigGetDeviceInfo(ref request) == 0 ? request.adapterDevicePath : null;
         }
 
+        private static DISPLAYCONFIG_PATH_INFO[] QueryDisplayPaths(uint flags) {
+            uint pathCount = 0;
+            uint modeCount = 0;
+            ThrowIfWin32Error(GetDisplayConfigBufferSizes(flags, out pathCount, out modeCount), "GetDisplayConfigBufferSizes");
+
+            DISPLAYCONFIG_PATH_INFO[] paths = null;
+            DISPLAYCONFIG_MODE_INFO[] modes = null;
+            int queryError = 0;
+            for (var attempt = 0; attempt < 3; attempt++) {
+                paths = new DISPLAYCONFIG_PATH_INFO[pathCount];
+                modes = new DISPLAYCONFIG_MODE_INFO[modeCount];
+                queryError = QueryDisplayConfig(flags, ref pathCount, paths, ref modeCount, modes, IntPtr.Zero);
+                if (queryError == 0) {
+                    if (paths.Length != pathCount) {
+                        Array.Resize(ref paths, (int)pathCount);
+                    }
+
+                    return paths;
+                }
+
+                if (queryError != 122) {
+                    ThrowIfWin32Error(queryError, "QueryDisplayConfig");
+                }
+
+                ThrowIfWin32Error(GetDisplayConfigBufferSizes(flags, out pathCount, out modeCount), "GetDisplayConfigBufferSizes");
+            }
+
+            ThrowIfWin32Error(queryError, "QueryDisplayConfig");
+            return Array.Empty<DISPLAYCONFIG_PATH_INFO>();
+        }
+
+        private static bool TryResolveActiveSource(string deviceName, out LUID adapterId, out uint sourceId, out bool isPrimary) {
+            adapterId = new LUID();
+            sourceId = 0;
+            isPrimary = false;
+
+            var activePaths = QueryDisplayPaths(QDC_ONLY_ACTIVE_PATHS);
+            var monitors = GetCurrentMonitors();
+            foreach (var path in activePaths) {
+                var sourceName = TryGetSourceName(path.sourceInfo.adapterId, path.sourceInfo.id);
+                if (!string.Equals(sourceName, deviceName, StringComparison.OrdinalIgnoreCase)) {
+                    continue;
+                }
+
+                adapterId = path.sourceInfo.adapterId;
+                sourceId = path.sourceInfo.id;
+
+                foreach (var monitor in monitors) {
+                    if (string.Equals(monitor.DeviceName, deviceName, StringComparison.OrdinalIgnoreCase)) {
+                        isPrimary = monitor.IsPrimary;
+                        break;
+                    }
+                }
+
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryGetDpiScalingInfo(LUID adapterId, uint sourceId, out uint current, out uint recommended, out uint minimum, out uint maximum) {
+            current = 100;
+            recommended = 100;
+            minimum = 100;
+            maximum = 100;
+
+            var requestPacket = new DISPLAYCONFIG_SOURCE_DPI_SCALE_GET();
+            requestPacket.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_DPI_SCALE;
+            requestPacket.header.size = (uint)Marshal.SizeOf(typeof(DISPLAYCONFIG_SOURCE_DPI_SCALE_GET));
+            requestPacket.header.adapterId = adapterId;
+            requestPacket.header.id = sourceId;
+
+            if (DisplayConfigGetDeviceInfo(ref requestPacket) != 0) {
+                return false;
+            }
+
+            var curRel = requestPacket.curScaleRel;
+            if (curRel < requestPacket.minScaleRel) {
+                curRel = requestPacket.minScaleRel;
+            }
+            else if (curRel > requestPacket.maxScaleRel) {
+                curRel = requestPacket.maxScaleRel;
+            }
+
+            var minAbs = Math.Abs(requestPacket.minScaleRel);
+            var currentIndex = minAbs + curRel;
+            var maximumIndex = minAbs + requestPacket.maxScaleRel;
+            if (minAbs < 0 || minAbs >= DpiScaleValues.Length || currentIndex < 0 || currentIndex >= DpiScaleValues.Length || maximumIndex < 0 || maximumIndex >= DpiScaleValues.Length) {
+                return false;
+            }
+
+            current = DpiScaleValues[currentIndex];
+            recommended = DpiScaleValues[minAbs];
+            minimum = DpiScaleValues[0];
+            maximum = DpiScaleValues[maximumIndex];
+            return true;
+        }
+
+        private static void SetAppliedDpi(uint dpiPercent) {
+            using (var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Control Panel\Desktop\WindowMetrics")) {
+                if (key != null) {
+                    key.SetValue("AppliedDPI", (int)Math.Round(dpiPercent * 0.96), Microsoft.Win32.RegistryValueKind.DWord);
+                }
+            }
+        }
+
         private static void ThrowIfWin32Error(int errorCode, string apiName) {
             if (errorCode != 0) {
                 throw new Win32Exception(errorCode, apiName + " failed.");
@@ -607,7 +864,41 @@ namespace ParsecEventExecutor {
         }
 
         public static void BroadcastSettingChange(string area) {
-            SendNotifyMessage(new IntPtr(0xffff), 0x001A, IntPtr.Zero, area);
+            IntPtr result;
+            var timeoutFlags = 0x0002u | 0x0008u;
+            var messageResult = SendMessageTimeout(new IntPtr(0xffff), 0x001A, IntPtr.Zero, area, timeoutFlags, 5000u, out result);
+            if (messageResult == IntPtr.Zero) {
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "SendMessageTimeout(WM_SETTINGCHANGE) failed.");
+            }
+        }
+
+        public static WindowCapture GetForegroundWindowCapture() {
+            return CaptureWindow(GetForegroundWindow());
+        }
+
+        public static WindowCapture[] GetTopLevelWindows() {
+            var windows = new List<WindowCapture>();
+            EnumWindows(delegate (IntPtr hWnd, IntPtr lParam) {
+                var capture = CaptureWindow(hWnd);
+                if (capture != null) {
+                    windows.Add(capture);
+                }
+
+                return true;
+            }, IntPtr.Zero);
+
+            return windows.ToArray();
+        }
+
+        public static bool ActivateWindow(long handle, bool restoreIfMinimized) {
+            var hWnd = new IntPtr(handle);
+            if (!IsWindow(hWnd)) {
+                return false;
+            }
+
+            ShowWindowAsync(hWnd, restoreIfMinimized ? 9 : 5);
+            BringWindowToTop(hWnd);
+            return SetForegroundWindow(hWnd);
         }
 
         public static string GetDesktopWallpaperPath() {
@@ -787,6 +1078,96 @@ namespace ParsecEventExecutor {
             return modes.ToArray();
         }
 
+        public static uint GetPrimaryDpiScale() {
+            foreach (var monitor in GetCurrentMonitors()) {
+                if (monitor.IsPrimary) {
+                    return GetDpiScaleForDevice(monitor.DeviceName);
+                }
+            }
+
+            return 100;
+        }
+
+        public static uint GetDpiScaleForDevice(string deviceName) {
+            if (string.IsNullOrWhiteSpace(deviceName)) {
+                throw new ArgumentException("Device name is required.", nameof(deviceName));
+            }
+
+            LUID adapterId;
+            uint sourceId;
+            bool isPrimary;
+            if (!TryResolveActiveSource(deviceName, out adapterId, out sourceId, out isPrimary)) {
+                throw new InvalidOperationException("Active display source not found for '" + deviceName + "'.");
+            }
+
+            uint current;
+            uint recommended;
+            uint minimum;
+            uint maximum;
+            if (!TryGetDpiScalingInfo(adapterId, sourceId, out current, out recommended, out minimum, out maximum)) {
+                throw new InvalidOperationException("Failed to query DPI scaling for '" + deviceName + "'.");
+            }
+
+            return current;
+        }
+
+        public static uint SetDpiScaleForDevice(string deviceName, uint dpiPercentToSet) {
+            if (string.IsNullOrWhiteSpace(deviceName)) {
+                throw new ArgumentException("Device name is required.", nameof(deviceName));
+            }
+
+            LUID adapterId;
+            uint sourceId;
+            bool isPrimary;
+            if (!TryResolveActiveSource(deviceName, out adapterId, out sourceId, out isPrimary)) {
+                throw new InvalidOperationException("Active display source not found for '" + deviceName + "'.");
+            }
+
+            uint current;
+            uint recommended;
+            uint minimum;
+            uint maximum;
+            if (!TryGetDpiScalingInfo(adapterId, sourceId, out current, out recommended, out minimum, out maximum)) {
+                throw new InvalidOperationException("Failed to query DPI scaling for '" + deviceName + "'.");
+            }
+
+            var target = dpiPercentToSet;
+            if (target < minimum) {
+                target = minimum;
+            }
+            else if (target > maximum) {
+                target = maximum;
+            }
+
+            if (target == current) {
+                if (isPrimary) {
+                    SetAppliedDpi(target);
+                }
+
+                return target;
+            }
+
+            var recommendedIndex = Array.IndexOf(DpiScaleValues, recommended);
+            var targetIndex = Array.IndexOf(DpiScaleValues, target);
+            if (recommendedIndex < 0 || targetIndex < 0) {
+                throw new InvalidOperationException("Unsupported DPI scale value '" + target.ToString() + "'.");
+            }
+
+            var setPacket = new DISPLAYCONFIG_SOURCE_DPI_SCALE_SET();
+            setPacket.header.adapterId = adapterId;
+            setPacket.header.id = sourceId;
+            setPacket.header.size = (uint)Marshal.SizeOf(typeof(DISPLAYCONFIG_SOURCE_DPI_SCALE_SET));
+            setPacket.header.type = DISPLAYCONFIG_DEVICE_INFO_SET_DPI_SCALE;
+            setPacket.scaleRel = targetIndex - recommendedIndex;
+            ThrowIfWin32Error(DisplayConfigSetDeviceInfo(ref setPacket), "DisplayConfigSetDeviceInfo");
+
+            if (isPrimary) {
+                SetAppliedDpi(target);
+            }
+
+            return target;
+        }
+
         public static DEVMODE GetDeviceMode(string deviceName, bool useRegistrySettings) {
             var mode = new DEVMODE();
             mode.dmSize = (short)Marshal.SizeOf(typeof(DEVMODE));
@@ -829,22 +1210,24 @@ function Get-ParsecTextScalePercent {
 
 function Get-ParsecUiScalePercent {
     [CmdletBinding()]
-    param()
-
-    $path = 'HKCU:\Control Panel\Desktop'
-    $logPixels = 96
+    param(
+        [Parameter()]
+        [string] $DeviceName
+    )
 
     try {
-        $value = Get-ItemPropertyValue -Path $path -Name 'LogPixels' -ErrorAction Stop
-        if ($value -is [int] -and $value -gt 0) {
-            $logPixels = [int] $value
+        Initialize-ParsecDisplayInterop
+        if (-not [string]::IsNullOrWhiteSpace($DeviceName)) {
+            return [int] [ParsecEventExecutor.DisplayNative]::GetDpiScaleForDevice($DeviceName)
         }
+
+        return [int] [ParsecEventExecutor.DisplayNative]::GetPrimaryDpiScale()
     }
     catch {
-        Write-Verbose 'LogPixels could not be read from the registry. Falling back to 100%.'
+        Write-Verbose "Native DPI scaling could not be queried. Falling back to 100%. $_"
     }
 
-    return [int] [Math]::Round(($logPixels * 100.0) / 96.0)
+    return 100
 }
 
 function ConvertTo-ParsecLogPixels {
@@ -1415,6 +1798,7 @@ function Set-ParsecTextScaleStateInternal {
     Initialize-ParsecPersonalizationInterop
     [ParsecEventExecutor.DisplayNative]::BroadcastSettingChange('Accessibility')
     [ParsecEventExecutor.DisplayNative]::BroadcastSettingChange('WindowMetrics')
+    [ParsecEventExecutor.DisplayNative]::BroadcastSettingChange('Control Panel\Desktop')
 
     return New-ParsecResult -Status 'Succeeded' -Message "Text scaling set to $textScalePercent%." -Observed @{
         text_scale_percent = $textScalePercent
@@ -1430,7 +1814,10 @@ function Set-ParsecUiScaleStateInternal {
         [hashtable] $Arguments
     )
 
-    $scalePercent = if ($Arguments.ContainsKey('scale_percent')) {
+    $scalePercent = if ($Arguments.ContainsKey('ui_scale_percent')) {
+        [int] $Arguments.ui_scale_percent
+    }
+    elseif ($Arguments.ContainsKey('scale_percent')) {
         [int] $Arguments.scale_percent
     }
     elseif ($Arguments.ContainsKey('value')) {
@@ -1440,35 +1827,25 @@ function Set-ParsecUiScaleStateInternal {
         [int] $Arguments.captured_state.ui_scale_percent
     }
     else {
-        throw 'UI scaling apply requires scale_percent or value.'
+        throw 'UI scaling apply requires ui_scale_percent, scale_percent, or value.'
     }
 
     if ($scalePercent -lt 100 -or $scalePercent -gt 500) {
         throw 'UI scaling percent must be between 100 and 500.'
     }
 
-    $path = 'HKCU:\Control Panel\Desktop'
-    if (-not (Test-Path -LiteralPath $path)) {
-        New-Item -Path $path -Force | Out-Null
-    }
-
-    $logPixels = ConvertTo-ParsecLogPixels -ScalePercent $scalePercent
-    $win8Scaling = if ($scalePercent -eq 100) { 0 } else { 1 }
-
-    New-ItemProperty -Path $path -Name 'LogPixels' -Value $logPixels -PropertyType DWord -Force | Out-Null
-    New-ItemProperty -Path $path -Name 'Win8DpiScaling' -Value $win8Scaling -PropertyType DWord -Force | Out-Null
-    Initialize-ParsecPersonalizationInterop
-    [ParsecEventExecutor.DisplayNative]::BroadcastSettingChange('WindowMetrics')
-    [ParsecEventExecutor.DisplayNative]::BroadcastSettingChange('Environment')
+    $deviceName = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments
+    Initialize-ParsecDisplayInterop
+    $appliedScalePercent = [int] [ParsecEventExecutor.DisplayNative]::SetDpiScaleForDevice($deviceName, [uint32] $scalePercent)
 
     return New-ParsecResult -Status 'Succeeded' -Message "UI scaling requested at $scalePercent%." -Observed @{
-        ui_scale_percent = $scalePercent
-        log_pixels = $logPixels
-        requires_signout = $true
+        device_name = $deviceName
+        ui_scale_percent = $appliedScalePercent
+        requires_signout = $false
     } -Outputs @{
-        ui_scale_percent = $scalePercent
-        log_pixels = $logPixels
-        requires_signout = $true
+        device_name = $deviceName
+        ui_scale_percent = $appliedScalePercent
+        requires_signout = $false
     }
 }
 
@@ -1495,6 +1872,10 @@ function Initialize-ParsecPersonalizationAdapter {
             param([hashtable] $Arguments)
             return Set-ParsecWallpaperStateInternal -Arguments $Arguments
         }
+        SetUiScale = {
+            param([hashtable] $Arguments)
+            return Set-ParsecUiScaleStateInternal -Arguments $Arguments
+        }
         SetTextScale = {
             param([hashtable] $Arguments)
             return Set-ParsecTextScaleStateInternal -Arguments $Arguments
@@ -1518,6 +1899,215 @@ function Invoke-ParsecPersonalizationAdapter {
     }
 
     return & $script:ParsecPersonalizationAdapter[$Method] $Arguments
+}
+
+function Get-ParsecWindowCaptureState {
+    [CmdletBinding()]
+    param()
+
+    $foreground = Invoke-ParsecWindowAdapter -Method 'GetForegroundWindowInfo'
+    $windows = @(Invoke-ParsecWindowAdapter -Method 'GetTopLevelWindows')
+
+    return [ordered]@{
+        captured_at = [DateTimeOffset]::UtcNow.ToString('o')
+        foreground_window = ConvertTo-ParsecPlainObject -InputObject $foreground
+        windows = @($windows | ForEach-Object { ConvertTo-ParsecPlainObject -InputObject $_ })
+    }
+}
+
+function Test-ParsecWindowActivationCandidate {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [System.Collections.IDictionary] $Window,
+
+        [Parameter()]
+        [bool] $IncludeMinimized = $false
+    )
+
+    if ($null -eq $Window.handle -or [int64] $Window.handle -eq 0) {
+        return $false
+    }
+
+    if ($Window.Contains('is_shell_window') -and [bool] $Window.is_shell_window) {
+        return $false
+    }
+
+    if ($Window.Contains('is_visible') -and -not [bool] $Window.is_visible) {
+        return $false
+    }
+
+    if ($Window.Contains('is_cloaked') -and [bool] $Window.is_cloaked) {
+        return $false
+    }
+
+    if (-not $IncludeMinimized -and $Window.Contains('is_minimized') -and [bool] $Window.is_minimized) {
+        return $false
+    }
+
+    return $true
+}
+
+function Invoke-ParsecWindowCycleInternal {
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        [hashtable] $Arguments = @{}
+    )
+
+    $dwellMilliseconds = if ($Arguments.ContainsKey('dwell_ms')) { [int] $Arguments.dwell_ms } else { 100 }
+    if ($dwellMilliseconds -lt 0) {
+        throw 'dwell_ms must be zero or greater.'
+    }
+
+    $includeMinimized = if ($Arguments.ContainsKey('include_minimized')) { [bool] $Arguments.include_minimized } else { $false }
+    $captureState = Get-ParsecWindowCaptureState
+    $foregroundWindow = if ($captureState.Contains('foreground_window')) { $captureState.foreground_window } else { $null }
+    $foregroundHandle = if ($null -ne $foregroundWindow -and $foregroundWindow.Contains('handle') -and $null -ne $foregroundWindow.handle) { [int64] $foregroundWindow.handle } else { 0 }
+    $candidates = @(
+        foreach ($window in @($captureState.windows)) {
+            if (-not ($window -is [System.Collections.IDictionary])) {
+                continue
+            }
+
+            if (-not (Test-ParsecWindowActivationCandidate -Window $window -IncludeMinimized:$includeMinimized)) {
+                continue
+            }
+
+            if ([int64] $window.handle -eq $foregroundHandle) {
+                continue
+            }
+
+            ConvertTo-ParsecPlainObject -InputObject $window
+        }
+    )
+
+    $activationResults = New-Object System.Collections.ArrayList
+    foreach ($window in $candidates) {
+        $activation = Invoke-ParsecWindowAdapter -Method 'ActivateWindow' -Arguments @{
+            handle = [int64] $window.handle
+            restore_if_minimized = $includeMinimized
+        }
+        [void] $activationResults.Add((ConvertTo-ParsecPlainObject -InputObject $activation))
+        if ($dwellMilliseconds -gt 0) {
+            Start-Sleep -Milliseconds $dwellMilliseconds
+        }
+    }
+
+    $restoredForeground = $null
+    if ($foregroundHandle -ne 0) {
+        $restoredForeground = Invoke-ParsecWindowAdapter -Method 'ActivateWindow' -Arguments @{
+            handle = $foregroundHandle
+            restore_if_minimized = $true
+        }
+    }
+
+    return New-ParsecResult -Status 'Succeeded' -Message 'Activation cycle completed.' -Observed @{
+        original_foreground_handle = $foregroundHandle
+        candidate_count = @($candidates).Count
+        activated_count = @($activationResults | Where-Object { $_.succeeded }).Count
+    } -Outputs @{
+        captured_state = @{
+            foreground_window = $foregroundWindow
+        }
+        original_foreground_window = $foregroundWindow
+        activation_results = @($activationResults)
+        attempted_windows = @($candidates)
+        dwell_ms = $dwellMilliseconds
+        include_minimized = $includeMinimized
+        restore_result = ConvertTo-ParsecPlainObject -InputObject $restoredForeground
+    }
+}
+
+function Restore-ParsecWindowForegroundInternal {
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        [hashtable] $Arguments = @{},
+
+        [Parameter()]
+        $ExecutionResult
+    )
+
+    $capturedState = Get-ParsecCapturedStateFromResult -Arguments $Arguments -ExecutionResult $ExecutionResult
+    if ($null -eq $capturedState -or -not $capturedState.Contains('foreground_window') -or $null -eq $capturedState.foreground_window) {
+        return New-ParsecResult -Status 'Succeeded' -Message 'No captured foreground window was available to restore.' -Outputs @{
+            restored = $false
+        }
+    }
+
+    $foregroundWindow = $capturedState.foreground_window
+    if (-not ($foregroundWindow -is [System.Collections.IDictionary]) -or -not $foregroundWindow.Contains('handle')) {
+        return New-ParsecResult -Status 'Succeeded' -Message 'No captured foreground window was available to restore.' -Outputs @{
+            restored = $false
+        }
+    }
+
+    $activation = Invoke-ParsecWindowAdapter -Method 'ActivateWindow' -Arguments @{
+        handle = [int64] $foregroundWindow.handle
+        restore_if_minimized = $true
+    }
+
+    if (-not $activation.succeeded) {
+        return New-ParsecResult -Status 'Failed' -Message 'Failed to restore the original foreground window.' -Observed (ConvertTo-ParsecPlainObject -InputObject $activation) -Outputs @{
+            restored = $false
+        } -Errors @('ForegroundRestoreFailed')
+    }
+
+    return New-ParsecResult -Status 'Succeeded' -Message 'Restored the original foreground window.' -Observed (ConvertTo-ParsecPlainObject -InputObject $activation.window) -Outputs @{
+        restored = $true
+        restored_window = ConvertTo-ParsecPlainObject -InputObject $activation.window
+    }
+}
+
+function Initialize-ParsecWindowAdapter {
+    [CmdletBinding()]
+    param()
+
+    if (Get-Variable -Name ParsecWindowAdapter -Scope Script -ErrorAction SilentlyContinue) {
+        return
+    }
+
+    $script:ParsecWindowAdapter = @{
+        GetForegroundWindowInfo = {
+            Initialize-ParsecDisplayInterop
+            return ConvertTo-ParsecPlainObject -InputObject ([ParsecEventExecutor.DisplayNative]::GetForegroundWindowCapture())
+        }
+        GetTopLevelWindows = {
+            Initialize-ParsecDisplayInterop
+            return @([ParsecEventExecutor.DisplayNative]::GetTopLevelWindows()) | ForEach-Object { ConvertTo-ParsecPlainObject -InputObject $_ }
+        }
+        ActivateWindow = {
+            param([hashtable] $Arguments)
+            Initialize-ParsecDisplayInterop
+            $handle = [int64] $Arguments.handle
+            $succeeded = [bool] [ParsecEventExecutor.DisplayNative]::ActivateWindow($handle, [bool] $Arguments.restore_if_minimized)
+            $window = ConvertTo-ParsecPlainObject -InputObject ([ParsecEventExecutor.DisplayNative]::GetForegroundWindowCapture())
+            return [ordered]@{
+                succeeded = $succeeded
+                handle = $handle
+                window = $window
+            }
+        }
+    }
+}
+
+function Invoke-ParsecWindowAdapter {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $Method,
+
+        [Parameter()]
+        [hashtable] $Arguments = @{}
+    )
+
+    Initialize-ParsecWindowAdapter
+    if (-not $script:ParsecWindowAdapter.ContainsKey($Method)) {
+        throw "Window adapter method '$Method' is not available."
+    }
+
+    return & $script:ParsecWindowAdapter[$Method] $Arguments
 }
 
 function Get-ParsecDisplayIdentityKey {
@@ -1633,7 +2223,19 @@ function Get-ParsecDisplayCaptureState {
             }
 
             $nativeMonitor = if ($nativeMonitorIndex.ContainsKey($deviceName)) { $nativeMonitorIndex[$deviceName] } else { $null }
-            $scalePercent = if ($null -ne $nativeMonitor -and $nativeMonitor.HasEffectiveDpi) { Get-ParsecScalePercent -EffectiveDpiX $nativeMonitor.EffectiveDpiX } else { $null }
+            $scalePercent = $null
+            if ([bool] $path.IsActive -and -not [string]::IsNullOrWhiteSpace($deviceName)) {
+                try {
+                    $scalePercent = Get-ParsecUiScalePercent -DeviceName $deviceName
+                }
+                catch {
+                    $scalePercent = $null
+                }
+            }
+
+            if ($null -eq $scalePercent -and $null -ne $nativeMonitor -and $nativeMonitor.HasEffectiveDpi) {
+                $scalePercent = Get-ParsecScalePercent -EffectiveDpiX $nativeMonitor.EffectiveDpiX
+            }
             $refreshRate = if ($path.RefreshRateDenominator -gt 0) { [int] [Math]::Round($path.RefreshRateNumerator / $path.RefreshRateDenominator) } elseif ($null -ne $nativeMonitor) { [int] $nativeMonitor.DisplayFrequency } else { $null }
             $width = if ($path.HasSourceMode) { [int] $path.SourceWidth } elseif ($path.HasTargetMode) { [int] $path.TargetWidth } elseif ($null -ne $nativeMonitor) { [int] $nativeMonitor.Width } else { $null }
             $height = if ($path.HasSourceMode) { [int] $path.SourceHeight } elseif ($path.HasTargetMode) { [int] $path.TargetHeight } elseif ($null -ne $nativeMonitor) { [int] $nativeMonitor.Height } else { $null }

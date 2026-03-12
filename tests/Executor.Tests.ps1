@@ -134,5 +134,30 @@ Describe 'Invoke-ParsecRecipe' {
             $result.step_results[0].ingredient | Should -Be 'display.set-orientation'
             $script:IngredientObservedState.monitors[0].orientation | Should -Be 'Portrait'
         }
+
+        It 'executes a text-scale recipe through the standalone ingredient pipeline' {
+            $stateRoot = Join-Path $TestDrive 'textscale-sequence'
+            $recipePath = Join-Path $PSScriptRoot 'fixtures\recipes\textscale-sequence.toml'
+
+            $result = Invoke-ParsecRecipe -NameOrPath $recipePath -StateRoot $stateRoot -Confirm:$false
+
+            $result.recipe_name | Should -Be 'textscale-sequence'
+            $result.terminal_status | Should -Be 'Succeeded'
+            $result.step_results[0].ingredient | Should -Be 'display.set-textscale'
+            $script:IngredientObservedState.font_scaling.text_scale_percent | Should -Be 150
+        }
+
+        It 'executes a UI-scale recipe through the standalone ingredient pipeline' {
+            $stateRoot = Join-Path $TestDrive 'uiscale-sequence'
+            $recipePath = Join-Path $PSScriptRoot 'fixtures\recipes\uiscale-sequence.toml'
+
+            $result = Invoke-ParsecRecipe -NameOrPath $recipePath -StateRoot $stateRoot -Confirm:$false
+
+            $result.recipe_name | Should -Be 'uiscale-sequence'
+            $result.terminal_status | Should -Be 'Succeeded'
+            $result.step_results[0].ingredient | Should -Be 'display.set-uiscale'
+            $result.step_results[0].readiness_result.Status | Should -Be 'Succeeded'
+            $script:IngredientObservedState.scaling.ui_scale_percent | Should -Be 125
+        }
     }
 }

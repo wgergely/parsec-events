@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "document_type": "ingredient-invocation",
+  "written_at": "2026-03-12T18:06:47.2226695+00:00",
+  "payload": {
+    "status": "Succeeded",
+    "capture_result": null,
+    "resolved_target_identity": null,
+    "readiness_result": null,
+    "ingredient_name": "display.set-textscale",
+    "started_at": "2026-03-12T18:06:46.4731065+00:00",
+    "operation_result": {
+      "Status": "Succeeded",
+      "Message": "Captured text scaling state.",
+      "Requested": {},
+      "Observed": {
+        "text_scale_percent": 100
+      },
+      "Outputs": {
+        "captured_state": {
+          "text_scale_percent": 100
+        }
+      },
+      "Warnings": [],
+      "Errors": [],
+      "CanCompensate": false,
+      "Timestamp": "2026-03-12T18:06:47.1989195+00:00"
+    },
+    "verify_result": null,
+    "requested_arguments": {},
+    "token_id": "",
+    "token_path": null,
+    "operation": "capture",
+    "invocation_id": "d5617515-50f7-49d5-ad0b-022993e447b1",
+    "reset_result": null,
+    "message": "Captured text scaling state.",
+    "requested_name": "set-textscale",
+    "completed_at": "2026-03-12T18:06:47.2132138+00:00"
+  }
+}

@@ -283,6 +283,172 @@ Describe 'Standalone ingredient surface' {
             }
         }
 
+        It 'applies and resets text scaling through the standalone ingredient surface' {
+            $stateRoot = Join-Path $TestDrive 'textscale-apply-reset'
+
+            $result = Invoke-ParsecIngredient -Name 'set-textscale' -Arguments @{
+                text_scale_percent = 150
+            } -StateRoot $stateRoot -Confirm:$false
+
+            $result.status | Should -Be 'Succeeded'
+            $result.ingredient_name | Should -Be 'display.set-textscale'
+            $result.token_id | Should -Not -BeNullOrEmpty
+            $script:IngredientObservedState.font_scaling.text_scale_percent | Should -Be 150
+
+            $reset = Invoke-ParsecIngredient -Name 'set-textscale' -Operation 'reset' -TokenId $result.token_id -StateRoot $stateRoot -Confirm:$false
+
+            $reset.status | Should -Be 'Succeeded'
+            $script:IngredientObservedState.font_scaling.text_scale_percent | Should -Be 130
+        }
+
+        It 'waits for readiness before succeeding when text scaling converges after delayed observations' {
+            $stateRoot = Join-Path $TestDrive 'textscale-delayed-readiness'
+            $definition = Get-ParsecIngredientDefinition -Name 'set-textscale'
+            $originalReadiness = ConvertTo-ParsecPlainObject -InputObject $definition.Readiness
+
+            try {
+                $definition.Readiness.timeout_ms = 100
+                $definition.Readiness.poll_interval_ms = 1
+                $definition.Readiness.success_count = 2
+                $script:IngredientTextScaleObservationLagRemaining = 2
+
+                $result = Invoke-ParsecIngredient -Name 'set-textscale' -Arguments @{
+                    text_scale_percent = 150
+                } -StateRoot $stateRoot -Confirm:$false
+
+                $result.status | Should -Be 'Succeeded'
+                $result.readiness_result.Status | Should -Be 'Succeeded'
+                $result.readiness_result.Outputs.attempts | Should -BeGreaterThan 1
+                $result.readiness_result.Outputs.successful_probes | Should -Be 2
+                $result.verify_result.Status | Should -Be 'Succeeded'
+            }
+            finally {
+                $definition.Readiness = ConvertTo-ParsecPlainObject -InputObject $originalReadiness
+            }
+        }
+
+        It 'fails when readiness times out before text scaling converges' {
+            $stateRoot = Join-Path $TestDrive 'textscale-readiness-timeout'
+            $definition = Get-ParsecIngredientDefinition -Name 'set-textscale'
+            $originalReadiness = ConvertTo-ParsecPlainObject -InputObject $definition.Readiness
+
+            try {
+                $definition.Readiness.timeout_ms = 10
+                $definition.Readiness.poll_interval_ms = 1
+                $definition.Readiness.success_count = 2
+                $script:IngredientTextScaleObservationLagRemaining = 100
+
+                $result = Invoke-ParsecIngredient -Name 'set-textscale' -Arguments @{
+                    text_scale_percent = 150
+                } -StateRoot $stateRoot -Confirm:$false
+
+                $result.status | Should -Be 'Failed'
+                $result.readiness_result.Errors | Should -Contain 'ReadinessTimeout'
+                $result.verify_result | Should -BeNullOrEmpty
+            }
+            finally {
+                $definition.Readiness = ConvertTo-ParsecPlainObject -InputObject $originalReadiness
+            }
+        }
+
+        It 'applies and resets UI scaling through the standalone ingredient surface' {
+            $stateRoot = Join-Path $TestDrive 'uiscale-apply-reset'
+
+            $result = Invoke-ParsecIngredient -Name 'set-uiscale' -Arguments @{
+                ui_scale_percent = 125
+            } -StateRoot $stateRoot -Confirm:$false
+
+            $result.status | Should -Be 'Succeeded'
+            $result.ingredient_name | Should -Be 'display.set-uiscale'
+            $result.token_id | Should -Not -BeNullOrEmpty
+            $result.operation_result.Outputs.requires_signout | Should -BeTrue
+            $script:IngredientObservedState.scaling.ui_scale_percent | Should -Be 125
+
+            $reset = Invoke-ParsecIngredient -Name 'set-uiscale' -Operation 'reset' -TokenId $result.token_id -StateRoot $stateRoot -Confirm:$false
+
+            $reset.status | Should -Be 'Succeeded'
+            $script:IngredientObservedState.scaling.ui_scale_percent | Should -Be 150
+        }
+
+        It 'waits for readiness before succeeding when UI scaling converges after delayed observations' {
+            $stateRoot = Join-Path $TestDrive 'uiscale-delayed-readiness'
+            $definition = Get-ParsecIngredientDefinition -Name 'set-uiscale'
+            $originalReadiness = ConvertTo-ParsecPlainObject -InputObject $definition.Readiness
+
+            try {
+                $definition.Readiness.timeout_ms = 100
+                $definition.Readiness.poll_interval_ms = 1
+                $definition.Readiness.success_count = 2
+                $script:IngredientUiScaleObservationLagRemaining = 2
+
+                $result = Invoke-ParsecIngredient -Name 'set-uiscale' -Arguments @{
+                    ui_scale_percent = 125
+                } -StateRoot $stateRoot -Confirm:$false
+
+                $result.status | Should -Be 'Succeeded'
+                $result.readiness_result.Status | Should -Be 'Succeeded'
+                $result.readiness_result.Outputs.attempts | Should -BeGreaterThan 1
+                $result.readiness_result.Outputs.successful_probes | Should -Be 2
+                $result.verify_result.Status | Should -Be 'Succeeded'
+            }
+            finally {
+                $definition.Readiness = ConvertTo-ParsecPlainObject -InputObject $originalReadiness
+            }
+        }
+
+        It 'fails when readiness times out before UI scaling converges' {
+            $stateRoot = Join-Path $TestDrive 'uiscale-readiness-timeout'
+            $definition = Get-ParsecIngredientDefinition -Name 'set-uiscale'
+            $originalReadiness = ConvertTo-ParsecPlainObject -InputObject $definition.Readiness
+
+            try {
+                $definition.Readiness.timeout_ms = 10
+                $definition.Readiness.poll_interval_ms = 1
+                $definition.Readiness.success_count = 2
+                $script:IngredientUiScaleObservationLagRemaining = 100
+
+                $result = Invoke-ParsecIngredient -Name 'set-uiscale' -Arguments @{
+                    ui_scale_percent = 125
+                } -StateRoot $stateRoot -Confirm:$false
+
+                $result.status | Should -Be 'Failed'
+                $result.readiness_result.Errors | Should -Contain 'ReadinessTimeout'
+                $result.verify_result | Should -BeNullOrEmpty
+            }
+            finally {
+                $definition.Readiness = ConvertTo-ParsecPlainObject -InputObject $originalReadiness
+            }
+        }
+
+        It 'cycles top-level windows and restores the original foreground window' {
+            $stateRoot = Join-Path $TestDrive 'window-cycle'
+
+            $result = Invoke-ParsecIngredient -Name 'cycle-activation' -Arguments @{
+                dwell_ms = 0
+            } -StateRoot $stateRoot -Confirm:$false
+
+            $result.status | Should -Be 'Succeeded'
+            $result.ingredient_name | Should -Be 'window.cycle-activation'
+            $result.operation_result.Outputs.activation_results.Count | Should -Be 1
+            $result.verify_result.Status | Should -Be 'Succeeded'
+            $script:IngredientWindowForegroundHandle | Should -Be 101
+            $script:IngredientWindowActivationLog | Should -Be @(102, 101)
+        }
+
+        It 'restores the original foreground window through reset when activation drift occurs' {
+            $stateRoot = Join-Path $TestDrive 'window-cycle-reset'
+
+            $apply = Invoke-ParsecIngredient -Name 'cycle-activation' -Arguments @{
+                dwell_ms = 0
+            } -StateRoot $stateRoot -Confirm:$false
+
+            $script:IngredientWindowForegroundHandle = 102
+            $reset = Invoke-ParsecIngredient -Name 'cycle-activation' -Operation 'reset' -TokenId $apply.token_id -StateRoot $stateRoot -Confirm:$false
+
+            $reset.status | Should -Be 'Succeeded'
+            $script:IngredientWindowForegroundHandle | Should -Be 101
+        }
+
         It 'captures and restores persisted topology snapshots explicitly' {
             $stateRoot = Join-Path $TestDrive 'persist-topology'
 

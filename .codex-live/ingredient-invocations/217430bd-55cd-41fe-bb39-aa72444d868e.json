@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "document_type": "ingredient-invocation",
+  "written_at": "2026-03-12T15:38:17.4165895+00:00",
+  "payload": {
+    "requested_arguments": {},
+    "status": "Succeeded",
+    "token_id": "",
+    "verify_result": null,
+    "requested_name": "set-uiscale",
+    "resolved_target_identity": null,
+    "reset_result": null,
+    "message": "Captured UI scaling state.",
+    "ingredient_name": "display.set-uiscale",
+    "started_at": "2026-03-12T15:38:16.6794848+00:00",
+    "invocation_id": "217430bd-55cd-41fe-bb39-aa72444d868e",
+    "completed_at": "2026-03-12T15:38:17.4073726+00:00",
+    "readiness_result": null,
+    "token_path": null,
+    "operation_result": {
+      "Status": "Succeeded",
+      "Message": "Captured UI scaling state.",
+      "Requested": {},
+      "Observed": {
+        "ui_scale_percent": 300
+      },
+      "Outputs": {
+        "captured_state": {
+          "ui_scale_percent": 300
+        }
+      },
+      "Warnings": [],
+      "Errors": [],
+      "CanCompensate": false,
+      "Timestamp": "2026-03-12T15:38:17.3940619+00:00"
+    },
+    "operation": "capture",
+    "capture_result": null
+  }
+}

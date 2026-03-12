@@ -1,0 +1,12 @@
+name = "textscale-sequence"
+description = "Sets text scaling."
+
+[[steps]]
+id = "set-textscale"
+ingredient = "set-textscale"
+verify = true
+retry_count = 0
+retry_delay_ms = 0
+
+[steps.arguments]
+text_scale_percent = 150

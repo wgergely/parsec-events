@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "document_type": "display-catalog",
+  "written_at": "2026-03-12T18:06:47.2722501+00:00",
+  "payload": {
+    "entries": [
+      {
+        "screen_id": 1,
+        "identity_key": "adapter_id+target_id:00000000:00013B12:29189",
+        "identity": {
+          "scheme": "adapter_id+target_id",
+          "adapter_id": "00000000:00013B12",
+          "source_id": 0,
+          "target_id": 29189,
+          "source_name": "\\\\.\\DISPLAY1",
+          "monitor_device_path": "\\\\?\\DISPLAY#AUS276D#5&20ef82a0&0&UID29189#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}"
+        },
+        "first_seen_at": "2026-03-12T16:41:48.2209466+01:00",
+        "last_seen_at": "2026-03-12T16:41:48.2209466+01:00",
+        "device_name": "\\\\.\\DISPLAY1",
+        "friendly_name": "PA278CV",
+        "is_primary": true,
+        "enabled": true
+      },
+      {
+        "screen_id": 2,
+        "identity_key": "adapter_id+target_id:00000000:00013B12:28934",
+        "identity": {
+          "scheme": "adapter_id+target_id",
+          "adapter_id": "00000000:00013B12",
+          "source_id": 1,
+          "target_id": 28934,
+          "source_name": "\\\\.\\DISPLAY2",
+          "monitor_device_path": "\\\\?\\DISPLAY#BNQ7944#5&20ef82a0&0&UID28934#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}"
+        },
+        "first_seen_at": "2026-03-12T16:41:48.2209466+01:00",
+        "last_seen_at": "2026-03-12T16:41:48.2209466+01:00",
+        "device_name": "\\\\.\\DISPLAY2",
+        "friendly_name": "BenQ EW2775ZH",
+        "is_primary": false,
+        "enabled": true
+      },
+      {
+        "screen_id": 3,
+        "identity_key": "adapter_id+target_id:00000000:00013B12:28928",
+        "identity": {
+          "scheme": "adapter_id+target_id",
+          "adapter_id": "00000000:00013B12",
+          "source_id": 3,
+          "target_id": 28928,
+          "source_name": "\\\\.\\DISPLAY4",
+          "monitor_device_path": "\\\\?\\DISPLAY#SAM7202#5&20ef82a0&0&UID28928#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}"
+        },
+        "first_seen_at": "2026-03-12T16:41:48.2209466+01:00",
+        "last_seen_at": "2026-03-12T18:06:47.2184571+00:00",
+        "device_name": "\\\\.\\DISPLAY4",
+        "friendly_name": "QBQ90",
+        "is_primary": false,
+        "enabled": false
+      }
+    ],
+    "updated_at": "2026-03-12T18:06:47.2674474+00:00"
+  }
+}

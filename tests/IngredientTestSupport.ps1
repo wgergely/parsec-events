@@ -168,6 +168,10 @@ function Initialize-ParsecIngredientTestEnvironment {
     $script:IngredientOrientationMutationEnabled = $true
     $script:IngredientOrientationObservationLagRemaining = 0
     $script:IngredientOrientationPendingOrientation = $null
+    $script:IngredientUiScaleObservationLagRemaining = 0
+    $script:IngredientUiScalePendingValue = $null
+    $script:IngredientTextScaleObservationLagRemaining = 0
+    $script:IngredientTextScalePendingValue = $null
     $script:IngredientNvidiaAvailable = $true
     $script:IngredientNvidiaLibraryPath = 'C:\Windows\System32\nvapi64.dll'
     $script:IngredientNvidiaDisplayIds = @{
@@ -178,6 +182,44 @@ function Initialize-ParsecIngredientTestEnvironment {
     }
     $script:IngredientNvidiaSupportedModeLagRemaining = 0
     $script:IngredientNvidiaPendingSupportedMode = $null
+    $script:IngredientWindowActivationLog = @()
+    $script:IngredientWindowActivationDeniedHandles = @()
+    $script:IngredientWindowForegroundHandle = 101
+    $script:IngredientWindows = @(
+        [ordered]@{
+            handle = [int64] 101
+            process_id = 1001
+            title = 'Editor'
+            class_name = 'ApplicationFrameWindow'
+            is_visible = $true
+            is_minimized = $false
+            is_cloaked = $false
+            is_shell_window = $false
+            extended_style = 0
+        },
+        [ordered]@{
+            handle = [int64] 102
+            process_id = 1002
+            title = 'Browser'
+            class_name = 'Chrome_WidgetWin_1'
+            is_visible = $true
+            is_minimized = $false
+            is_cloaked = $false
+            is_shell_window = $false
+            extended_style = 0
+        },
+        [ordered]@{
+            handle = [int64] 103
+            process_id = 1003
+            title = 'Hidden Utility'
+            class_name = 'ToolWindow'
+            is_visible = $false
+            is_minimized = $false
+            is_cloaked = $false
+            is_shell_window = $false
+            extended_style = 0
+        }
+    )
     $script:IngredientSupportedModes = @(
         [ordered]@{ width = 1280; height = 720; bits_per_pel = 32; refresh_rate_hz = 60; orientation = 'Landscape' },
         [ordered]@{ width = 1920; height = 1080; bits_per_pel = 32; refresh_rate_hz = 60; orientation = 'Landscape' }
@@ -333,14 +375,35 @@ function Initialize-ParsecIngredientTestEnvironment {
             $script:IngredientObservedState.wallpaper = $wallpaperState
             New-ParsecResult -Status 'Succeeded' -Message 'wallpaper' -Observed $wallpaperState -Outputs @{ wallpaper_state = $wallpaperState }
         }
+        SetUiScale = {
+            param($Arguments)
+
+            $value = if ($Arguments.ContainsKey('ui_scale_percent')) { [int] $Arguments.ui_scale_percent } elseif ($Arguments.ContainsKey('scale_percent')) { [int] $Arguments.scale_percent } else { [int] $Arguments.value }
+            if ($script:IngredientUiScaleObservationLagRemaining -gt 0) {
+                $script:IngredientUiScalePendingValue = $value
+            }
+            else {
+                $script:IngredientObservedState.scaling.ui_scale_percent = $value
+                $script:IngredientObservedState.scaling.monitors[0].scale_percent = $value
+                $script:IngredientObservedState.monitors[0].display.scale_percent = $value
+            }
+
+            New-ParsecResult -Status 'Succeeded' -Message 'ui-scale' -Observed @{ ui_scale_percent = $value } -Outputs @{ ui_scale_percent = $value; requires_signout = $true }
+        }
         SetTextScale = {
             param($Arguments)
 
             $value = if ($Arguments.ContainsKey('text_scale_percent')) { [int] $Arguments.text_scale_percent } else { [int] $Arguments.value }
-            $script:IngredientObservedState.font_scaling.text_scale_percent = $value
-            $script:IngredientObservedState.scaling.text_scale_percent = $value
-            $script:IngredientObservedState.scaling.monitors[0].text_scale_percent = $value
-            $script:IngredientObservedState.monitors[0].display.text_scale_percent = $value
+            if ($script:IngredientTextScaleObservationLagRemaining -gt 0) {
+                $script:IngredientTextScalePendingValue = $value
+            }
+            else {
+                $script:IngredientObservedState.font_scaling.text_scale_percent = $value
+                $script:IngredientObservedState.scaling.text_scale_percent = $value
+                $script:IngredientObservedState.scaling.monitors[0].text_scale_percent = $value
+                $script:IngredientObservedState.monitors[0].display.text_scale_percent = $value
+            }
+
             New-ParsecResult -Status 'Succeeded' -Message 'text-scale' -Observed @{ text_scale_percent = $value } -Outputs @{ text_scale_percent = $value }
         }
     }
@@ -368,6 +431,33 @@ function Initialize-ParsecIngredientTestEnvironment {
                     }
 
                     $script:IngredientOrientationPendingOrientation = $null
+                }
+            }
+
+            if ($null -ne $script:IngredientUiScalePendingValue) {
+                if ($script:IngredientUiScaleObservationLagRemaining -gt 0) {
+                    $script:IngredientUiScaleObservationLagRemaining--
+                }
+                else {
+                    $value = [int] $script:IngredientUiScalePendingValue
+                    $script:IngredientObservedState.scaling.ui_scale_percent = $value
+                    $script:IngredientObservedState.scaling.monitors[0].scale_percent = $value
+                    $script:IngredientObservedState.monitors[0].display.scale_percent = $value
+                    $script:IngredientUiScalePendingValue = $null
+                }
+            }
+
+            if ($null -ne $script:IngredientTextScalePendingValue) {
+                if ($script:IngredientTextScaleObservationLagRemaining -gt 0) {
+                    $script:IngredientTextScaleObservationLagRemaining--
+                }
+                else {
+                    $value = [int] $script:IngredientTextScalePendingValue
+                    $script:IngredientObservedState.font_scaling.text_scale_percent = $value
+                    $script:IngredientObservedState.scaling.text_scale_percent = $value
+                    $script:IngredientObservedState.scaling.monitors[0].text_scale_percent = $value
+                    $script:IngredientObservedState.monitors[0].display.text_scale_percent = $value
+                    $script:IngredientTextScalePendingValue = $null
                 }
             }
 
@@ -517,9 +607,14 @@ function Initialize-ParsecIngredientTestEnvironment {
             param($Arguments)
             if ($Arguments.ContainsKey('ui_scale_percent')) {
                 $value = [int] $Arguments.ui_scale_percent
-                $script:IngredientObservedState.scaling.ui_scale_percent = $value
-                $script:IngredientObservedState.monitors[0].display.scale_percent = $value
-                $script:IngredientObservedState.scaling.monitors[0].scale_percent = $value
+                if ($script:IngredientUiScaleObservationLagRemaining -gt 0) {
+                    $script:IngredientUiScalePendingValue = $value
+                }
+                else {
+                    $script:IngredientObservedState.scaling.ui_scale_percent = $value
+                    $script:IngredientObservedState.monitors[0].display.scale_percent = $value
+                    $script:IngredientObservedState.scaling.monitors[0].scale_percent = $value
+                }
             }
             elseif ($Arguments.ContainsKey('text_scale_percent')) {
                 $value = [int] $Arguments.text_scale_percent
@@ -530,6 +625,40 @@ function Initialize-ParsecIngredientTestEnvironment {
             }
 
             New-ParsecResult -Status 'Succeeded' -Message 'scaling' -Requested $Arguments
+        }
+    }
+
+    $script:ParsecWindowAdapter = @{
+        GetForegroundWindowInfo = {
+            $window = @($script:IngredientWindows | Where-Object { [int64] $_.handle -eq [int64] $script:IngredientWindowForegroundHandle }) | Select-Object -First 1
+            if ($null -eq $window) {
+                return $null
+            }
+
+            return ConvertTo-ParsecPlainObject -InputObject $window
+        }
+        GetTopLevelWindows = {
+            return @($script:IngredientWindows | ForEach-Object { ConvertTo-ParsecPlainObject -InputObject $_ })
+        }
+        ActivateWindow = {
+            param($Arguments)
+
+            $handle = [int64] $Arguments.handle
+            $script:IngredientWindowActivationLog += $handle
+            $window = @($script:IngredientWindows | Where-Object { [int64] $_.handle -eq $handle }) | Select-Object -First 1
+            $succeeded = ($null -ne $window) -and -not (@($script:IngredientWindowActivationDeniedHandles) -contains $handle)
+            if ($succeeded) {
+                $script:IngredientWindowForegroundHandle = $handle
+                if ($Arguments.restore_if_minimized -and $window.is_minimized) {
+                    $window.is_minimized = $false
+                }
+            }
+
+            return [ordered]@{
+                succeeded = $succeeded
+                handle = $handle
+                window = if ($null -ne $window) { ConvertTo-ParsecPlainObject -InputObject $window } else { $null }
+            }
         }
     }
 

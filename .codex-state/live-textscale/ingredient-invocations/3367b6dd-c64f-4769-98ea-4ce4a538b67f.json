@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "document_type": "ingredient-invocation",
+  "written_at": "2026-03-12T18:24:25.1410185+00:00",
+  "payload": {
+    "completed_at": "2026-03-12T18:24:25.1316900+00:00",
+    "readiness_result": null,
+    "status": "Succeeded",
+    "capture_result": null,
+    "started_at": "2026-03-12T18:24:24.3611058+00:00",
+    "token_path": null,
+    "token_id": "",
+    "resolved_target_identity": null,
+    "ingredient_name": "display.set-textscale",
+    "verify_result": null,
+    "message": "Captured text scaling state.",
+    "operation": "capture",
+    "requested_name": "set-textscale",
+    "operation_result": {
+      "Status": "Succeeded",
+      "Message": "Captured text scaling state.",
+      "Requested": {},
+      "Observed": {
+        "text_scale_percent": 100
+      },
+      "Outputs": {
+        "captured_state": {
+          "text_scale_percent": 100
+        }
+      },
+      "Warnings": [],
+      "Errors": [],
+      "CanCompensate": false,
+      "Timestamp": "2026-03-12T18:24:25.1176207+00:00"
+    },
+    "reset_result": null,
+    "requested_arguments": {},
+    "invocation_id": "3367b6dd-c64f-4769-98ea-4ce4a538b67f"
+  }
+}
