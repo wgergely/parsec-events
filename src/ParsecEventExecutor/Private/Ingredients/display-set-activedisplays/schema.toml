@@ -1,0 +1,32 @@
+name = "display.set-activedisplays"
+aliases = ["set-activedisplays"]
+kind = "display"
+description = "Keep only the requested displays active and preserve their relative topology."
+capabilities = ["capture", "apply", "wait", "verify", "reset"]
+required_backends = ["DisplayAdapter"]
+safety_class = "ReversibleSystemChange"
+success_signals = []
+failure_signals = []
+wait_conditions = []
+
+[readiness]
+timeout_ms = 6000
+poll_interval_ms = 200
+success_count = 2
+
+[operation_schemas.capture]
+required = []
+
+[operation_schemas.apply]
+required = ["screen_ids"]
+
+[operation_schemas.wait]
+required = ["screen_ids"]
+
+[operation_schemas.verify]
+required = ["screen_ids"]
+
+[operation_schemas.reset]
+required = []
+[operation_schemas.reset.types]
+captured_state = "hashtable"

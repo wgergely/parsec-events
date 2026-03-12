@@ -36,6 +36,92 @@ function Set-ParsecIngredientObservedPosition {
     $script:IngredientObservedState.monitors[0].topology.source_mode.position_y = $Y
 }
 
+function Get-ParsecIngredientObservedMonitorByDeviceName {
+    param(
+        [Parameter(Mandatory)]
+        [string] $DeviceName
+    )
+
+    return @($script:IngredientObservedState.monitors) | Where-Object { [string] $_.device_name -eq $DeviceName } | Select-Object -First 1
+}
+
+function Enable-ParsecIngredientDualMonitorEnvironment {
+    $secondaryMonitor = [ordered]@{
+        device_name = '\\.\DISPLAY2'
+        source_name = '\\.\DISPLAY2'
+        friendly_name = 'Secondary Panel'
+        is_primary = $false
+        enabled = $true
+        bounds = [ordered]@{ x = -1600; y = 0; width = 1600; height = 900 }
+        working_area = [ordered]@{ x = -1600; y = 0; width = 1600; height = 860 }
+        orientation = 'Landscape'
+        display = [ordered]@{
+            width = 1600
+            height = 900
+            bits_per_pel = 32
+            refresh_rate_hz = 60
+            effective_dpi_x = 96
+            effective_dpi_y = 96
+            scale_percent = 100
+            text_scale_percent = 130
+        }
+        identity = [ordered]@{
+            scheme = 'adapter_id+target_id'
+            adapter_id = '00000000:00000001'
+            source_id = 1
+            target_id = 2
+            source_name = '\\.\DISPLAY2'
+            monitor_device_path = '\\?\DISPLAY#SECONDARY'
+        }
+        topology = [ordered]@{
+            is_active = $true
+            target_available = $true
+            path_flags = 1
+            source_status_flags = 0
+            target_status_flags = 0
+            output_technology = 0
+            scaling_mode = 0
+            scan_line_ordering = 0
+            source_mode = [ordered]@{
+                available = $true
+                width = 1600
+                height = 900
+                position_x = -1600
+                position_y = 0
+                pixel_format = 0
+            }
+            target_mode = [ordered]@{
+                available = $true
+                width = 1600
+                height = 900
+                pixel_rate = 0
+            }
+        }
+        monitor_device_path = '\\?\DISPLAY#SECONDARY'
+        target_available = $true
+    }
+
+    $script:IngredientObservedState.monitors += , $secondaryMonitor
+    $script:IngredientObservedState.scaling.monitors += , [ordered]@{
+        device_name = '\\.\DISPLAY2'
+        scale_percent = 100
+        effective_dpi_x = 96
+        effective_dpi_y = 96
+        text_scale_percent = 130
+    }
+    $script:IngredientObservedState.topology.path_count = 2
+    $script:IngredientObservedState.topology.paths += , [ordered]@{
+        adapter_id = '00000000:00000001'
+        source_id = 1
+        target_id = 2
+        source_name = '\\.\DISPLAY2'
+        friendly_name = 'Secondary Panel'
+        monitor_device_path = '\\?\DISPLAY#SECONDARY'
+        is_active = $true
+        target_available = $true
+    }
+}
+
 function Add-ParsecIngredientSupportedMode {
     param(
         [Parameter(Mandatory)]
@@ -79,6 +165,9 @@ function Initialize-ParsecIngredientTestEnvironment {
     $script:IngredientResolutionMutationEnabled = $true
     $script:IngredientResolutionObservationLagRemaining = 0
     $script:IngredientResolutionPendingResolution = $null
+    $script:IngredientOrientationMutationEnabled = $true
+    $script:IngredientOrientationObservationLagRemaining = 0
+    $script:IngredientOrientationPendingOrientation = $null
     $script:IngredientNvidiaAvailable = $true
     $script:IngredientNvidiaLibraryPath = 'C:\Windows\System32\nvapi64.dll'
     $script:IngredientNvidiaDisplayIds = @{
@@ -268,6 +357,20 @@ function Initialize-ParsecIngredientTestEnvironment {
                 }
             }
 
+            if ($null -ne $script:IngredientOrientationPendingOrientation) {
+                if ($script:IngredientOrientationObservationLagRemaining -gt 0) {
+                    $script:IngredientOrientationObservationLagRemaining--
+                }
+                else {
+                    $monitor = Get-ParsecIngredientObservedMonitorByDeviceName -DeviceName ([string] $script:IngredientOrientationPendingOrientation.device_name)
+                    if ($null -ne $monitor) {
+                        $monitor.orientation = [string] $script:IngredientOrientationPendingOrientation.orientation
+                    }
+
+                    $script:IngredientOrientationPendingOrientation = $null
+                }
+            }
+
             $script:IngredientObservedState.captured_at = [DateTimeOffset]::UtcNow.ToString('o')
             return ConvertTo-ParsecPlainObject -InputObject $script:IngredientObservedState
         }
@@ -292,22 +395,83 @@ function Initialize-ParsecIngredientTestEnvironment {
         }
         SetEnabled = {
             param($Arguments)
-            $script:IngredientObservedState.monitors[0].enabled = [bool] $Arguments.enabled
+            $monitor = Get-ParsecIngredientObservedMonitorByDeviceName -DeviceName ([string] $Arguments.device_name)
+            if ($null -eq $monitor) {
+                return New-ParsecResult -Status 'Failed' -Message "Monitor '$($Arguments.device_name)' not found." -Requested $Arguments -Errors @('MonitorNotFound')
+            }
+
+            $monitor.enabled = [bool] $Arguments.enabled
+            $monitor.topology.is_active = [bool] $Arguments.enabled
             if ($Arguments.ContainsKey('bounds') -and $Arguments.bounds -is [System.Collections.IDictionary]) {
                 if ($Arguments.bounds.Contains('x')) {
-                    Set-ParsecIngredientObservedPosition -X ([int] $Arguments.bounds.x) -Y ([int] $Arguments.bounds.y)
+                    $monitor.bounds.x = $Arguments.bounds.x
+                    $monitor.working_area.x = $Arguments.bounds.x
+                    $monitor.topology.source_mode.position_x = $Arguments.bounds.x
+                }
+
+                if ($Arguments.bounds.Contains('y')) {
+                    $monitor.bounds.y = $Arguments.bounds.y
+                    $monitor.working_area.y = $Arguments.bounds.y
+                    $monitor.topology.source_mode.position_y = $Arguments.bounds.y
                 }
 
                 if ($Arguments.bounds.Contains('width') -and $Arguments.bounds.Contains('height') -and $Arguments.enabled) {
-                    Set-ParsecIngredientObservedResolution -Width ([int] $Arguments.bounds.width) -Height ([int] $Arguments.bounds.height)
+                    $monitor.bounds.width = [int] $Arguments.bounds.width
+                    $monitor.bounds.height = [int] $Arguments.bounds.height
+                    $monitor.working_area.width = [int] $Arguments.bounds.width
+                    $monitor.working_area.height = [Math]::Max([int] $Arguments.bounds.height - 40, 0)
+                    $monitor.display.width = [int] $Arguments.bounds.width
+                    $monitor.display.height = [int] $Arguments.bounds.height
+                    $monitor.topology.source_mode.width = [int] $Arguments.bounds.width
+                    $monitor.topology.source_mode.height = [int] $Arguments.bounds.height
+                    $monitor.topology.target_mode.width = [int] $Arguments.bounds.width
+                    $monitor.topology.target_mode.height = [int] $Arguments.bounds.height
                 }
+            }
+            elseif (-not [bool] $Arguments.enabled) {
+                $monitor.bounds.x = $null
+                $monitor.bounds.y = $null
+                $monitor.bounds.width = $null
+                $monitor.bounds.height = $null
+                $monitor.working_area.x = $null
+                $monitor.working_area.y = $null
+                $monitor.working_area.width = $null
+                $monitor.working_area.height = $null
+                $monitor.display.width = $null
+                $monitor.display.height = $null
+                $monitor.topology.source_mode.available = $false
+                $monitor.topology.source_mode.width = $null
+                $monitor.topology.source_mode.height = $null
+                $monitor.topology.source_mode.position_x = $null
+                $monitor.topology.source_mode.position_y = $null
+                $monitor.topology.target_mode.available = $false
+                $monitor.topology.target_mode.width = $null
+                $monitor.topology.target_mode.height = $null
             }
 
             New-ParsecResult -Status 'Succeeded' -Message 'enabled' -Requested $Arguments
         }
         SetPrimary = {
             param($Arguments)
-            $script:IngredientObservedState.monitors[0].is_primary = $true
+            foreach ($monitor in @($script:IngredientObservedState.monitors)) {
+                $monitor.is_primary = $false
+            }
+
+            $monitor = Get-ParsecIngredientObservedMonitorByDeviceName -DeviceName ([string] $Arguments.device_name)
+            if ($null -eq $monitor) {
+                return New-ParsecResult -Status 'Failed' -Message "Monitor '$($Arguments.device_name)' not found." -Requested $Arguments -Errors @('MonitorNotFound')
+            }
+
+            $monitor.is_primary = $true
+            if ($monitor.bounds -is [System.Collections.IDictionary]) {
+                $monitor.bounds.x = 0
+                $monitor.bounds.y = 0
+                $monitor.working_area.x = 0
+                $monitor.working_area.y = 0
+                $monitor.topology.source_mode.position_x = 0
+                $monitor.topology.source_mode.position_y = 0
+            }
+
             New-ParsecResult -Status 'Succeeded' -Message 'primary' -Requested $Arguments
         }
         SetResolution = {
@@ -330,7 +494,23 @@ function Initialize-ParsecIngredientTestEnvironment {
         }
         SetOrientation = {
             param($Arguments)
-            $script:IngredientObservedState.monitors[0].orientation = [string] $Arguments.orientation
+            $monitor = Get-ParsecIngredientObservedMonitorByDeviceName -DeviceName ([string] $Arguments.device_name)
+            if ($null -eq $monitor) {
+                return New-ParsecResult -Status 'Failed' -Message "Monitor '$($Arguments.device_name)' not found." -Requested $Arguments -Errors @('MonitorNotFound')
+            }
+
+            if ($script:IngredientOrientationMutationEnabled) {
+                if ($script:IngredientOrientationObservationLagRemaining -gt 0) {
+                    $script:IngredientOrientationPendingOrientation = [ordered]@{
+                        device_name = [string] $Arguments.device_name
+                        orientation = [string] $Arguments.orientation
+                    }
+                }
+                else {
+                    $monitor.orientation = [string] $Arguments.orientation
+                }
+            }
+
             New-ParsecResult -Status 'Succeeded' -Message 'orientation' -Requested $Arguments
         }
         SetScaling = {

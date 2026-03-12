@@ -108,5 +108,31 @@ Describe 'Invoke-ParsecRecipe' {
             $script:IngredientObservedState.monitors[0].bounds.width | Should -Be 1920
             $script:IngredientObservedState.monitors[0].bounds.height | Should -Be 1080
         }
+
+        It 'executes an active-display recipe through the standalone ingredient pipeline' {
+            $stateRoot = Join-Path $TestDrive 'active-display-sequence'
+            $recipePath = Join-Path $PSScriptRoot 'fixtures\recipes\active-display-sequence.toml'
+            Enable-ParsecIngredientDualMonitorEnvironment
+
+            $result = Invoke-ParsecRecipe -NameOrPath $recipePath -StateRoot $stateRoot -Confirm:$false
+
+            $result.recipe_name | Should -Be 'active-display-sequence'
+            $result.terminal_status | Should -Be 'Succeeded'
+            $result.step_results[0].ingredient | Should -Be 'display.set-activedisplays'
+            (@($script:IngredientObservedState.monitors | Where-Object { $_.enabled })).Count | Should -Be 1
+            (@($script:IngredientObservedState.monitors | Where-Object { $_.enabled })[0].device_name) | Should -Be '\\.\DISPLAY1'
+        }
+
+        It 'executes an orientation recipe through the standalone ingredient pipeline' {
+            $stateRoot = Join-Path $TestDrive 'orientation-sequence'
+            $recipePath = Join-Path $PSScriptRoot 'fixtures\recipes\orientation-sequence.toml'
+
+            $result = Invoke-ParsecRecipe -NameOrPath $recipePath -StateRoot $stateRoot -Confirm:$false
+
+            $result.recipe_name | Should -Be 'orientation-sequence'
+            $result.terminal_status | Should -Be 'Succeeded'
+            $result.step_results[0].ingredient | Should -Be 'display.set-orientation'
+            $script:IngredientObservedState.monitors[0].orientation | Should -Be 'Portrait'
+        }
     }
 }

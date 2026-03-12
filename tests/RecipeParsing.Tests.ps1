@@ -45,6 +45,25 @@ Describe 'Get-ParsecRecipe' {
         $recipe.steps[0].arguments.height | Should -Be 720
     }
 
+    It 'parses an array argument for the active-display ingredient' {
+        $recipePath = Join-Path $PSScriptRoot 'fixtures\recipes\active-display-sequence.toml'
+        $recipe = Get-ParsecRecipe -NameOrPath $recipePath
+
+        $recipe.steps.Count | Should -Be 1
+        $recipe.steps[0].ingredient | Should -Be 'set-activedisplays'
+        @($recipe.steps[0].arguments.screen_ids).Count | Should -Be 1
+        $recipe.steps[0].arguments.screen_ids[0] | Should -Be 1
+    }
+
+    It 'parses a direct orientation recipe that uses the flat alias' {
+        $recipePath = Join-Path $PSScriptRoot 'fixtures\recipes\orientation-sequence.toml'
+        $recipe = Get-ParsecRecipe -NameOrPath $recipePath
+
+        $recipe.steps.Count | Should -Be 1
+        $recipe.steps[0].ingredient | Should -Be 'set-orientation'
+        $recipe.steps[0].arguments.orientation | Should -Be 'Portrait'
+    }
+
     It 'parses the mission recipes as mobile preset and snapshot reset flows' {
         $mobile = Get-ParsecRecipe -NameOrPath 'enter-mobile'
         $desktop = Get-ParsecRecipe -NameOrPath 'return-desktop'

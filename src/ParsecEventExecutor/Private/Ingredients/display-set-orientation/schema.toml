@@ -1,33 +1,50 @@
 name = "display.set-orientation"
+aliases = ["set-orientation"]
 kind = "display"
 description = "Set monitor orientation."
-capabilities = ["capture", "apply", "verify", "reset"]
+capabilities = ["capture", "apply", "wait", "verify", "reset"]
 required_backends = ["DisplayAdapter"]
 safety_class = "ReversibleSystemChange"
 success_signals = []
 failure_signals = []
 wait_conditions = []
 
+[readiness]
+timeout_ms = 4000
+poll_interval_ms = 200
+success_count = 2
+
 [operation_schemas.capture]
-required = ["device_name"]
+required = []
 [operation_schemas.capture.types]
 device_name = "string"
+screen_id = "integer"
 
 [operation_schemas.apply]
-required = ["device_name", "orientation"]
+required = ["orientation"]
 [operation_schemas.apply.types]
 device_name = "string"
+screen_id = "integer"
+orientation = "string"
+
+[operation_schemas.wait]
+required = ["orientation"]
+[operation_schemas.wait.types]
+device_name = "string"
+screen_id = "integer"
 orientation = "string"
 
 [operation_schemas.verify]
-required = ["device_name", "orientation"]
+required = ["orientation"]
 [operation_schemas.verify.types]
 device_name = "string"
+screen_id = "integer"
 orientation = "string"
 
 [operation_schemas.reset]
 required = []
 [operation_schemas.reset.types]
 device_name = "string"
+screen_id = "integer"
 orientation = "string"
 captured_state = "hashtable"

@@ -218,6 +218,71 @@ Describe 'Standalone ingredient surface' {
             $result.verify_result | Should -BeNullOrEmpty
         }
 
+        It 'applies a screen-id based orientation change through the standalone ingredient surface' {
+            $stateRoot = Join-Path $TestDrive 'orientation-screen-id'
+            $display = @(Get-ParsecDisplay -StateRoot $stateRoot) | Select-Object -First 1
+
+            $result = Invoke-ParsecIngredient -Name 'set-orientation' -Arguments @{
+                screen_id = $display.screen_id
+                orientation = 'Portrait'
+            } -StateRoot $stateRoot -Confirm:$false
+
+            $result.status | Should -Be 'Succeeded'
+            $result.ingredient_name | Should -Be 'display.set-orientation'
+            $result.operation_result.Outputs.device_name | Should -Be '\\.\DISPLAY1'
+            $script:IngredientObservedState.monitors[0].orientation | Should -Be 'Portrait'
+        }
+
+        It 'waits for readiness before succeeding when the orientation converges after delayed observations' {
+            $stateRoot = Join-Path $TestDrive 'orientation-delayed-readiness'
+            $definition = Get-ParsecIngredientDefinition -Name 'set-orientation'
+            $originalReadiness = ConvertTo-ParsecPlainObject -InputObject $definition.Readiness
+
+            try {
+                $definition.Readiness.timeout_ms = 100
+                $definition.Readiness.poll_interval_ms = 1
+                $definition.Readiness.success_count = 2
+                $script:IngredientOrientationObservationLagRemaining = 2
+
+                $result = Invoke-ParsecIngredient -Name 'set-orientation' -Arguments @{
+                    orientation = 'Portrait'
+                } -StateRoot $stateRoot -Confirm:$false
+
+                $result.status | Should -Be 'Succeeded'
+                $result.readiness_result.Status | Should -Be 'Succeeded'
+                $result.readiness_result.Outputs.attempts | Should -BeGreaterThan 1
+                $result.readiness_result.Outputs.successful_probes | Should -Be 2
+                $result.verify_result.Status | Should -Be 'Succeeded'
+            }
+            finally {
+                $definition.Readiness = ConvertTo-ParsecPlainObject -InputObject $originalReadiness
+            }
+        }
+
+        It 'fails when readiness times out before the orientation converges' {
+            $stateRoot = Join-Path $TestDrive 'orientation-readiness-timeout'
+            $definition = Get-ParsecIngredientDefinition -Name 'set-orientation'
+            $originalReadiness = ConvertTo-ParsecPlainObject -InputObject $definition.Readiness
+
+            try {
+                $definition.Readiness.timeout_ms = 10
+                $definition.Readiness.poll_interval_ms = 1
+                $definition.Readiness.success_count = 2
+                $script:IngredientOrientationObservationLagRemaining = 100
+
+                $result = Invoke-ParsecIngredient -Name 'set-orientation' -Arguments @{
+                    orientation = 'Portrait'
+                } -StateRoot $stateRoot -Confirm:$false
+
+                $result.status | Should -Be 'Failed'
+                $result.readiness_result.Errors | Should -Contain 'ReadinessTimeout'
+                $result.verify_result | Should -BeNullOrEmpty
+            }
+            finally {
+                $definition.Readiness = ConvertTo-ParsecPlainObject -InputObject $originalReadiness
+            }
+        }
+
         It 'captures and restores persisted topology snapshots explicitly' {
             $stateRoot = Join-Path $TestDrive 'persist-topology'
 
@@ -247,6 +312,27 @@ Describe 'Standalone ingredient surface' {
             $script:IngredientObservedState.monitors[0].bounds.x | Should -Be 0
             $script:IngredientObservedState.monitors[0].bounds.width | Should -Be 1920
             $script:IngredientObservedState.monitors[0].orientation | Should -Be 'Landscape'
+        }
+
+        It 'applies and resets an active-display selection through the standalone ingredient surface' {
+            $stateRoot = Join-Path $TestDrive 'active-displays'
+            Enable-ParsecIngredientDualMonitorEnvironment
+            $inventory = @(Get-ParsecDisplay -StateRoot $stateRoot)
+
+            $result = Invoke-ParsecIngredient -Name 'set-activedisplays' -Arguments @{
+                screen_ids = @($inventory[0].screen_id)
+            } -StateRoot $stateRoot -Confirm:$false
+
+            $result.status | Should -Be 'Succeeded'
+            $result.ingredient_name | Should -Be 'display.set-activedisplays'
+            $result.token_id | Should -Not -BeNullOrEmpty
+            (@($script:IngredientObservedState.monitors | Where-Object { $_.enabled })).Count | Should -Be 1
+            (@($script:IngredientObservedState.monitors | Where-Object { $_.enabled })[0].device_name) | Should -Be '\\.\DISPLAY1'
+
+            $reset = Invoke-ParsecIngredient -Name 'set-activedisplays' -Operation 'reset' -TokenId $result.token_id -StateRoot $stateRoot -Confirm:$false
+
+            $reset.status | Should -Be 'Succeeded'
+            (@($script:IngredientObservedState.monitors | Where-Object { $_.enabled })).Count | Should -Be 2
         }
 
         It 'ignores a caller supplied token id for apply when the ingredient does not capture state' {

@@ -2060,6 +2060,219 @@ function Compare-ParsecDisplayTopologyState {
     }
 }
 
+function Compare-ParsecActiveDisplaySelectionState {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [hashtable] $TargetState,
+
+        [Parameter(Mandatory)]
+        [hashtable] $ObservedState
+    )
+
+    $mismatches = New-Object System.Collections.Generic.List[string]
+    $targetEnabled = @($TargetState.monitors | Where-Object { [bool] $_.enabled } | ForEach-Object { [string] $_.device_name })
+    $observedEnabled = @($ObservedState.monitors | Where-Object { [bool] $_.enabled } | ForEach-Object { [string] $_.device_name })
+    $targetPrimary = @($TargetState.monitors | Where-Object { [bool] $_.enabled -and [bool] $_.is_primary } | Select-Object -First 1)
+    $observedPrimary = @($ObservedState.monitors | Where-Object { [bool] $_.enabled -and [bool] $_.is_primary } | Select-Object -First 1)
+
+    $targetEnabledSet = @($targetEnabled | Sort-Object -Unique)
+    $observedEnabledSet = @($observedEnabled | Sort-Object -Unique)
+    if ((ConvertTo-Json $targetEnabledSet -Compress) -cne (ConvertTo-Json $observedEnabledSet -Compress)) {
+        $mismatches.Add('Enabled display set mismatch.')
+    }
+
+    if ($targetPrimary.Count -eq 0) {
+        $mismatches.Add('Target state does not define a primary active display.')
+    }
+    elseif ($observedPrimary.Count -eq 0) {
+        $mismatches.Add('Observed state does not define a primary active display.')
+    }
+    elseif ([string] $targetPrimary[0].device_name -ne [string] $observedPrimary[0].device_name) {
+        $mismatches.Add("Primary display mismatch. Expected '$($targetPrimary[0].device_name)' but observed '$($observedPrimary[0].device_name)'.")
+    }
+
+    if ($mismatches.Count -gt 0) {
+        return New-ParsecResult -Status 'Failed' -Message ($mismatches -join ' ') -Observed $ObservedState -Outputs @{
+            mismatches = @($mismatches)
+            target_state = $TargetState
+            target_enabled = $targetEnabledSet
+            observed_enabled = $observedEnabledSet
+        }
+    }
+
+    return New-ParsecResult -Status 'Succeeded' -Message 'Observed active display selection matches the target state.' -Observed $ObservedState -Outputs @{
+        target_state = $TargetState
+        target_enabled = $targetEnabledSet
+        observed_enabled = $observedEnabledSet
+    }
+}
+
+function Resolve-ParsecActiveDisplayTargetState {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [System.Collections.IDictionary] $ObservedState,
+
+        [Parameter(Mandatory)]
+        [hashtable] $Arguments,
+
+        [Parameter()]
+        [string] $StateRoot = (Get-ParsecDefaultStateRoot)
+    )
+
+    $requestedScreenIds = @($Arguments.screen_ids)
+    if ($requestedScreenIds.Count -eq 0) {
+        return New-ParsecResult -Status 'Failed' -Message 'set-activedisplays requires at least one screen id.' -Observed $ObservedState -Errors @('MissingScreenIds')
+    }
+
+    $requestedMonitors = New-Object System.Collections.Generic.List[object]
+    $requestedIdentityKeys = New-Object System.Collections.Generic.HashSet[string]
+    $requestedDeviceNames = New-Object System.Collections.Generic.HashSet[string]
+    foreach ($screenId in $requestedScreenIds) {
+        $monitor = Resolve-ParsecDisplayMonitorByScreenId -ObservedState $ObservedState -ScreenId ([int] $screenId) -StateRoot $StateRoot
+        if ($null -eq $monitor) {
+            return New-ParsecResult -Status 'Failed' -Message "Screen id '$screenId' could not be resolved." -Observed $ObservedState -Errors @('MonitorNotFound')
+        }
+
+        $identityKey = Get-ParsecDisplayMonitorIdentityKey -Monitor $monitor
+        if (-not $requestedIdentityKeys.Add($identityKey)) {
+            return New-ParsecResult -Status 'Failed' -Message "Screen id '$screenId' resolves to a duplicate display target." -Observed $ObservedState -Errors @('DuplicateScreenId')
+        }
+
+        if ($monitor.Contains('target_available') -and $null -ne $monitor.target_available -and -not [bool] $monitor.target_available) {
+            return New-ParsecResult -Status 'Failed' -Message "Screen id '$screenId' is not currently target-available." -Observed $ObservedState -Errors @('TargetUnavailable')
+        }
+
+        $requestedMonitors.Add($monitor)
+        $requestedDeviceNames.Add([string] $monitor.device_name) | Out-Null
+    }
+
+    $primaryMonitor = @($requestedMonitors | ForEach-Object { $_ } | Where-Object { [bool] $_.is_primary }) | Select-Object -First 1
+    if ($null -eq $primaryMonitor) {
+        $primaryMonitor = $requestedMonitors[0]
+    }
+
+    $primaryOffsetX = if ($primaryMonitor.Contains('bounds') -and $primaryMonitor.bounds -is [System.Collections.IDictionary] -and $null -ne $primaryMonitor.bounds.x) {
+        [int] $primaryMonitor.bounds.x
+    }
+    else {
+        0
+    }
+    $primaryOffsetY = if ($primaryMonitor.Contains('bounds') -and $primaryMonitor.bounds -is [System.Collections.IDictionary] -and $null -ne $primaryMonitor.bounds.y) {
+        [int] $primaryMonitor.bounds.y
+    }
+    else {
+        0
+    }
+
+    $targetState = Get-ParsecDisplayTopologyCaptureState -ObservedState $ObservedState
+    $targetState.monitors = @(
+        foreach ($monitor in @($targetState.monitors)) {
+            $deviceName = [string] $monitor.device_name
+            $isRequested = $requestedDeviceNames.Contains($deviceName)
+            $targetMonitor = ConvertTo-ParsecPlainObject -InputObject $monitor
+
+            if ($isRequested) {
+                $targetMonitor.enabled = $true
+                $targetMonitor.is_primary = ($deviceName -eq [string] $primaryMonitor.device_name)
+                if ($targetMonitor.Contains('bounds') -and $targetMonitor.bounds -is [System.Collections.IDictionary]) {
+                    if ($null -ne $targetMonitor.bounds.x) {
+                        $targetMonitor.bounds.x = [int] $targetMonitor.bounds.x - $primaryOffsetX
+                    }
+                    if ($null -ne $targetMonitor.bounds.y) {
+                        $targetMonitor.bounds.y = [int] $targetMonitor.bounds.y - $primaryOffsetY
+                    }
+                }
+
+                if ($targetMonitor.Contains('topology') -and $targetMonitor.topology -is [System.Collections.IDictionary]) {
+                    $targetMonitor.topology.is_active = $true
+                    if ($targetMonitor.topology.Contains('source_mode') -and $targetMonitor.topology.source_mode -is [System.Collections.IDictionary]) {
+                        $targetMonitor.topology.source_mode.available = $true
+                        if ($targetMonitor.topology.source_mode.Contains('position_x') -and $null -ne $targetMonitor.topology.source_mode.position_x) {
+                            $targetMonitor.topology.source_mode.position_x = [int] $targetMonitor.topology.source_mode.position_x - $primaryOffsetX
+                        }
+                        if ($targetMonitor.topology.source_mode.Contains('position_y') -and $null -ne $targetMonitor.topology.source_mode.position_y) {
+                            $targetMonitor.topology.source_mode.position_y = [int] $targetMonitor.topology.source_mode.position_y - $primaryOffsetY
+                        }
+                    }
+
+                    if ($targetMonitor.topology.Contains('target_mode') -and $targetMonitor.topology.target_mode -is [System.Collections.IDictionary]) {
+                        $targetMonitor.topology.target_mode.available = $true
+                    }
+                }
+            }
+            else {
+                $targetMonitor.enabled = $false
+                $targetMonitor.is_primary = $false
+                $targetMonitor.orientation = $null
+                $targetMonitor.bounds = [ordered]@{
+                    x = $null
+                    y = $null
+                    width = $null
+                    height = $null
+                }
+                if ($targetMonitor.Contains('display') -and $targetMonitor.display -is [System.Collections.IDictionary]) {
+                    $targetMonitor.display.width = $null
+                    $targetMonitor.display.height = $null
+                }
+
+                if ($targetMonitor.Contains('topology') -and $targetMonitor.topology -is [System.Collections.IDictionary]) {
+                    $targetMonitor.topology.is_active = $false
+                    if ($targetMonitor.topology.Contains('source_mode') -and $targetMonitor.topology.source_mode -is [System.Collections.IDictionary]) {
+                        $targetMonitor.topology.source_mode.available = $false
+                        $targetMonitor.topology.source_mode.width = $null
+                        $targetMonitor.topology.source_mode.height = $null
+                        $targetMonitor.topology.source_mode.position_x = $null
+                        $targetMonitor.topology.source_mode.position_y = $null
+                    }
+
+                    if ($targetMonitor.topology.Contains('target_mode') -and $targetMonitor.topology.target_mode -is [System.Collections.IDictionary]) {
+                        $targetMonitor.topology.target_mode.available = $false
+                        $targetMonitor.topology.target_mode.width = $null
+                        $targetMonitor.topology.target_mode.height = $null
+                    }
+                }
+            }
+
+            $targetMonitor
+        }
+    )
+
+    return New-ParsecResult -Status 'Succeeded' -Message 'Resolved target active-display topology.' -Observed $ObservedState -Outputs @{
+        target_state = $targetState
+        requested_screen_ids = @($requestedScreenIds | ForEach-Object { [int] $_ })
+        requested_device_names = @($requestedMonitors | ForEach-Object { [string] $_.device_name })
+        primary_device_name = [string] $primaryMonitor.device_name
+    }
+}
+
+function Resolve-ParsecActiveDisplayTargetStateForOperation {
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        $ExecutionResult,
+
+        [Parameter()]
+        [hashtable] $Arguments = @{},
+
+        [Parameter()]
+        [string] $StateRoot = (Get-ParsecDefaultStateRoot)
+    )
+
+    if ($null -ne $ExecutionResult -and $ExecutionResult.Outputs -and $ExecutionResult.Outputs.target_state) {
+        return ConvertTo-ParsecPlainObject -InputObject $ExecutionResult.Outputs.target_state
+    }
+
+    $observed = Get-ParsecObservedState
+    $resolution = Resolve-ParsecActiveDisplayTargetState -ObservedState $observed -Arguments $Arguments -StateRoot $StateRoot
+    if (-not (Test-ParsecSuccessfulStatus -Status $resolution.Status)) {
+        return $resolution
+    }
+
+    return ConvertTo-ParsecPlainObject -InputObject $resolution.Outputs.target_state
+}
+
 function Get-ParsecCapturedStateFromResult {
     [CmdletBinding()]
     param(
