@@ -1,4 +1,37 @@
 function Get-ParsecIngredientOperations {
+    function script:Resolve-ParsecUiScaleExpectedValue {
+        param(
+            [Parameter()]
+            [System.Collections.IDictionary] $Arguments = @{},
+
+            [Parameter()]
+            $ExecutionResult
+        )
+
+        if ($null -ne $ExecutionResult -and $ExecutionResult.Outputs -and $ExecutionResult.Outputs.Contains('ui_scale_percent')) {
+            return [int] $ExecutionResult.Outputs.ui_scale_percent
+        }
+
+        if ($Arguments.Contains('ui_scale_percent')) {
+            return [int] $Arguments.ui_scale_percent
+        }
+
+        if ($Arguments.Contains('scale_percent')) {
+            return [int] $Arguments.scale_percent
+        }
+
+        if ($Arguments.Contains('value')) {
+            return [int] $Arguments.value
+        }
+
+        $capturedState = Get-ParsecCapturedStateFromResult -Arguments $Arguments -ExecutionResult $ExecutionResult
+        if ($null -ne $capturedState -and $capturedState.Contains('ui_scale_percent')) {
+            return [int] $capturedState.ui_scale_percent
+        }
+
+        throw 'UI scale operation requires ui_scale_percent, scale_percent, or value.'
+    }
+
     return @{
         capture = {
             param($Arguments, $ExecutionResult, $StateRoot, $RunState, $Definition)
@@ -21,29 +54,18 @@ function Get-ParsecIngredientOperations {
         }
         apply = {
             param($Arguments, $ExecutionResult, $StateRoot, $RunState, $Definition)
-            $uiScalePercent = if ($Arguments.Contains('ui_scale_percent')) {
-                [int] $Arguments.ui_scale_percent
-            }
-            elseif ($Arguments.Contains('scale_percent')) {
-                [int] $Arguments.scale_percent
-            }
-            elseif ($Arguments.Contains('value')) {
-                [int] $Arguments.value
-            }
-            else {
-                $capturedState = Get-ParsecCapturedStateFromResult -Arguments $Arguments -ExecutionResult $ExecutionResult
-                if ($null -ne $capturedState -and $capturedState.Contains('ui_scale_percent')) {
-                    [int] $capturedState.ui_scale_percent
-                }
-                else {
-                    throw 'UI scale operation requires ui_scale_percent, scale_percent, or value.'
-                }
-            }
+            $uiScalePercent = Resolve-ParsecUiScaleExpectedValue -Arguments $Arguments -ExecutionResult $ExecutionResult
 
             $deviceName = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments -StateRoot $StateRoot
             $result = Invoke-ParsecPersonalizationAdapter -Method 'SetUiScale' -Arguments @{
                 device_name = $deviceName
                 ui_scale_percent = $uiScalePercent
+            }
+            $appliedUiScalePercent = if ($result.Outputs -and $result.Outputs.Contains('ui_scale_percent')) {
+                [int] $result.Outputs.ui_scale_percent
+            }
+            else {
+                $uiScalePercent
             }
             $result.Requested = [ordered]@{
                 device_name = $deviceName
@@ -51,31 +73,14 @@ function Get-ParsecIngredientOperations {
             }
             $result.Outputs = [ordered]@{
                 device_name = $deviceName
-                ui_scale_percent = $uiScalePercent
+                ui_scale_percent = $appliedUiScalePercent
                 requires_signout = if ($result.Outputs -and $result.Outputs.Contains('requires_signout')) { [bool] $result.Outputs.requires_signout } else { $false }
             }
             return $result
         }
         wait = {
             param($Arguments, $ExecutionResult, $StateRoot, $RunState, $Definition)
-            $expected = if ($Arguments.Contains('ui_scale_percent')) {
-                [int] $Arguments.ui_scale_percent
-            }
-            elseif ($Arguments.Contains('scale_percent')) {
-                [int] $Arguments.scale_percent
-            }
-            elseif ($Arguments.Contains('value')) {
-                [int] $Arguments.value
-            }
-            else {
-                $capturedState = Get-ParsecCapturedStateFromResult -Arguments $Arguments -ExecutionResult $ExecutionResult
-                if ($null -ne $capturedState -and $capturedState.Contains('ui_scale_percent')) {
-                    [int] $capturedState.ui_scale_percent
-                }
-                else {
-                    throw 'UI scale operation requires ui_scale_percent, scale_percent, or value.'
-                }
-            }
+            $expected = Resolve-ParsecUiScaleExpectedValue -Arguments $Arguments -ExecutionResult $ExecutionResult
             $observed = Get-ParsecObservedState
             $deviceName = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments -StateRoot $StateRoot
             $monitor = Get-ParsecObservedMonitor -ObservedState $observed -DeviceName $deviceName
@@ -101,24 +106,7 @@ function Get-ParsecIngredientOperations {
         }
         verify = {
             param($Arguments, $ExecutionResult, $StateRoot, $RunState, $Definition)
-            $expected = if ($Arguments.Contains('ui_scale_percent')) {
-                [int] $Arguments.ui_scale_percent
-            }
-            elseif ($Arguments.Contains('scale_percent')) {
-                [int] $Arguments.scale_percent
-            }
-            elseif ($Arguments.Contains('value')) {
-                [int] $Arguments.value
-            }
-            else {
-                $capturedState = Get-ParsecCapturedStateFromResult -Arguments $Arguments -ExecutionResult $ExecutionResult
-                if ($null -ne $capturedState -and $capturedState.Contains('ui_scale_percent')) {
-                    [int] $capturedState.ui_scale_percent
-                }
-                else {
-                    throw 'UI scale operation requires ui_scale_percent, scale_percent, or value.'
-                }
-            }
+            $expected = Resolve-ParsecUiScaleExpectedValue -Arguments $Arguments -ExecutionResult $ExecutionResult
             $observed = Get-ParsecObservedState
             $deviceName = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments -StateRoot $StateRoot
             $monitor = Get-ParsecObservedMonitor -ObservedState $observed -DeviceName $deviceName

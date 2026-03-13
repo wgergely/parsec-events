@@ -764,7 +764,7 @@ function Invoke-ParsecIngredientCommandInternal {
             if ($Verify -and (Test-ParsecSuccessfulStatus -Status $finalStatus) -and (Test-ParsecIngredientOperationSupported -Definition $definition -Operation 'verify')) {
                 $verificationResult = Invoke-ParsecIngredientOperation -Name $definition.Name -Operation 'verify' -Arguments $Arguments -ExecutionResult $operationResult -StateRoot $stateRoot -RunState @{}
                 if (-not (Test-ParsecSuccessfulStatus -Status $verificationResult.Status)) {
-                    $finalStatus = if ($verificationResult.Status -eq 'Ambiguous') { 'Ambiguous' } else { 'Failed' }
+                    $finalStatus = if ($verificationResult.Status -eq 'Ambiguous') { 'Ambiguous' } else { 'SucceededWithDrift' }
                 }
             }
 
@@ -800,8 +800,14 @@ function Invoke-ParsecIngredientCommandInternal {
             }
 
             $resolvedTargetIdentity = ConvertTo-ParsecPlainObject -InputObject $tokenDocument.resolved_target_identity
+            $resetExecutionResult = if ($tokenDocument.apply_result) {
+                ConvertTo-ParsecPlainObject -InputObject $tokenDocument.apply_result
+            }
+            else {
+                $null
+            }
             $resetArguments = Merge-ParsecRecipeMap -Base ([ordered]@{ captured_state = $tokenDocument.captured_state }) -Override (Merge-ParsecRecipeMap -Base $tokenDocument.requested_arguments -Override $Arguments)
-            $operationResult = Invoke-ParsecIngredientOperation -Name $definition.Name -Operation 'reset' -Arguments $resetArguments -StateRoot $stateRoot -RunState @{}
+            $operationResult = Invoke-ParsecIngredientOperation -Name $definition.Name -Operation 'reset' -Arguments $resetArguments -ExecutionResult $resetExecutionResult -StateRoot $stateRoot -RunState @{}
             $resetResult = $operationResult
             $finalStatus = [string] $operationResult.Status
 

@@ -189,7 +189,7 @@ Describe 'Standalone ingredient surface' {
             }
         }
 
-        It 'fails verification when the display backend drifts from the requested resolution' {
+        It 'reports verification drift when the display backend diverges after apply' {
             $stateRoot = Join-Path $TestDrive 'resolution-drift'
             $definition = Get-ParsecIngredientDefinition -Name 'set-resolution'
             $waitOperation = $definition.Operations['wait']
@@ -206,7 +206,7 @@ Describe 'Standalone ingredient surface' {
                 $definition.Operations['wait'] = $waitOperation
             }
 
-            $result.status | Should -Be 'Failed'
+            $result.status | Should -Be 'SucceededWithDrift'
             $result.verify_result.Errors | Should -Contain 'ResolutionDrift'
             $result.verify_result.Observed.bounds.width | Should -Be 1920
         }
@@ -382,6 +382,24 @@ Describe 'Standalone ingredient surface' {
 
             $reset.status | Should -Be 'Succeeded'
             $script:IngredientObservedState.scaling.ui_scale_percent | Should -Be 150
+        }
+
+        It 'uses the applied UI scale from the adapter when the backend clamps the request' {
+            $stateRoot = Join-Path $TestDrive 'uiscale-clamped'
+            $script:IngredientUiScaleMinimum = 100
+            $script:IngredientUiScaleMaximum = 125
+
+            $result = Invoke-ParsecIngredient -Name 'set-uiscale' -Arguments @{
+                ui_scale_percent = 80
+            } -StateRoot $stateRoot -Confirm:$false
+
+            $result.status | Should -Be 'Succeeded'
+            $result.operation_result.Outputs['ui_scale_percent'] | Should -Be 100
+            $result.readiness_result.Status | Should -Be 'Succeeded'
+            $result.readiness_result.Outputs.last_probe.Outputs['ui_scale_percent'] | Should -Be 100
+            $result.verify_result.Status | Should -Be 'Succeeded'
+            $result.verify_result.Outputs['ui_scale_percent'] | Should -Be 100
+            $script:IngredientObservedState.scaling.ui_scale_percent | Should -Be 100
         }
 
         It 'waits for readiness before succeeding when UI scaling converges after delayed observations' {
@@ -583,6 +601,53 @@ Describe 'Standalone ingredient surface' {
             $result.token_path | Should -BeNullOrEmpty
             $result.operation_result.Outputs.width | Should -Be 1600
             $result.operation_result.Outputs.height | Should -Be 900
+        }
+
+        It 'passes persisted apply output into token-based reset execution' {
+            $stateRoot = Join-Path $TestDrive 'process-start-token-reset'
+            $tokenId = 'process-start-token'
+
+            $tokenDocument = @{
+                token_id = $tokenId
+                ingredient_name = 'process.start'
+                requested_name = 'process.start'
+                requested_arguments = @{
+                    file_path = 'C:\Program Files\PowerShell\7\pwsh.exe'
+                    arguments = @('-NoProfile', '-Command', 'Start-Sleep -Seconds 10')
+                }
+                resolved_target_identity = @{}
+                captured_state = @{
+                    is_running = $false
+                }
+                apply_result = @{
+                    Outputs = @{
+                        process_id = 4242
+                        process_name = 'pwsh'
+                        file_path = 'C:\Program Files\PowerShell\7\pwsh.exe'
+                    }
+                }
+                readiness_result = $null
+                verify_result = $null
+                reset_result = $null
+                reset_status = 'Available'
+                created_at = [DateTimeOffset]::UtcNow.ToString('o')
+                updated_at = [DateTimeOffset]::UtcNow.ToString('o')
+            }
+            $null = Save-ParsecIngredientTokenDocument -TokenDocument $tokenDocument -StateRoot $stateRoot
+
+            Mock Get-Process {
+                [pscustomobject]@{
+                    Id = 4242
+                    ProcessName = 'pwsh'
+                }
+            } -ParameterFilter { $Id -eq 4242 }
+            Mock Stop-Process {} -ParameterFilter { $Id -eq 4242 }
+
+            $reset = Invoke-ParsecIngredientCommandInternal -Name 'process.start' -Operation 'reset' -TokenId $tokenId -StateRoot $stateRoot
+
+            $reset.status | Should -Be 'Succeeded'
+            Should -Invoke Get-Process -Times 1 -Exactly -ParameterFilter { $Id -eq 4242 }
+            Should -Invoke Stop-Process -Times 1 -Exactly -ParameterFilter { $Id -eq 4242 }
         }
     }
 }

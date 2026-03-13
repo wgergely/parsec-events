@@ -170,6 +170,8 @@ function Initialize-ParsecIngredientTestEnvironment {
     $script:IngredientOrientationPendingOrientation = $null
     $script:IngredientUiScaleObservationLagRemaining = 0
     $script:IngredientUiScalePendingValue = $null
+    $script:IngredientUiScaleMinimum = $null
+    $script:IngredientUiScaleMaximum = $null
     $script:IngredientTextScaleObservationLagRemaining = 0
     $script:IngredientTextScalePendingValue = $null
     $script:IngredientNvidiaAvailable = $true
@@ -397,7 +399,16 @@ function Initialize-ParsecIngredientTestEnvironment {
         SetUiScale = {
             param($Arguments)
 
-            $value = if ($Arguments.ContainsKey('ui_scale_percent')) { [int] $Arguments.ui_scale_percent } elseif ($Arguments.ContainsKey('scale_percent')) { [int] $Arguments.scale_percent } else { [int] $Arguments.value }
+            $requestedValue = if ($Arguments.ContainsKey('ui_scale_percent')) { [int] $Arguments.ui_scale_percent } elseif ($Arguments.ContainsKey('scale_percent')) { [int] $Arguments.scale_percent } else { [int] $Arguments.value }
+            $value = $requestedValue
+            if ($null -ne $script:IngredientUiScaleMinimum -and $value -lt [int] $script:IngredientUiScaleMinimum) {
+                $value = [int] $script:IngredientUiScaleMinimum
+            }
+
+            if ($null -ne $script:IngredientUiScaleMaximum -and $value -gt [int] $script:IngredientUiScaleMaximum) {
+                $value = [int] $script:IngredientUiScaleMaximum
+            }
+
             if ($script:IngredientUiScaleObservationLagRemaining -gt 0) {
                 $script:IngredientUiScalePendingValue = $value
             }
@@ -407,7 +418,7 @@ function Initialize-ParsecIngredientTestEnvironment {
                 $script:IngredientObservedState.monitors[0].display.scale_percent = $value
             }
 
-            New-ParsecResult -Status 'Succeeded' -Message 'ui-scale' -Observed @{ ui_scale_percent = $value } -Outputs @{ ui_scale_percent = $value; requires_signout = $true }
+            New-ParsecResult -Status 'Succeeded' -Message 'ui-scale' -Observed @{ ui_scale_percent = $value } -Outputs @{ requested_ui_scale_percent = $requestedValue; ui_scale_percent = $value; requires_signout = $true }
         }
         SetTextScale = {
             param($Arguments)

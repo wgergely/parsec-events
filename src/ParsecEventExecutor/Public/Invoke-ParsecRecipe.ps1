@@ -14,5 +14,5 @@ function Invoke-ParsecRecipe {
         return
     }
 
-    return Invoke-ParsecRecipeSequence -Recipe $recipe -StateRoot $StateRoot
+    return Invoke-ParsecRecipeInternal -Recipe $recipe -StateRoot $StateRoot
 }
