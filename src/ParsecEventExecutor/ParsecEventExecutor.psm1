@@ -17,6 +17,15 @@ foreach ($privateFile in $privateLoadOrder) {
     . (Join-Path -Path $privateRoot -ChildPath $privateFile)
 }
 
+$coreRoot = Join-Path -Path $privateRoot -ChildPath 'Core'
+if (Test-Path -LiteralPath $coreRoot) {
+    . (Join-Path -Path $coreRoot -ChildPath 'Bootstrap.ps1')
+    foreach ($coreFile in @(Get-ParsecCoreLoadOrder)) {
+        . (Join-Path -Path $coreRoot -ChildPath $coreFile)
+    }
+    . (Join-Path -Path $coreRoot -ChildPath 'Compat.ps1')
+}
+
 Get-ChildItem -Path $publicRoot -Filter '*.ps1' -File | Sort-Object Name | ForEach-Object {
     . $_.FullName
 }

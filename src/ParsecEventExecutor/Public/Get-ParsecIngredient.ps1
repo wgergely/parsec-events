@@ -5,7 +5,12 @@ function Get-ParsecIngredient {
         [string] $Name = '*'
     )
 
-    $items = $script:ParsecIngredientRegistry.Values | Sort-Object Name
+    $items = if (Get-Command -Name Get-ParsecCoreIngredientDefinitions -ErrorAction SilentlyContinue) {
+        Get-ParsecCoreIngredientDefinitions
+    }
+    else {
+        $script:ParsecIngredientRegistry.Values | Sort-Object Name
+    }
     if ($Name -ne '*') {
         if ($Name.IndexOfAny(@('*', '?')) -lt 0) {
             try {

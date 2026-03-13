@@ -66,6 +66,16 @@ Describe 'Standalone ingredient surface' {
             } | Should -Throw "*argument 'width' must be of type 'integer'*"
         }
 
+        It 'registers migrated ingredients through entry packages while preserving legacy fallback for untouched ingredients' {
+            $entryDefinition = Get-ParsecIngredientDefinition -Name 'display.set-resolution'
+            $legacyDefinition = Get-ParsecIngredientDefinition -Name 'command.invoke'
+
+            $entryDefinition.Metadata.package_format | Should -Be 'entry'
+            $entryDefinition.Metadata.ingredient_path | Should -Match 'display-set-resolution'
+            $legacyDefinition.Metadata.package_format | Should -Be 'legacy-lib'
+            $legacyDefinition.Metadata.ingredient_path | Should -Match 'command-invoke'
+        }
+
         It 'accepts a flat ingredient alias and persists a reusable token on apply' {
             $stateRoot = Join-Path $TestDrive 'alias-apply'
 
