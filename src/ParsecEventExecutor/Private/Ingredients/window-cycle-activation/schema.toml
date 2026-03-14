@@ -1,5 +1,6 @@
 name = "window.cycle-activation"
 aliases = ["cycle-activation"]
+domain = "window"
 kind = "window"
 description = "Cycle activation across top-level windows and restore the original foreground window."
 capabilities = ["capture", "apply", "verify", "reset"]
