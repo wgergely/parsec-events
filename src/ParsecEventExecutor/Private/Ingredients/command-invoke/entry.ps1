@@ -10,8 +10,8 @@ return @{
     Domain = 'command'
     Operations = @{
         apply = {
-            param($ctx, $args, $prior)
-            & $ctx.DomainApi.Invoke 'RunProcess' $args
+            param($ctx, $operationArguments, $prior)
+            & $ctx.DomainApi.Invoke 'RunProcess' $operationArguments $prior $ctx.StateRoot $ctx.RunState
         }
     }
 }
