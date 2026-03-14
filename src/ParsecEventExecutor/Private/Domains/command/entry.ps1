@@ -1,5 +1,6 @@
 $supportFiles = @(
-    (Join-Path -Path (Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent) -ChildPath 'Core\HostSupport.ps1')
+    (Join-Path -Path (Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent) -ChildPath 'Core\HostSupport.ps1'),
+    (Join-Path -Path (Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent) -ChildPath 'Utility.ps1')
 )
 
 $loadSupportFiles = {
@@ -14,6 +15,34 @@ $loadSupportFiles = {
     }
 
     foreach ($file in @($files)) { . $file }
+}.GetNewClosure()
+
+$newResult = {
+    param(
+        [string] $Status,
+        [string] $Message,
+        [System.Collections.IDictionary] $Requested = @{},
+        [System.Collections.IDictionary] $Observed = @{},
+        [System.Collections.IDictionary] $Outputs = @{},
+        [string[]] $Errors = @()
+    )
+
+    if (Get-Command -Name 'New-ParsecResult' -ErrorAction SilentlyContinue) {
+        return New-ParsecResult -Status $Status -Message $Message -Requested $Requested -Observed $Observed -Outputs $Outputs -Errors $Errors
+    }
+
+    return [pscustomobject]@{
+        PSTypeName = 'ParsecEventExecutor.Result'
+        Status = $Status
+        Message = $Message
+        Requested = $Requested
+        Observed = $Observed
+        Outputs = $Outputs
+        Warnings = @()
+        Errors = @($Errors)
+        CanCompensate = $false
+        Timestamp = [DateTimeOffset]::UtcNow.ToString('o')
+    }
 }.GetNewClosure()
 
 return @{
@@ -45,7 +74,7 @@ return @{
                     }
                     catch {
                         $stderr.Add([string] $_)
-                        return New-ParsecResult -Status 'Failed' -Message ("Failed to start command '{0}'." -f [string] $Arguments.file_path) -Requested $Arguments -Outputs @{
+                        return & $newResult -Status 'Failed' -Message ("Failed to start command '{0}'." -f [string] $Arguments.file_path) -Requested $Arguments -Outputs @{
                             stdout = ''
                             stderr = ($stderr -join [Environment]::NewLine)
                             exit_code = -1
@@ -74,7 +103,7 @@ return @{
                         $errors = @('NonZeroExitCode')
                     }
 
-                    return New-ParsecResult -Status $status -Message $message -Requested $Arguments -Outputs @{
+                    return & $newResult -Status $status -Message $message -Requested $Arguments -Outputs @{
                         stdout = ($stdout -join [Environment]::NewLine)
                         stderr = ($stderr -join [Environment]::NewLine)
                         exit_code = $normalizedExitCode
@@ -82,6 +111,6 @@ return @{
                 }
                 default { throw "Command domain method '$Method' is not available." }
             }
-        }
+        }.GetNewClosure()
     }
 }
