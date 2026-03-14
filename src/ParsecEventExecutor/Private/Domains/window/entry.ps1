@@ -1,9 +1,11 @@
 $supportFiles = @(
     (Join-Path -Path (Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent) -ChildPath 'Core\HostSupport.ps1'),
-    (Join-Path -Path (Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent) -ChildPath 'Utility.ps1')
+    (Join-Path -Path (Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent) -ChildPath 'Utility.ps1'),
+    (Join-Path -Path (Join-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -ChildPath 'display') -ChildPath 'Platform.ps1')
 )
 
 foreach ($file in @($supportFiles)) { . $file }
+Initialize-ParsecDisplayInterop
 
 $toPlain = {
     param($InputObject)

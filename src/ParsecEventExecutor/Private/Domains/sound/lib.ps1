@@ -83,7 +83,8 @@ function Get-ParsecSoundDefaultPlaybackDevice {
 }
 
 function Set-ParsecSoundDefaultPlaybackDevice {
-    [CmdletBinding(SupportsShouldProcess)]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    [CmdletBinding()]
     [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
@@ -100,11 +101,6 @@ function Set-ParsecSoundDefaultPlaybackDevice {
 
     if ([string]::IsNullOrWhiteSpace($deviceId) -and [string]::IsNullOrWhiteSpace($deviceName)) {
         return New-ParsecResult -Status 'Failed' -Message 'Either device_id or device_name is required to set the default playback device.' -Errors @('MissingArgument')
-    }
-
-    $targetDescription = if (-not [string]::IsNullOrWhiteSpace($deviceId)) { "device '$deviceId'" } else { "device '$deviceName'" }
-    if (-not $PSCmdlet.ShouldProcess($targetDescription, 'Set default playback device')) {
-        return New-ParsecResult -Status 'Skipped' -Message 'Operation skipped by ShouldProcess.'
     }
 
     # Try AudioDeviceCmdlets module

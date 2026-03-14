@@ -96,11 +96,42 @@ function Initialize-ParsecPersonalizationInterop {
     [OutputType([void])]
     param()
 
-    Initialize-ParsecDisplayInterop
+    if ('ParsecEventExecutor.PersonalizationNative' -as [type]) {
+        return
+    }
+
+    Add-Type -TypeDefinition @"
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+
+namespace ParsecEventExecutor {
+    public static class PersonalizationNative {
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        private static extern IntPtr SendMessageTimeout(
+            IntPtr hWnd, uint msg, IntPtr wParam, string lParam,
+            uint fuFlags, uint uTimeout, out IntPtr lpdwResult);
+
+        public static void BroadcastSettingChange(string area) {
+            IntPtr result;
+            var timeoutFlags = 0x0002u | 0x0008u;
+            var messageResult = SendMessageTimeout(
+                new IntPtr(0xffff), 0x001A, IntPtr.Zero, area,
+                timeoutFlags, 5000u, out result);
+            if (messageResult == IntPtr.Zero) {
+                throw new Win32Exception(
+                    Marshal.GetLastWin32Error(),
+                    "SendMessageTimeout(WM_SETTINGCHANGE) failed.");
+            }
+        }
+    }
+}
+"@ -ErrorAction Stop
 }
 
 function Set-ParsecThemeStateInternal {
-    [CmdletBinding(SupportsShouldProcess)]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    [CmdletBinding()]
     [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
@@ -141,10 +172,6 @@ function Set-ParsecThemeStateInternal {
     $appsUseLightTheme = if ($appMode -ieq 'Dark') { 0 } else { 1 }
     $systemUsesLightTheme = if ($systemMode -ieq 'Dark') { 0 } else { 1 }
 
-    if (-not $PSCmdlet.ShouldProcess("Theme (app=$appMode, system=$systemMode)", 'Set theme state')) {
-        return New-ParsecResult -Status 'Skipped' -Message 'Operation skipped by ShouldProcess.'
-    }
-
     $path = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize'
     if (-not (Test-Path -LiteralPath $path)) {
         New-Item -Path $path -Force | Out-Null
@@ -153,8 +180,8 @@ function Set-ParsecThemeStateInternal {
     New-ItemProperty -Path $path -Name 'AppsUseLightTheme' -Value $appsUseLightTheme -PropertyType DWord -Force | Out-Null
     New-ItemProperty -Path $path -Name 'SystemUsesLightTheme' -Value $systemUsesLightTheme -PropertyType DWord -Force | Out-Null
     Initialize-ParsecPersonalizationInterop
-    [ParsecEventExecutor.DisplayNative]::BroadcastSettingChange('ImmersiveColorSet')
-    [ParsecEventExecutor.DisplayNative]::BroadcastSettingChange('WindowsThemeElement')
+    [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('ImmersiveColorSet')
+    [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('WindowsThemeElement')
 
     $state = Get-ParsecThemeState
     return New-ParsecResult -Status 'Succeeded' -Message ("Theme set to app={0}, system={1}." -f $state.app_mode, $state.system_mode) -Observed $state -Outputs @{
@@ -163,7 +190,8 @@ function Set-ParsecThemeStateInternal {
 }
 
 function Set-ParsecWallpaperStateInternal {
-    [CmdletBinding(SupportsShouldProcess)]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    [CmdletBinding()]
     [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
@@ -217,10 +245,6 @@ function Set-ParsecWallpaperStateInternal {
         ''
     }
 
-    if (-not $PSCmdlet.ShouldProcess("Wallpaper '$wallpaperPath'", 'Set wallpaper state')) {
-        return New-ParsecResult -Status 'Skipped' -Message 'Operation skipped by ShouldProcess.'
-    }
-
     $desktopPath = 'HKCU:\Control Panel\Desktop'
     $colorsPath = 'HKCU:\Control Panel\Colors'
     if (-not (Test-Path -LiteralPath $desktopPath)) {
@@ -240,8 +264,8 @@ function Set-ParsecWallpaperStateInternal {
 
     Initialize-ParsecPersonalizationInterop
     [ParsecEventExecutor.DisplayNative]::SetDesktopWallpaper($wallpaperPath)
-    [ParsecEventExecutor.DisplayNative]::BroadcastSettingChange('Control Panel\Desktop')
-    [ParsecEventExecutor.DisplayNative]::BroadcastSettingChange('Environment')
+    [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('Control Panel\Desktop')
+    [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('Environment')
 
     $state = Get-ParsecWallpaperState
     return New-ParsecResult -Status 'Succeeded' -Message 'Wallpaper state restored.' -Observed $state -Outputs @{
@@ -250,7 +274,8 @@ function Set-ParsecWallpaperStateInternal {
 }
 
 function Set-ParsecTextScaleStateInternal {
-    [CmdletBinding(SupportsShouldProcess)]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    [CmdletBinding()]
     [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
@@ -274,10 +299,6 @@ function Set-ParsecTextScaleStateInternal {
         throw 'Text scaling percent must be between 100 and 225.'
     }
 
-    if (-not $PSCmdlet.ShouldProcess("Text scale to ${textScalePercent}%", 'Set text scale')) {
-        return New-ParsecResult -Status 'Skipped' -Message 'Operation skipped by ShouldProcess.'
-    }
-
     $path = 'HKCU:\SOFTWARE\Microsoft\Accessibility'
     if (-not (Test-Path -LiteralPath $path)) {
         New-Item -Path $path -Force | Out-Null
@@ -285,9 +306,9 @@ function Set-ParsecTextScaleStateInternal {
 
     New-ItemProperty -Path $path -Name 'TextScaleFactor' -Value $textScalePercent -PropertyType DWord -Force | Out-Null
     Initialize-ParsecPersonalizationInterop
-    [ParsecEventExecutor.DisplayNative]::BroadcastSettingChange('Accessibility')
-    [ParsecEventExecutor.DisplayNative]::BroadcastSettingChange('WindowMetrics')
-    [ParsecEventExecutor.DisplayNative]::BroadcastSettingChange('Control Panel\Desktop')
+    [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('Accessibility')
+    [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('WindowMetrics')
+    [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('Control Panel\Desktop')
 
     return New-ParsecResult -Status 'Succeeded' -Message "Text scaling set to $textScalePercent%." -Observed @{
         text_scale_percent = $textScalePercent
@@ -297,7 +318,8 @@ function Set-ParsecTextScaleStateInternal {
 }
 
 function Set-ParsecUiScaleStateInternal {
-    [CmdletBinding(SupportsShouldProcess)]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    [CmdletBinding()]
     [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
@@ -322,10 +344,6 @@ function Set-ParsecUiScaleStateInternal {
 
     if ($scalePercent -lt 100 -or $scalePercent -gt 500) {
         throw 'UI scaling percent must be between 100 and 500.'
-    }
-
-    if (-not $PSCmdlet.ShouldProcess("UI scale to ${scalePercent}%", 'Set UI scale')) {
-        return New-ParsecResult -Status 'Skipped' -Message 'Operation skipped by ShouldProcess.'
     }
 
     $deviceName = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments

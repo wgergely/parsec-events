@@ -1409,7 +1409,8 @@ function Invoke-ParsecApplyDisplayMode {
 }
 
 function Set-ParsecDisplayResolutionInternal {
-    [CmdletBinding(SupportsShouldProcess)]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    [CmdletBinding()]
     [OutputType([hashtable])]
     param(
         [Parameter(Mandatory)]
@@ -1417,9 +1418,6 @@ function Set-ParsecDisplayResolutionInternal {
     )
 
     $deviceName = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments
-    if (-not $PSCmdlet.ShouldProcess("Display '$deviceName'", "Set resolution to $($Arguments.width)x$($Arguments.height)")) {
-        return New-ParsecResult -Status 'Skipped' -Message 'Operation skipped by ShouldProcess.'
-    }
 
     $mode = Get-ParsecNativeDeviceMode -DeviceName $deviceName
     $mode.dmPelsWidth = [int] $Arguments.width
@@ -1435,7 +1433,8 @@ function Set-ParsecDisplayResolutionInternal {
 }
 
 function Set-ParsecDisplayOrientationInternal {
-    [CmdletBinding(SupportsShouldProcess)]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    [CmdletBinding()]
     [OutputType([hashtable])]
     param(
         [Parameter(Mandatory)]
@@ -1443,9 +1442,6 @@ function Set-ParsecDisplayOrientationInternal {
     )
 
     $deviceName = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments
-    if (-not $PSCmdlet.ShouldProcess("Display '$deviceName'", "Set orientation to '$($Arguments.orientation)'")) {
-        return New-ParsecResult -Status 'Skipped' -Message 'Operation skipped by ShouldProcess.'
-    }
 
     $mode = Get-ParsecNativeDeviceMode -DeviceName $deviceName
     $currentOrientation = [int] $mode.dmDisplayOrientation
@@ -1472,7 +1468,8 @@ function Set-ParsecDisplayOrientationInternal {
 }
 
 function Set-ParsecDisplayEnabledInternal {
-    [CmdletBinding(SupportsShouldProcess)]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    [CmdletBinding()]
     [OutputType([hashtable])]
     param(
         [Parameter(Mandatory)]
@@ -1481,10 +1478,6 @@ function Set-ParsecDisplayEnabledInternal {
 
     $deviceName = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments
     $enable = [bool] $Arguments.enabled
-    $stateName = if ($enable) { 'Enable' } else { 'Disable' }
-    if (-not $PSCmdlet.ShouldProcess("Display '$deviceName'", $stateName)) {
-        return New-ParsecResult -Status 'Skipped' -Message 'Operation skipped by ShouldProcess.'
-    }
 
     $mode = Get-ParsecNativeDeviceMode -DeviceName $deviceName
 
@@ -1527,7 +1520,8 @@ function Set-ParsecDisplayEnabledInternal {
 }
 
 function Set-ParsecDisplayPrimaryInternal {
-    [CmdletBinding(SupportsShouldProcess)]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    [CmdletBinding()]
     [OutputType([hashtable])]
     param(
         [Parameter(Mandatory)]
@@ -1535,9 +1529,6 @@ function Set-ParsecDisplayPrimaryInternal {
     )
 
     $deviceName = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments
-    if (-not $PSCmdlet.ShouldProcess("Display '$deviceName'", 'Set as primary')) {
-        return New-ParsecResult -Status 'Skipped' -Message 'Operation skipped by ShouldProcess.'
-    }
 
     $mode = Get-ParsecNativeDeviceMode -DeviceName $deviceName
     $mode.dmPositionX = 0

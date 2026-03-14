@@ -114,7 +114,8 @@ function Resolve-ParsecProcessDomainLaunchMetadata {
 }
 
 function Start-ParsecProcessDomainFromState {
-    [CmdletBinding(SupportsShouldProcess)]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    [CmdletBinding()]
     [OutputType([PSCustomObject])]
     param(
         [Parameter()]
@@ -155,10 +156,6 @@ function Start-ParsecProcessDomainFromState {
     }
     else {
         @()
-    }
-
-    if (-not $PSCmdlet.ShouldProcess($filePath, 'Start process')) {
-        return New-ParsecResult -Status 'Skipped' -Message 'Operation skipped by ShouldProcess.'
     }
 
     $process = Start-Process -FilePath $filePath -ArgumentList $argumentList -PassThru

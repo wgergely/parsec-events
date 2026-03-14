@@ -489,7 +489,8 @@ function Get-ParsecNvidiaCustomResolutionInternal {
 }
 
 function Add-ParsecNvidiaCustomResolutionInternal {
-    [CmdletBinding(SupportsShouldProcess)]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    [CmdletBinding()]
     [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
@@ -502,10 +503,6 @@ function Add-ParsecNvidiaCustomResolutionInternal {
     $refreshRateHz = [single] $Arguments.refresh_rate_hz
     $depth = if ($Arguments.ContainsKey('bits_per_pel')) { [uint32] $Arguments.bits_per_pel } else { [uint32] 32 }
     $libraryPath = if ($Arguments.ContainsKey('library_path')) { [string] $Arguments.library_path } else { $null }
-
-    if (-not $PSCmdlet.ShouldProcess("NVIDIA display $displayId", "Add custom resolution ${width}x${height}@${refreshRateHz}")) {
-        return New-ParsecResult -Status 'Skipped' -Message 'Operation skipped by ShouldProcess.' -Requested $Arguments
-    }
 
     try {
         $availability = Get-ParsecNvidiaBackendAvailability -LibraryPath $libraryPath
