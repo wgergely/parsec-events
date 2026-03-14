@@ -88,7 +88,7 @@ function Invoke-ParsecSnapshotDomainCapture {
     )
 
     $snapshotName = Resolve-ParsecSnapshotDomainName -Arguments $Arguments -StateRoot $StateRoot -RunState $RunState -UseDefaultCaptureName
-    $observed = Get-ParsecObservedState
+    $observed = Get-ParsecDisplayDomainObservedState
     $snapshot = [ordered]@{
         schema_version = 1
         name = $snapshotName
@@ -165,7 +165,7 @@ function Invoke-ParsecSnapshotDomainVerify {
     )
 
     $target = Get-ParsecSnapshotDomainTarget -Arguments $Arguments -StateRoot $StateRoot -RunState $RunState
-    $observed = Get-ParsecObservedState
+    $observed = Get-ParsecDisplayDomainObservedState
     $verification = Compare-ParsecDisplayDomainState -TargetState $target.snapshot.display -ObservedState $observed
     $verification.Outputs.snapshot_name = $target.snapshot_name
     return $verification
