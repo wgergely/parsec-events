@@ -8,7 +8,7 @@ function Test-ParsecSnapshot {
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)
     )
 
-    return Invoke-ParsecIngredientOperation -Name 'display.snapshot' -Operation 'verify' -Arguments @{ snapshot_name = $Name } -StateRoot $StateRoot -RunState @{}
+    return Invoke-ParsecCoreIngredientOperation -Name 'display.snapshot' -Operation 'verify' -Arguments @{ snapshot_name = $Name } -StateRoot $StateRoot -RunState @{}
 }
 
 function Test-ParsecProfile {

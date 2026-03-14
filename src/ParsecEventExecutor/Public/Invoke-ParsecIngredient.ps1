@@ -22,7 +22,7 @@ function Invoke-ParsecIngredient {
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)
     )
 
-    $definition = Get-ParsecIngredientDefinition -Name $Name
+    $definition = Get-ParsecCoreIngredientDefinition -Name $Name
     $target = if ($Operation -eq 'reset' -and -not [string]::IsNullOrWhiteSpace($TokenId)) {
         "{0} ({1})" -f $definition.Name, $TokenId
     }

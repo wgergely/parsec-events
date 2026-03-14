@@ -5,5 +5,6 @@ function Get-ParsecDisplay {
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)
     )
 
-    return @(Get-ParsecDisplayInventory -StateRoot $StateRoot)
+    $domain = Get-ParsecCoreDomainDefinition -Name 'display'
+    return @(& $domain.Api.Invoke 'GetInventory' @{} $null $StateRoot @{})
 }
