@@ -5,6 +5,46 @@ $supportFiles = @(
 
 foreach ($file in @($supportFiles)) { . $file }
 
+$toPlain = {
+    param($InputObject)
+
+    if (Get-Command -Name 'ConvertTo-ParsecPlainObject' -ErrorAction SilentlyContinue) {
+        return ConvertTo-ParsecPlainObject -InputObject $InputObject
+    }
+
+    return $InputObject
+}.GetNewClosure()
+
+$newResult = {
+    param(
+        [string] $Status,
+        [string] $Message = '',
+        [System.Collections.IDictionary] $Requested = @{},
+        [System.Collections.IDictionary] $Observed = @{},
+        [System.Collections.IDictionary] $Outputs = @{},
+        [string[]] $Warnings = @(),
+        [string[]] $Errors = @(),
+        [bool] $CanCompensate = $false
+    )
+
+    if (Get-Command -Name 'New-ParsecResult' -ErrorAction SilentlyContinue) {
+        return New-ParsecResult -Status $Status -Message $Message -Requested $Requested -Observed $Observed -Outputs $Outputs -Warnings $Warnings -Errors $Errors -CanCompensate $CanCompensate
+    }
+
+    return [pscustomobject]@{
+        PSTypeName = 'ParsecEventExecutor.Result'
+        Status = $Status
+        Message = $Message
+        Requested = & $toPlain $Requested
+        Observed = & $toPlain $Observed
+        Outputs = & $toPlain $Outputs
+        Warnings = @($Warnings)
+        Errors = @($Errors)
+        CanCompensate = $CanCompensate
+        Timestamp = [DateTimeOffset]::UtcNow.ToString('o')
+    }
+}.GetNewClosure()
+
 $invokeWindowAdapter = {
     param(
         [string] $Method,
@@ -33,15 +73,15 @@ $invokeWindowAdapter = {
 
     switch ($Method) {
         'GetForegroundWindowInfo' {
-            return ConvertTo-ParsecPlainObject -InputObject ([ParsecEventExecutor.DisplayNative]::GetForegroundWindowCapture())
+            return & $toPlain ([ParsecEventExecutor.DisplayNative]::GetForegroundWindowCapture())
         }
         'GetTopLevelWindows' {
-            return @([ParsecEventExecutor.DisplayNative]::GetTopLevelWindows()) | ForEach-Object { ConvertTo-ParsecPlainObject -InputObject $_ }
+            return @([ParsecEventExecutor.DisplayNative]::GetTopLevelWindows()) | ForEach-Object { & $toPlain $_ }
         }
         'ActivateWindow' {
             $handle = [int64] $Arguments.handle
             $succeeded = [bool] [ParsecEventExecutor.DisplayNative]::ActivateWindow($handle, [bool] $Arguments.restore_if_minimized)
-            $window = ConvertTo-ParsecPlainObject -InputObject ([ParsecEventExecutor.DisplayNative]::GetForegroundWindowCapture())
+            $window = & $toPlain ([ParsecEventExecutor.DisplayNative]::GetForegroundWindowCapture())
             return [ordered]@{
                 succeeded = $succeeded
                 handle = $handle
@@ -102,14 +142,14 @@ $captureState = {
             if ($hasToolWindowStyle) { continue }
             if ($hasTopMostStyle) { continue }
 
-            ConvertTo-ParsecPlainObject -InputObject $window
+            & $toPlain $window
         }
     )
 
     return [ordered]@{
         captured_at = [DateTimeOffset]::UtcNow.ToString('o')
-        foreground_window = ConvertTo-ParsecPlainObject -InputObject $foreground
-        windows = @($candidates | ForEach-Object { ConvertTo-ParsecPlainObject -InputObject $_ })
+        foreground_window = & $toPlain $foreground
+        windows = @($candidates | ForEach-Object { & $toPlain $_ })
     }
 }.GetNewClosure()
 
@@ -118,27 +158,27 @@ $cycleActivation = {
         [System.Collections.IDictionary] $Arguments = @{}
     )
 
-    $dwellMilliseconds = if ($Arguments.ContainsKey('dwell_ms')) { [int] $Arguments.dwell_ms } else { 100 }
+    $dwellMilliseconds = if ($Arguments.Contains('dwell_ms')) { [int] $Arguments.dwell_ms } else { 100 }
     if ($dwellMilliseconds -lt 0) { throw 'dwell_ms must be zero or greater.' }
 
-    $maxCycles = if ($Arguments.ContainsKey('max_cycles')) { [int] $Arguments.max_cycles } else { 30 }
+    $maxCycles = if ($Arguments.Contains('max_cycles')) { [int] $Arguments.max_cycles } else { 30 }
     if ($maxCycles -lt 1) { throw 'max_cycles must be one or greater.' }
 
     $capture = & $captureState
-    $foregroundWindow = if ($capture.Contains('foreground_window')) { ConvertTo-ParsecPlainObject -InputObject $capture.foreground_window } else { $null }
+    $foregroundWindow = if ($capture.Contains('foreground_window')) { & $toPlain $capture.foreground_window } else { $null }
     $foregroundHandle = if ($foregroundWindow -is [System.Collections.IDictionary] -and $foregroundWindow.Contains('handle') -and $null -ne $foregroundWindow.handle) { [int64] $foregroundWindow.handle } else { 0 }
     if ($foregroundHandle -eq 0) {
-        return New-ParsecResult -Status 'Failed' -Message 'Could not capture the current foreground window.' -Errors @('MissingForegroundWindow')
+        return & $newResult -Status 'Failed' -Message 'Could not capture the current foreground window.' -Errors @('MissingForegroundWindow')
     }
 
     $altTabCandidates = if ($capture.Contains('windows')) { @($capture.windows) } else { @() }
     $candidateHandles = @($altTabCandidates | ForEach-Object { if ($_ -is [System.Collections.IDictionary] -and $_.Contains('handle')) { [int64] $_.handle } })
     if ($candidateHandles.Count -eq 0) {
-        return New-ParsecResult -Status 'Failed' -Message 'No Alt-Tab candidate windows were available to cycle.' -Observed @{ foreground_window = $foregroundWindow } -Errors @('MissingAltTabCandidates')
+        return & $newResult -Status 'Failed' -Message 'No Alt-Tab candidate windows were available to cycle.' -Observed @{ foreground_window = $foregroundWindow } -Errors @('MissingAltTabCandidates')
     }
 
     if (-not ($candidateHandles -contains $foregroundHandle)) {
-        return New-ParsecResult -Status 'Failed' -Message 'The current foreground window is not an Alt-Tab candidate.' -Observed @{
+        return & $newResult -Status 'Failed' -Message 'The current foreground window is not an Alt-Tab candidate.' -Observed @{
             foreground_window = $foregroundWindow
             candidate_handles = @($candidateHandles)
         } -Errors @('ForegroundNotAltTabCandidate')
@@ -163,9 +203,9 @@ $cycleActivation = {
         $currentForeground = & $invokeWindowAdapter 'GetForegroundWindowInfo' @{}
         $stepRecord = [ordered]@{
             cycle = $cycle
-            candidate = ConvertTo-ParsecPlainObject -InputObject $candidate
-            activation = ConvertTo-ParsecPlainObject -InputObject $activation
-            foreground_window = ConvertTo-ParsecPlainObject -InputObject $currentForeground
+            candidate = & $toPlain $candidate
+            activation = & $toPlain $activation
+            foreground_window = & $toPlain $currentForeground
         }
         [void] $activationResults.Add($stepRecord)
         if (-not $activation.succeeded) {
@@ -192,7 +232,7 @@ $cycleActivation = {
     if (-not $activationSucceeded) { $errors += 'WindowActivationFailed' }
     if (-not $loopReturned) { $errors += 'ForegroundRestoreFailed' }
 
-    return New-ParsecResult -Status $status -Message $message -Observed @{
+    return & $newResult -Status $status -Message $message -Observed @{
         original_foreground_handle = $foregroundHandle
         alt_tab_candidate_count = $candidateHandles.Count
         cycle_count = @($activationResults).Count
@@ -205,7 +245,7 @@ $cycleActivation = {
         original_foreground_window = $foregroundWindow
         alt_tab_candidates = @($altTabCandidates)
         activation_results = @($activationResults)
-        restore_result = ConvertTo-ParsecPlainObject -InputObject $restoreResult
+        restore_result = & $toPlain $restoreResult
         dwell_ms = $dwellMilliseconds
         max_cycles = $maxCycles
     } -Errors $errors
@@ -217,14 +257,22 @@ $restoreForeground = {
         $Prior
     )
 
-    $capturedState = Get-ParsecCapturedStateFromResult -Arguments $Arguments -ExecutionResult $Prior
+    $capturedState = if ($Arguments.Contains('captured_state') -and $Arguments.captured_state -is [System.Collections.IDictionary]) {
+        & $toPlain $Arguments.captured_state
+    }
+    elseif ($null -ne $Prior -and $Prior.Outputs -and $Prior.Outputs.captured_state) {
+        & $toPlain $Prior.Outputs.captured_state
+    }
+    else {
+        $null
+    }
     if ($null -eq $capturedState -or -not $capturedState.Contains('foreground_window') -or $null -eq $capturedState.foreground_window) {
-        return New-ParsecResult -Status 'Succeeded' -Message 'No captured foreground window was available to restore.' -Outputs @{ restored = $false }
+        return & $newResult -Status 'Succeeded' -Message 'No captured foreground window was available to restore.' -Outputs @{ restored = $false }
     }
 
     $foregroundWindow = $capturedState.foreground_window
     if (-not ($foregroundWindow -is [System.Collections.IDictionary]) -or -not $foregroundWindow.Contains('handle')) {
-        return New-ParsecResult -Status 'Succeeded' -Message 'No captured foreground window was available to restore.' -Outputs @{ restored = $false }
+        return & $newResult -Status 'Succeeded' -Message 'No captured foreground window was available to restore.' -Outputs @{ restored = $false }
     }
 
     $activation = & $invokeWindowAdapter 'ActivateWindow' @{
@@ -233,12 +281,12 @@ $restoreForeground = {
     }
 
     if (-not $activation.succeeded) {
-        return New-ParsecResult -Status 'Failed' -Message 'Failed to restore the original foreground window.' -Observed (ConvertTo-ParsecPlainObject -InputObject $activation) -Outputs @{ restored = $false } -Errors @('ForegroundRestoreFailed')
+        return & $newResult -Status 'Failed' -Message 'Failed to restore the original foreground window.' -Observed (& $toPlain $activation) -Outputs @{ restored = $false } -Errors @('ForegroundRestoreFailed')
     }
 
-    return New-ParsecResult -Status 'Succeeded' -Message 'Restored the original foreground window.' -Observed (ConvertTo-ParsecPlainObject -InputObject $activation.window) -Outputs @{
+    return & $newResult -Status 'Succeeded' -Message 'Restored the original foreground window.' -Observed (& $toPlain $activation.window) -Outputs @{
         restored = $true
-        restored_window = ConvertTo-ParsecPlainObject -InputObject $activation.window
+        restored_window = & $toPlain $activation.window
     }
 }.GetNewClosure()
 
