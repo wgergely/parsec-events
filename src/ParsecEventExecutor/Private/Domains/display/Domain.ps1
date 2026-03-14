@@ -1456,6 +1456,17 @@ function Compare-ParsecDisplayDomainState {
             if ($TargetState.theme.Contains('system_mode') -and $ObservedState.theme.system_mode -ne $TargetState.theme.system_mode) { $mismatches.Add('System theme mismatch.') }
         }
     }
+    if ($TargetState.Contains('wallpaper')) {
+        if (-not $ObservedState.Contains('wallpaper')) {
+            $mismatches.Add('Wallpaper state is missing.')
+        }
+        else {
+            if ($TargetState.wallpaper.Contains('path') -and $ObservedState.wallpaper.path -ne $TargetState.wallpaper.path) { $mismatches.Add('Wallpaper path mismatch.') }
+            if ($TargetState.wallpaper.Contains('wallpaper_style') -and $ObservedState.wallpaper.wallpaper_style -ne $TargetState.wallpaper.wallpaper_style) { $mismatches.Add('Wallpaper style mismatch.') }
+            if ($TargetState.wallpaper.Contains('tile_wallpaper') -and $ObservedState.wallpaper.tile_wallpaper -ne $TargetState.wallpaper.tile_wallpaper) { $mismatches.Add('Wallpaper tiling mismatch.') }
+            if ($TargetState.wallpaper.Contains('background_color') -and $ObservedState.wallpaper.background_color -ne $TargetState.wallpaper.background_color) { $mismatches.Add('Wallpaper background color mismatch.') }
+        }
+    }
     if ($mismatches.Count -gt 0) { return New-ParsecResult -Status 'Failed' -Message ($mismatches -join ' ') -Observed $ObservedState -Outputs @{ mismatches = @($mismatches) } }
     return New-ParsecResult -Status 'Succeeded' -Message 'Observed state matches the target state.' -Observed $ObservedState -Outputs @{ target_state = $TargetState }
 }

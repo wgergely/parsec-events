@@ -142,5 +142,93 @@ Describe 'Snapshot workflow' {
             $result.Status | Should -Be 'Succeeded'
             $result.Outputs['snapshot_name'] | Should -Be 'desktop-pre-parsec'
         }
+
+        It 'fails snapshot verification when wallpaper state drifts' {
+            $stateRoot = Join-Path $TestDrive 'wallpaper-drift'
+            Save-ParsecSnapshot -Name 'desktop-pre-parsec' -StateRoot $stateRoot -Confirm:$false | Out-Null
+
+            $script:ParsecDisplayAdapter = @{
+                GetObservedState = {
+                    return [ordered]@{
+                        captured_at = [DateTimeOffset]::UtcNow.ToString('o')
+                        computer_name = 'TESTHOST'
+                        display_backend = 'TestAdapter'
+                        monitor_identity = 'device_name'
+                        monitors = @(
+                            [ordered]@{
+                                device_name = '\\.\DISPLAY1'
+                                is_primary = $true
+                                enabled = $true
+                                bounds = [ordered]@{ x = 0; y = 0; width = 1920; height = 1080 }
+                                working_area = [ordered]@{ x = 0; y = 0; width = 1920; height = 1040 }
+                                orientation = 'Landscape'
+                                identity = [ordered]@{
+                                    scheme = 'adapter_id+target_id'
+                                    adapter_id = '00000000:00000001'
+                                    source_id = 0
+                                    target_id = 1
+                                    source_name = '\\.\DISPLAY1'
+                                    monitor_device_path = '\\?\DISPLAY#PRIMARY'
+                                }
+                                topology = [ordered]@{
+                                    is_active = $true
+                                    target_available = $true
+                                    path_flags = 1
+                                    source_status_flags = 0
+                                    target_status_flags = 0
+                                    output_technology = 0
+                                    scaling_mode = 0
+                                    scan_line_ordering = 0
+                                    source_mode = [ordered]@{
+                                        available = $true
+                                        width = 1920
+                                        height = 1080
+                                        position_x = 0
+                                        position_y = 0
+                                        pixel_format = 0
+                                    }
+                                    target_mode = [ordered]@{
+                                        available = $true
+                                        width = 1920
+                                        height = 1080
+                                        pixel_rate = 0
+                                    }
+                                }
+                            }
+                        )
+                        topology = [ordered]@{
+                            query_mode = 'QDC_ALL_PATHS'
+                            path_count = 1
+                            paths = @(
+                                [ordered]@{
+                                    adapter_id = '00000000:00000001'
+                                    source_id = 0
+                                    target_id = 1
+                                    source_name = '\\.\DISPLAY1'
+                                    friendly_name = 'Primary Panel'
+                                    monitor_device_path = '\\?\DISPLAY#PRIMARY'
+                                    is_active = $true
+                                    target_available = $true
+                                }
+                            )
+                        }
+                        scaling = [ordered]@{ status = 'Unsupported' }
+                        font_scaling = [ordered]@{ text_scale_percent = 130 }
+                        theme = [ordered]@{ mode = 'Dark'; app_mode = 'Dark'; system_mode = 'Dark' }
+                        wallpaper = [ordered]@{ path = 'C:\wallpapers\drifted.jpg'; wallpaper_style = '10'; tile_wallpaper = '0'; background_color = '0 0 0' }
+                    }
+                }
+                SetEnabled = { param($Arguments) New-ParsecResult -Status 'Succeeded' -Message 'enabled' -Requested $Arguments }
+                SetPrimary = { param($Arguments) New-ParsecResult -Status 'Succeeded' -Message 'primary' -Requested $Arguments }
+                SetResolution = { param($Arguments) New-ParsecResult -Status 'Succeeded' -Message 'resolution' -Requested $Arguments }
+                SetOrientation = { param($Arguments) New-ParsecResult -Status 'Succeeded' -Message 'orientation' -Requested $Arguments }
+                SetScaling = { param($Arguments) New-ParsecResult -Status 'Succeeded' -Message 'scaling' -Requested $Arguments }
+            }
+
+            $verification = Test-ParsecSnapshot -Name 'desktop-pre-parsec' -StateRoot $stateRoot
+
+            $verification.Status | Should -Be 'Failed'
+            $verification.Message | Should -Match 'Wallpaper path mismatch.'
+        }
     }
 }

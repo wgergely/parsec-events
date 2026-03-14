@@ -14,9 +14,19 @@ function Resolve-GitPath {
         return $gitCommand.Source
     }
 
+    $programFiles = [Environment]::GetFolderPath('ProgramFiles')
+    $programFilesX86 = [Environment]::GetFolderPath('ProgramFilesX86')
+    $userProfile = [Environment]::GetFolderPath('UserProfile')
     $candidatePath = @(
-        (Join-Path -Path $env:ProgramFiles -ChildPath 'Git\cmd\git.exe'),
-        (Join-Path -Path $env:USERPROFILE -ChildPath 'scoop\apps\git\current\cmd\git.exe')
+        if (-not [string]::IsNullOrWhiteSpace($programFiles)) {
+            Join-Path -Path $programFiles -ChildPath 'Git\cmd\git.exe'
+        }
+        if (-not [string]::IsNullOrWhiteSpace($programFilesX86)) {
+            Join-Path -Path $programFilesX86 -ChildPath 'Git\cmd\git.exe'
+        }
+        if (-not [string]::IsNullOrWhiteSpace($userProfile)) {
+            Join-Path -Path $userProfile -ChildPath 'scoop\apps\git\current\cmd\git.exe'
+        }
     )
 
     foreach ($candidate in $candidatePath) {
@@ -70,6 +80,14 @@ function Invoke-GitCapture {
     )
 }
 
+function Get-ScriptExitCode {
+    if (Test-Path -LiteralPath Variable:\LASTEXITCODE) {
+        return [int] $LASTEXITCODE
+    }
+
+    return 0
+}
+
 $gitPath = Resolve-GitPath
 $stagedFiles = @(
     Invoke-GitCapture -GitExecutable $gitPath -ArgumentList @(
@@ -91,4 +109,11 @@ if ($stagedFiles.Count -eq 0) {
 }
 
 & $formatterPath @stagedFiles
+if ((Get-ScriptExitCode) -ne 0) {
+    exit (Get-ScriptExitCode)
+}
+
 & $lintPath @stagedFiles
+if ((Get-ScriptExitCode) -ne 0) {
+    exit (Get-ScriptExitCode)
+}
