@@ -135,7 +135,7 @@ Describe 'Snapshot workflow' {
             $stateRoot = Join-Path $TestDrive 'restore-state'
             Save-ParsecSnapshot -Name 'desktop-pre-parsec' -StateRoot $stateRoot -Confirm:$false | Out-Null
 
-            $result = Invoke-ParsecIngredientOperation -Name 'display.snapshot' -Operation 'reset' -Arguments @{
+            $result = Invoke-ParsecCoreIngredientOperation -Name 'display.snapshot' -Operation 'reset' -Arguments @{
                 snapshot_name = 'desktop-pre-parsec'
             } -StateRoot $stateRoot -RunState @{}
 

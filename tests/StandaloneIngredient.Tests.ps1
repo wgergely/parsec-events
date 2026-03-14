@@ -3,9 +3,46 @@ Import-Module $modulePath -Force
 
 Describe 'Standalone ingredient surface' {
     InModuleScope ParsecEventExecutor {
+        BeforeAll {
+            . (Join-Path $PSScriptRoot 'IngredientTestSupport.ps1')
+            $script:GuardStateRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("parsec-standalone-guard-{0}" -f ([Guid]::NewGuid().ToString('N')))
+            $script:GuardSnapshotName = "standalone-guard-{0}" -f ([Guid]::NewGuid().ToString('N'))
+            Clear-ParsecTestAdapters
+
+            $guardCapture = Invoke-ParsecCoreIngredientOperation -Name 'display.snapshot' -Operation 'capture' -Arguments @{
+                snapshot_name = $script:GuardSnapshotName
+            } -StateRoot $script:GuardStateRoot -RunState @{}
+
+            if (-not (Test-ParsecSuccessfulStatus -Status $guardCapture.Status)) {
+                throw "Failed to capture the standalone test guard snapshot: $($guardCapture.Message)"
+            }
+        }
+
         BeforeEach {
             . (Join-Path $PSScriptRoot 'IngredientTestSupport.ps1')
             Initialize-ParsecIngredientTestEnvironment
+            Initialize-ParsecCoreRuntime -Force
+        }
+
+        AfterEach {
+            Clear-ParsecTestAdapters
+            Initialize-ParsecCoreRuntime -Force
+
+            $verifyArguments = @{
+                snapshot_name = $script:GuardSnapshotName
+            }
+            $verify = Invoke-ParsecCoreIngredientOperation -Name 'display.snapshot' -Operation 'verify' -Arguments $verifyArguments -StateRoot $script:GuardStateRoot -RunState @{}
+            if (-not (Test-ParsecSuccessfulStatus -Status $verify.Status)) {
+                $reset = Invoke-ParsecCoreIngredientOperation -Name 'display.snapshot' -Operation 'reset' -Arguments $verifyArguments -StateRoot $script:GuardStateRoot -RunState @{}
+                if (-not (Test-ParsecSuccessfulStatus -Status $reset.Status)) {
+                    throw "Standalone test cleanup could not restore the guard snapshot: $($reset.Message)"
+                }
+
+                $postResetVerify = Invoke-ParsecCoreIngredientOperation -Name 'display.snapshot' -Operation 'verify' -Arguments $verifyArguments -StateRoot $script:GuardStateRoot -RunState @{}
+                if (-not (Test-ParsecSuccessfulStatus -Status $postResetVerify.Status)) {
+                    throw "Standalone test cleanup left the machine drifted after reset: $($postResetVerify.Message)"
+                }
+            }
         }
 
         It 'returns stable screen ids from the persisted display catalog' {
@@ -66,14 +103,14 @@ Describe 'Standalone ingredient surface' {
             } | Should -Throw "*argument 'width' must be of type 'integer'*"
         }
 
-        It 'registers migrated ingredients through entry packages while preserving legacy fallback for untouched ingredients' {
-            $entryDefinition = Get-ParsecIngredientDefinition -Name 'display.set-resolution'
-            $legacyDefinition = Get-ParsecIngredientDefinition -Name 'command.invoke'
+        It 'registers ingredient packages through entry definitions' {
+            $displayDefinition = Get-ParsecCoreIngredientDefinition -Name 'display.set-resolution'
+            $commandDefinition = Get-ParsecCoreIngredientDefinition -Name 'command.invoke'
 
-            $entryDefinition.Metadata.package_format | Should -Be 'entry'
-            $entryDefinition.Metadata.ingredient_path | Should -Match 'display-set-resolution'
-            $legacyDefinition.Metadata.package_format | Should -Be 'legacy-lib'
-            $legacyDefinition.Metadata.ingredient_path | Should -Match 'command-invoke'
+            $displayDefinition.Metadata.package_format | Should -Be 'entry'
+            $displayDefinition.Metadata.ingredient_path | Should -Match 'display-set-resolution'
+            $commandDefinition.Metadata.package_format | Should -Be 'entry'
+            $commandDefinition.Metadata.ingredient_path | Should -Match 'command-invoke'
         }
 
         It 'accepts a flat ingredient alias and persists a reusable token on apply' {
@@ -98,7 +135,7 @@ Describe 'Standalone ingredient surface' {
 
         It 'waits for readiness before succeeding when the resolution converges after delayed observations' {
             $stateRoot = Join-Path $TestDrive 'delayed-readiness'
-            $definition = Get-ParsecIngredientDefinition -Name 'set-resolution'
+            $definition = Get-ParsecCoreIngredientDefinition -Name 'set-resolution'
             $originalReadiness = ConvertTo-ParsecPlainObject -InputObject $definition.Readiness
 
             try {
@@ -176,7 +213,7 @@ Describe 'Standalone ingredient surface' {
 
         It 'fails when readiness times out before the display converges to the requested resolution' {
             $stateRoot = Join-Path $TestDrive 'readiness-timeout'
-            $definition = Get-ParsecIngredientDefinition -Name 'set-resolution'
+            $definition = Get-ParsecCoreIngredientDefinition -Name 'set-resolution'
             $originalReadiness = ConvertTo-ParsecPlainObject -InputObject $definition.Readiness
 
             try {
@@ -201,7 +238,7 @@ Describe 'Standalone ingredient surface' {
 
         It 'reports verification drift when the display backend diverges after apply' {
             $stateRoot = Join-Path $TestDrive 'resolution-drift'
-            $definition = Get-ParsecIngredientDefinition -Name 'set-resolution'
+            $definition = Get-ParsecCoreIngredientDefinition -Name 'set-resolution'
             $waitOperation = $definition.Operations['wait']
             $definition.Operations.Remove('wait')
             $script:IngredientResolutionMutationEnabled = $false
@@ -223,7 +260,7 @@ Describe 'Standalone ingredient surface' {
 
         It 'allows standalone apply to skip verification explicitly' {
             $stateRoot = Join-Path $TestDrive 'skip-verify'
-            $definition = Get-ParsecIngredientDefinition -Name 'set-resolution'
+            $definition = Get-ParsecCoreIngredientDefinition -Name 'set-resolution'
             $waitOperation = $definition.Operations['wait']
             $definition.Operations.Remove('wait')
             $script:IngredientResolutionMutationEnabled = $false
@@ -259,7 +296,7 @@ Describe 'Standalone ingredient surface' {
 
         It 'waits for readiness before succeeding when the orientation converges after delayed observations' {
             $stateRoot = Join-Path $TestDrive 'orientation-delayed-readiness'
-            $definition = Get-ParsecIngredientDefinition -Name 'set-orientation'
+            $definition = Get-ParsecCoreIngredientDefinition -Name 'set-orientation'
             $originalReadiness = ConvertTo-ParsecPlainObject -InputObject $definition.Readiness
 
             try {
@@ -285,7 +322,7 @@ Describe 'Standalone ingredient surface' {
 
         It 'fails when readiness times out before the orientation converges' {
             $stateRoot = Join-Path $TestDrive 'orientation-readiness-timeout'
-            $definition = Get-ParsecIngredientDefinition -Name 'set-orientation'
+            $definition = Get-ParsecCoreIngredientDefinition -Name 'set-orientation'
             $originalReadiness = ConvertTo-ParsecPlainObject -InputObject $definition.Readiness
 
             try {
@@ -327,7 +364,7 @@ Describe 'Standalone ingredient surface' {
 
         It 'waits for readiness before succeeding when text scaling converges after delayed observations' {
             $stateRoot = Join-Path $TestDrive 'textscale-delayed-readiness'
-            $definition = Get-ParsecIngredientDefinition -Name 'set-textscale'
+            $definition = Get-ParsecCoreIngredientDefinition -Name 'set-textscale'
             $originalReadiness = ConvertTo-ParsecPlainObject -InputObject $definition.Readiness
 
             try {
@@ -353,7 +390,7 @@ Describe 'Standalone ingredient surface' {
 
         It 'fails when readiness times out before text scaling converges' {
             $stateRoot = Join-Path $TestDrive 'textscale-readiness-timeout'
-            $definition = Get-ParsecIngredientDefinition -Name 'set-textscale'
+            $definition = Get-ParsecCoreIngredientDefinition -Name 'set-textscale'
             $originalReadiness = ConvertTo-ParsecPlainObject -InputObject $definition.Readiness
 
             try {
@@ -414,7 +451,7 @@ Describe 'Standalone ingredient surface' {
 
         It 'waits for readiness before succeeding when UI scaling converges after delayed observations' {
             $stateRoot = Join-Path $TestDrive 'uiscale-delayed-readiness'
-            $definition = Get-ParsecIngredientDefinition -Name 'set-uiscale'
+            $definition = Get-ParsecCoreIngredientDefinition -Name 'set-uiscale'
             $originalReadiness = ConvertTo-ParsecPlainObject -InputObject $definition.Readiness
 
             try {
@@ -440,7 +477,7 @@ Describe 'Standalone ingredient surface' {
 
         It 'fails when readiness times out before UI scaling converges' {
             $stateRoot = Join-Path $TestDrive 'uiscale-readiness-timeout'
-            $definition = Get-ParsecIngredientDefinition -Name 'set-uiscale'
+            $definition = Get-ParsecCoreIngredientDefinition -Name 'set-uiscale'
             $originalReadiness = ConvertTo-ParsecPlainObject -InputObject $definition.Readiness
 
             try {
@@ -561,11 +598,11 @@ Describe 'Standalone ingredient surface' {
             $script:IngredientObservedState.monitors[0].display.height = 720
             $script:IngredientObservedState.monitors[0].orientation = 'Portrait'
 
-            $reset = Invoke-ParsecIngredientOperation -Name 'display.persist-topology' -Operation 'reset' -Arguments @{
+            $reset = Invoke-ParsecCoreIngredientOperation -Name 'display.persist-topology' -Operation 'reset' -Arguments @{
                 snapshot_name = 'topology-standalone'
             } -StateRoot $stateRoot
 
-            $verify = Invoke-ParsecIngredientOperation -Name 'display.persist-topology' -Operation 'verify' -Arguments @{
+            $verify = Invoke-ParsecCoreIngredientOperation -Name 'display.persist-topology' -Operation 'verify' -Arguments @{
                 snapshot_name = 'topology-standalone'
             } -StateRoot $stateRoot
 

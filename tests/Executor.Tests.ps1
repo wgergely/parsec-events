@@ -136,7 +136,7 @@ height = 720
             $stateRoot = Join-Path $TestDrive 'resolution-readiness-blocks'
             $recipePath = Join-Path $PSScriptRoot 'fixtures\recipes\resolution-readiness-blocks.toml'
             $recipe = Get-ParsecRecipeDocument -NameOrPath $recipePath
-            $definition = Get-ParsecIngredientDefinition -Name 'set-resolution'
+            $definition = Get-ParsecCoreIngredientDefinition -Name 'set-resolution'
             $originalReadiness = ConvertTo-ParsecPlainObject -InputObject $definition.Readiness
 
             try {

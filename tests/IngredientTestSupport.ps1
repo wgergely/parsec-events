@@ -437,6 +437,7 @@ function Initialize-ParsecIngredientTestEnvironment {
             New-ParsecResult -Status 'Succeeded' -Message 'text-scale' -Observed @{ text_scale_percent = $value } -Outputs @{ text_scale_percent = $value }
         }
     }
+    $global:ParsecPersonalizationAdapter = $script:ParsecPersonalizationAdapter
 
     $script:ParsecDisplayAdapter = @{
         GetObservedState = {
@@ -657,6 +658,7 @@ function Initialize-ParsecIngredientTestEnvironment {
             New-ParsecResult -Status 'Succeeded' -Message 'scaling' -Requested $Arguments
         }
     }
+    $global:ParsecDisplayAdapter = $script:ParsecDisplayAdapter
 
     $script:ParsecWindowAdapter = @{
         GetForegroundWindowInfo = {
@@ -709,6 +711,7 @@ function Initialize-ParsecIngredientTestEnvironment {
             }
         }
     }
+    $global:ParsecWindowAdapter = $script:ParsecWindowAdapter
 
     $script:ParsecNvidiaAdapter = @{
         GetAvailability = {
@@ -808,6 +811,28 @@ function Initialize-ParsecIngredientTestEnvironment {
                 refresh_rate_hz = [double] $customResolution.refresh_rate_hz
                 bits_per_pel = [int] $customResolution.depth
             }
+        }
+    }
+    $global:ParsecNvidiaAdapter = $script:ParsecNvidiaAdapter
+
+    if (Get-Command -Name 'Set-ParsecModuleVariableValue' -ErrorAction SilentlyContinue) {
+        Set-ParsecModuleVariableValue -Name 'ParsecPersonalizationAdapter' -Value $script:ParsecPersonalizationAdapter | Out-Null
+        Set-ParsecModuleVariableValue -Name 'ParsecDisplayAdapter' -Value $script:ParsecDisplayAdapter | Out-Null
+        Set-ParsecModuleVariableValue -Name 'ParsecWindowAdapter' -Value $script:ParsecWindowAdapter | Out-Null
+        Set-ParsecModuleVariableValue -Name 'ParsecNvidiaAdapter' -Value $script:ParsecNvidiaAdapter | Out-Null
+    }
+}
+
+function Clear-ParsecTestAdapters {
+    foreach ($name in @(
+            'ParsecPersonalizationAdapter',
+            'ParsecDisplayAdapter',
+            'ParsecWindowAdapter',
+            'ParsecNvidiaAdapter'
+        )) {
+        Set-Variable -Scope Global -Name $name -Value $null -Force
+        if (Get-Command -Name 'Set-ParsecModuleVariableValue' -ErrorAction SilentlyContinue) {
+            Set-ParsecModuleVariableValue -Name $name -Value $null | Out-Null
         }
     }
 }

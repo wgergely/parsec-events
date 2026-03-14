@@ -28,7 +28,7 @@ Describe 'NVIDIA standalone ingredient surface' {
 
         It 'waits until the new custom resolution appears in supported display modes' {
             $stateRoot = Join-Path $TestDrive 'nvidia-wait'
-            $definition = Get-ParsecIngredientDefinition -Name 'nvidia.add-custom-resolution'
+            $definition = Get-ParsecCoreIngredientDefinition -Name 'nvidia.add-custom-resolution'
             $definition.Readiness.timeout_ms = 100
             $definition.Readiness.poll_interval_ms = 1
             $definition.Readiness.success_count = 2
@@ -47,7 +47,7 @@ Describe 'NVIDIA standalone ingredient surface' {
 
         It 'fails when the supported mode list never converges to the saved custom resolution' {
             $stateRoot = Join-Path $TestDrive 'nvidia-timeout'
-            $definition = Get-ParsecIngredientDefinition -Name 'nvidia.add-custom-resolution'
+            $definition = Get-ParsecCoreIngredientDefinition -Name 'nvidia.add-custom-resolution'
             $definition.Readiness.timeout_ms = 10
             $definition.Readiness.poll_interval_ms = 1
             $definition.Readiness.success_count = 2
