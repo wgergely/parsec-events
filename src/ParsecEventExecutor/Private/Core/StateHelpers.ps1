@@ -48,17 +48,6 @@ function Get-ParsecDisplayResetMonitorState {
     return $capturedState
 }
 
-function Get-ParsecObservedState {
-    [CmdletBinding()]
-    param()
-
-    $privateRoot = Split-Path -Path $PSScriptRoot -Parent
-    . (Join-Path -Path $privateRoot -ChildPath 'Domains\display\Platform.ps1')
-    . (Join-Path -Path $privateRoot -ChildPath 'Domains\personalization\Platform.ps1')
-
-    return Invoke-ParsecDisplayAdapter -Method 'GetObservedState'
-}
-
 function Get-ParsecObservedMonitor {
     [CmdletBinding()]
     param(

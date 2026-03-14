@@ -207,12 +207,7 @@ function Get-ParsecCoreIngredientCatalogDefinition {
         }
     }
 
-    $domain = if ($Schema.Contains('domain')) {
-        [string] $Schema.domain
-    }
-    else {
-        Resolve-ParsecCoreIngredientDomain -Name ([string] $Schema.name)
-    }
+    $domain = Get-ParsecCoreRequiredIngredientDomain -Schema $Schema
 
     return New-ParsecCoreIngredientDefinition `
         -Name ([string] $Schema.name) `

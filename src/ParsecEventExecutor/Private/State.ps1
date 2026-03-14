@@ -10,23 +10,26 @@ function New-ParsecRunState {
 
     $runId = New-ParsecRunIdentifier
     return [ordered]@{
-        run_id            = $runId
-        recipe_name       = $Recipe.name
-        recipe_file       = $Recipe.path
-        desired_state     = $Recipe.target_mode
-        actual_state      = $null
-        last_good_state   = $null
-        active_snapshot   = $null
-        terminal_status   = 'Running'
-        transition_id     = $runId
-        transition_phase  = 'Starting'
-        started_at        = [DateTimeOffset]::UtcNow.ToString('o')
-        completed_at      = $null
-        step_results      = @()
+        run_id = $runId
+        recipe_name = $Recipe.name
+        recipe_file = $Recipe.path
+        desired_state = $Recipe.target_mode
+        actual_state = $null
+        last_good_state = $null
+        active_snapshot = $null
+        terminal_status = 'Running'
+        transition_id = $runId
+        transition_phase = 'Starting'
+        started_at = [DateTimeOffset]::UtcNow.ToString('o')
+        completed_at = $null
+        step_results = @()
         compensation_logs = @()
-        errors            = @()
-        warnings          = @()
-        state_root        = (Initialize-ParsecStateRoot -StateRoot $StateRoot)
+        rollback_results = @()
+        rollback_status = 'NotNeeded'
+        validation_errors = @()
+        errors = @()
+        warnings = @()
+        state_root = (Initialize-ParsecStateRoot -StateRoot $StateRoot)
     }
 }
 
@@ -54,15 +57,15 @@ function Get-ParsecExecutorStateDocument {
     $document = Read-ParsecStateDocument -Path $path -ExpectedDocumentType 'executor-state'
     if ($null -eq $document) {
         return [ordered]@{
-            desired_mode        = $null
-            actual_mode         = $null
-            last_good_mode      = $null
-            active_snapshot     = $null
-            transition_id       = $null
-            transition_phase    = 'Idle'
-            last_run_id         = $null
-            last_error          = $null
-            updated_at          = [DateTimeOffset]::UtcNow.ToString('o')
+            desired_mode = $null
+            actual_mode = $null
+            last_good_mode = $null
+            active_snapshot = $null
+            transition_id = $null
+            transition_phase = 'Idle'
+            last_run_id = $null
+            last_error = $null
+            updated_at = [DateTimeOffset]::UtcNow.ToString('o')
         }
     }
 
@@ -196,16 +199,16 @@ function Get-ParsecRecoveryStatus {
     $isRecoverable = $recoveryCandidate.recovered_from_journal -and $issues.Count -gt 0
 
     return [ordered]@{
-        desired_mode      = $state.desired_mode
-        actual_mode       = $state.actual_mode
-        last_good_mode    = $state.last_good_mode
-        active_snapshot   = $state.active_snapshot
-        last_run_id       = $state.last_run_id
-        issues            = @($issues)
+        desired_mode = $state.desired_mode
+        actual_mode = $state.actual_mode
+        last_good_mode = $state.last_good_mode
+        active_snapshot = $state.active_snapshot
+        last_run_id = $state.last_run_id
+        issues = @($issues)
         recovery_candidate = $recoveryCandidate
-        recoverable       = $isRecoverable
-        status            = if ($issues.Count -eq 0) { 'Converged' } elseif ($isRecoverable) { 'RecoverableDrift' } else { 'NeedsIntervention' }
-        checked_at        = [DateTimeOffset]::UtcNow.ToString('o')
+        recoverable = $isRecoverable
+        status = if ($issues.Count -eq 0) { 'Converged' } elseif ($isRecoverable) { 'RecoverableDrift' } else { 'NeedsIntervention' }
+        checked_at = [DateTimeOffset]::UtcNow.ToString('o')
     }
 }
 
@@ -231,15 +234,15 @@ function Get-ParsecEventDocuments {
         if ($document -is [System.Collections.IDictionary] -and $document.Contains('envelope') -and $document.Contains('payload')) {
             [ordered]@{
                 file_path = $file.FullName
-                envelope  = ConvertTo-ParsecPlainObject -InputObject $document.envelope
-                payload   = ConvertTo-ParsecPlainObject -InputObject $document.payload
+                envelope = ConvertTo-ParsecPlainObject -InputObject $document.envelope
+                payload = ConvertTo-ParsecPlainObject -InputObject $document.payload
             }
         }
         else {
             [ordered]@{
                 file_path = $file.FullName
-                envelope  = $null
-                payload   = ConvertTo-ParsecPlainObject -InputObject $document
+                envelope = $null
+                payload = ConvertTo-ParsecPlainObject -InputObject $document
             }
         }
     }
@@ -255,16 +258,16 @@ function Get-ParsecRecoveryCandidateFromEvents {
     )
 
     $candidate = [ordered]@{
-        desired_mode        = $null
-        actual_mode         = $null
-        last_good_mode      = $null
-        active_snapshot     = $null
-        transition_id       = $null
-        transition_phase    = 'Idle'
-        last_run_id         = $null
-        last_error          = $null
+        desired_mode = $null
+        actual_mode = $null
+        last_good_mode = $null
+        active_snapshot = $null
+        transition_id = $null
+        transition_phase = 'Idle'
+        last_run_id = $null
+        last_error = $null
         recovered_from_journal = $false
-        recovered_at        = [DateTimeOffset]::UtcNow.ToString('o')
+        recovered_at = [DateTimeOffset]::UtcNow.ToString('o')
     }
 
     foreach ($eventRecord in @(Get-ParsecEventDocuments -StateRoot $StateRoot)) {
@@ -323,19 +326,19 @@ function Repair-ParsecExecutorStateDocumentInternal {
     $candidate = Get-ParsecRecoveryCandidateFromEvents -StateRoot $StateRoot
     if (-not $candidate.recovered_from_journal) {
         return [ordered]@{
-            status     = 'NoRecoveryData'
+            status = 'NoRecoveryData'
             state_root = $StateRoot
-            repaired   = $false
-            candidate  = $candidate
+            repaired = $false
+            candidate = $candidate
         }
     }
 
     Save-ParsecExecutorStateDocument -StateDocument $candidate -StateRoot $StateRoot | Out-Null
     return [ordered]@{
-        status      = 'Recovered'
-        state_root  = $StateRoot
-        repaired    = $true
-        candidate   = $candidate
+        status = 'Recovered'
+        state_root = $StateRoot
+        repaired = $true
+        candidate = $candidate
         repaired_at = [DateTimeOffset]::UtcNow.ToString('o')
     }
 }

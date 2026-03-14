@@ -504,7 +504,7 @@ function Get-ParsecDisplayInventory {
         Get-ParsecCoreDomainDefinition -Name 'display' | Out-Null
     }
 
-    $observed = Get-ParsecObservedState
+    $observed = Get-ParsecDisplayDomainObservedState
     $catalog = Sync-ParsecDisplayCatalog -ObservedState $observed -StateRoot $StateRoot
     return @(
         foreach ($monitor in @($observed.monitors)) {

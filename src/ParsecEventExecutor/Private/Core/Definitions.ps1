@@ -112,15 +112,7 @@ function New-ParsecCoreIngredientDefinitionFromSchema {
         }
     }
 
-    $domain = if ($Schema.Contains('domain')) {
-        [string] $Schema.domain
-    }
-    elseif ($Package.Contains('Domain')) {
-        [string] $Package.Domain
-    }
-    else {
-        Resolve-ParsecCoreIngredientDomain -Name ([string] $Schema.name)
-    }
+    $domain = Get-ParsecCoreRequiredIngredientDomain -Schema $Schema -Package $Package
 
     $requiredCapabilities = if ($Schema.Contains('required_capabilities')) {
         @($Schema.required_capabilities)
@@ -150,23 +142,52 @@ function New-ParsecCoreIngredientDefinitionFromSchema {
         -Metadata $(if ($Package.Contains('Metadata')) { [System.Collections.IDictionary] (ConvertTo-ParsecPlainObject -InputObject $Package.Metadata) } else { @{} })
 }
 
-function Resolve-ParsecCoreIngredientDomain {
+function Get-ParsecCoreRequiredIngredientDomain {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
-        [string] $Name
+        [System.Collections.IDictionary] $Schema,
+
+        [Parameter()]
+        [System.Collections.IDictionary] $Package = @{}
     )
 
+    if (-not $Schema.Contains('domain') -or [string]::IsNullOrWhiteSpace([string] $Schema.domain)) {
+        throw "Ingredient '$($Schema.name)' is missing required 'domain' metadata in schema.toml."
+    }
+
+    $domain = [string] $Schema.domain
+
+    if ($Package.Contains('Domain') -and -not [string]::IsNullOrWhiteSpace([string] $Package.Domain) -and [string] $Package.Domain -ne $domain) {
+        throw "Ingredient '$($Schema.name)' declares domain '$domain' in schema.toml, but entry.ps1 returned domain '$($Package.Domain)'."
+    }
+
+    Assert-ParsecCoreIngredientDomainNaming -Name ([string] $Schema.name) -Domain $domain
+    return $domain
+}
+
+function Assert-ParsecCoreIngredientDomainNaming {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $Name,
+
+        [Parameter(Mandatory)]
+        [string] $Domain
+    )
+
+    $expectedDomain = $null
     switch -Regex ($Name) {
-        '^display\.' { return 'display' }
-        '^process\.' { return 'process' }
-        '^service\.' { return 'service' }
-        '^nvidia\.' { return 'nvidia' }
-        '^window\.' { return 'window' }
-        '^command\.' { return 'command' }
-        '^system\.set-theme$' { return 'personalization' }
-        default {
-            throw "Ingredient '$Name' is missing required 'domain' metadata and no domain could be inferred."
-        }
+        '^display\.' { $expectedDomain = 'display'; break }
+        '^process\.' { $expectedDomain = 'process'; break }
+        '^service\.' { $expectedDomain = 'service'; break }
+        '^nvidia\.' { $expectedDomain = 'nvidia'; break }
+        '^window\.' { $expectedDomain = 'window'; break }
+        '^command\.' { $expectedDomain = 'command'; break }
+        '^system\.set-theme$' { $expectedDomain = 'personalization'; break }
+    }
+
+    if ($null -ne $expectedDomain -and $Domain -ne $expectedDomain) {
+        throw "Ingredient '$Name' declares domain '$Domain', but its public name requires domain '$expectedDomain'."
     }
 }
