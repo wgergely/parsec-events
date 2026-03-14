@@ -124,7 +124,7 @@ function Get-ParsecTextScaleCaptureResult {
     [CmdletBinding()]
     param()
 
-    $observed = Get-ParsecObservedState
+    $observed = Get-ParsecDisplayDomainObservedState
     $textScalePercent = if ($observed.Contains('font_scaling') -and $observed.font_scaling.Contains('text_scale_percent')) {
         [int] $observed.font_scaling.text_scale_percent
     }
@@ -175,7 +175,7 @@ function Invoke-ParsecTextScaleWait {
     )
 
     $expected = Resolve-ParsecTextScaleExpectedValue -Arguments $Arguments -ExecutionResult $ExecutionResult
-    $observed = Get-ParsecObservedState
+    $observed = Get-ParsecDisplayDomainObservedState
     $current = if ($observed.Contains('font_scaling') -and $observed.font_scaling.Contains('text_scale_percent')) {
         [int] $observed.font_scaling.text_scale_percent
     }
@@ -206,7 +206,7 @@ function Invoke-ParsecTextScaleVerify {
     )
 
     $expected = Resolve-ParsecTextScaleExpectedValue -Arguments $Arguments -ExecutionResult $ExecutionResult
-    $observed = Get-ParsecObservedState
+    $observed = Get-ParsecDisplayDomainObservedState
     $current = if ($observed.Contains('font_scaling') -and $observed.font_scaling.Contains('text_scale_percent')) {
         [int] $observed.font_scaling.text_scale_percent
     }
@@ -290,7 +290,7 @@ function Get-ParsecUiScaleCaptureResult {
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)
     )
 
-    $observed = Get-ParsecObservedState
+    $observed = Get-ParsecDisplayDomainObservedState
     $targetMonitor = Resolve-ParsecDisplayTargetMonitor -ObservedState $observed -Arguments $Arguments -StateRoot $StateRoot
     if ($null -eq $targetMonitor) {
         return New-ParsecResult -Status 'Failed' -Message 'Target monitor could not be resolved.' -Observed $observed -Errors @('MonitorNotFound')
@@ -365,7 +365,7 @@ function Invoke-ParsecUiScaleWait {
     )
 
     $expected = Resolve-ParsecUiScaleExpectedValue -Arguments $Arguments -ExecutionResult $ExecutionResult
-    $observed = Get-ParsecObservedState
+    $observed = Get-ParsecDisplayDomainObservedState
     $deviceName = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments -StateRoot $StateRoot
     $monitor = Get-ParsecObservedMonitor -ObservedState $observed -DeviceName $deviceName
     if ($null -eq $monitor) {
@@ -409,7 +409,7 @@ function Invoke-ParsecUiScaleVerify {
     )
 
     $expected = Resolve-ParsecUiScaleExpectedValue -Arguments $Arguments -ExecutionResult $ExecutionResult
-    $observed = Get-ParsecObservedState
+    $observed = Get-ParsecDisplayDomainObservedState
     $deviceName = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments -StateRoot $StateRoot
     $monitor = Get-ParsecObservedMonitor -ObservedState $observed -DeviceName $deviceName
     if ($null -eq $monitor) {
