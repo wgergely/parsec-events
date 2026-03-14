@@ -1,5 +1,6 @@
 name = "nvidia.add-custom-resolution"
 aliases = ["nvidia-add-custom-resolution"]
+domain = "nvidia"
 kind = "nvidia"
 description = "Persist a custom NVIDIA resolution for a target display."
 capabilities = ["apply", "wait", "verify"]

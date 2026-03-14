@@ -13,7 +13,7 @@ function Initialize-ParsecNvidiaDomain {
             $availability = Invoke-ParsecNvidiaAdapter -Method 'GetAvailability'
             $requestedWidth = [int] $Arguments.width
             $requestedHeight = [int] $Arguments.height
-            $observed = Get-ParsecObservedState
+            $observed = Get-ParsecDisplayDomainObservedState
             $targetMonitor = Resolve-ParsecDisplayTargetMonitor -ObservedState $observed -Arguments $Arguments -StateRoot $StateRoot
             if ($null -eq $targetMonitor) {
                 return [ordered]@{
