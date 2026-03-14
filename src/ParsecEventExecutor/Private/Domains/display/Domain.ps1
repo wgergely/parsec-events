@@ -1273,6 +1273,26 @@ function Get-ParsecDisplayDomainInventory {
     )
 }
 
+function Get-ParsecDisplayDomainAuditState {
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        [string] $StateRoot = (Get-ParsecDefaultStateRoot)
+    )
+
+    $observed = Get-ParsecDisplayDomainObservedState
+    $monitors = @(Get-ParsecDisplayDomainInventory -StateRoot $StateRoot)
+
+    return [ordered]@{
+        captured_at = if ($observed.Contains('captured_at')) { [string] $observed.captured_at } else { [DateTimeOffset]::UtcNow.ToString('o') }
+        computer_name = if ($observed.Contains('computer_name')) { [string] $observed.computer_name } else { $env:COMPUTERNAME }
+        display_backend = if ($observed.Contains('display_backend')) { [string] $observed.display_backend } else { $null }
+        scaling = if ($observed.Contains('scaling')) { ConvertTo-ParsecPlainObject -InputObject $observed.scaling } else { $null }
+        font_scaling = if ($observed.Contains('font_scaling')) { ConvertTo-ParsecPlainObject -InputObject $observed.font_scaling } else { $null }
+        monitors = @($monitors | ForEach-Object { ConvertTo-ParsecPlainObject -InputObject $_ })
+    }
+}
+
 function Get-ParsecDisplayDomainTopologyCaptureState {
     [CmdletBinding()]
     param(

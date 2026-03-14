@@ -20,6 +20,8 @@ The migration moved materially forward in this cycle. The following architecture
 - modular domain entry wiring for snapshot, personalization, display scaling, and service dispatch was repaired
 - executor-state and snapshot/profile harnesses were updated to inject module-backed adapters that match the current domain contracts
 - readiness now guarantees a small minimum probe budget, which removed slow-first-probe flakiness from NVIDIA wait verification
+- service-domain execution now honors an explicit module-backed adapter seam again, so aggregate ingredient tests no longer hit live workstation service cmdlets
+- the standalone token-reset path for `process.start` is now proven with a real disposable process instead of a mock-only assertion
 
 The rewrite is still not complete from a live-operability perspective. The main remaining gaps are:
 
@@ -27,7 +29,7 @@ The rewrite is still not complete from a live-operability perspective. The main 
 - some required ingredients still do not satisfy the full reversible `capture/apply/wait/verify/reset` contract
 - display remains the main complexity hotspot and still needs internal decomposition
 - scale/text-scale audit visibility still needs a stronger live inspection surface
-- one standalone process-token reset assertion is still red and needs either runtime confirmation or test-contract cleanup
+- no cooperative live restore-token validation has been run for the latest risky batches yet
 
 ## Current Development State
 
@@ -88,19 +90,21 @@ This observed state still does not match the user-reported expected desktop base
 
 | Surface | Result | Date | Notes |
 | --- | --- | --- | --- |
-| `tests/StandaloneIngredient.Tests.ps1` | `33 passed, 1 failed, 0 skipped` | 2026-03-14 | Remaining failure is the token-backed `process.start` reset assertion; the runtime returns `Succeeded`, but the test still expects proof that the persisted `process_id` is consumed through a specific lookup path |
+| `tests/StandaloneIngredient.Tests.ps1` | `34 passed, 0 failed, 0 skipped` | 2026-03-14 | Standalone coverage is green after removing the live guard-snapshot cleanup path and proving token-backed `process.start` reset with a real disposable process |
 | `tests/Profile.Tests.ps1` | `3 passed, 0 failed, 0 skipped` | 2026-03-14 | Snapshot/profile flows are green after adapter injection was moved onto the module-backed path |
 | `tests/ExecutorState.Tests.ps1` | `6 passed, 0 failed, 0 skipped` | 2026-03-14 | Executor-backed mobile/desktop state transitions are green again after fixing harness domain contracts and display scaling dispatch |
 | `tests/NvidiaStandaloneIngredient.Tests.ps1` | `4 passed, 0 failed, 0 skipped` | 2026-03-14 | NVIDIA readiness no longer collapses to a single slow probe |
 | `tests/Executor.Tests.ps1` | `15 passed, 0 failed, 0 skipped` | 2026-03-14 | Recipe-backed graph validation, ordering, rollback, and readiness behavior are green in the targeted executor suite |
+| `tests/Ingredients.Tests.ps1` | `34 passed, 0 failed, 0 skipped` | 2026-03-14 | Aggregate ingredient coverage is green again after restoring the service adapter seam and isolating the active-display ingredient tests from persisted catalog state |
+| `Invoke-Pester -Path tests` | `105 passed, 0 failed, 0 skipped` | 2026-03-14 | Full repository suite is green for this migration batch |
 
 ### Test-surface observations
 
 - No active `skip`, `xfail`, or pending test markers were found in `tests`.
 - The current tests are not stubbed out of existence; the executor and standalone ingredient surfaces are both exercised.
-- The targeted migration suites are now mostly green. The remaining red test is isolated to the token-backed `process.start` reset assertion.
-- The green test state does not yet prove that all live display restore paths are correct on real hardware.
-- This cycle did not rerun the broader `tests/Ingredients.Tests.ps1` aggregate suite, so any conclusions about the entire ingredient surface should still be treated as bounded to the targeted suites above.
+- The targeted migration suites and the broader aggregate ingredient suite are green.
+- The green suite is still adapter-backed and disposable-process-backed validation; it does not prove that all live display restore paths are correct on real hardware.
+- Live workstation behavior remains unvalidated for this batch because no cooperative restore-token run has been executed yet.
 
 ## Live Validation Status
 
@@ -137,7 +141,7 @@ These both execute through the modular runtime and return shaped failures instea
 
 ### Live validation gap
 
-The current audit can prove live success for resolution and orientation changes, but it cannot yet prove that restore-token and snapshot-driven reset behavior is reliable after real topology changes. That gap is materially important because the user already observed one live restore regression.
+The current audit can prove live success for resolution and orientation changes, but it cannot yet prove that restore-token and snapshot-driven reset behavior is reliable after real topology changes. That gap is materially important because the user already observed one live restore regression, and this cycle's green tests were not accompanied by a cooperative live-validation run.
 
 ## Event Chaining Assessment
 
@@ -423,38 +427,41 @@ Impact:
 - personalization bootstrap is no longer a known targeted runtime blocker
 - the broader aggregate ingredient suite still needs a fresh rerun to confirm closure across every surface
 
-### AUD-019 Resolved In Targeted Wiring Batch: Service-domain dispatch no longer depends on cached scriptblocks that bypass test isolation
+### AUD-019 Resolved: Service-domain dispatch now restores an explicit adapter seam for isolated ingredient testing
 
-The service domain now dispatches through direct functions instead of cached scriptblocks, which removes the loader pattern that previously bypassed test interception.
+The service domain now dispatches through direct functions while honoring a module-backed service adapter, which restores isolated ingredient testing without hitting live workstation service cmdlets.
 
 Evidence:
 
 - `src/ParsecEventExecutor/Private/Domains/service/lib.ps1`
-- targeted runtime repair in this cycle
+- `tests/IngredientTestSupport.ps1`
+- `src/ParsecEventExecutor/Private/Ingredients/service-start/test.ps1`
+- `src/ParsecEventExecutor/Private/Ingredients/service-stop/test.ps1`
 
 Impact:
 
-- the service-domain bootstrap is simpler and more testable
-- the aggregate ingredient suite still needs a fresh rerun before this item can be treated as fully closed
+- the service-domain bootstrap is simpler and safer to validate in automated tests
+- the aggregate ingredient suite is green again with the isolated service seam in place
 
-### AUD-020 Resolved In Targeted Wiring Batch: The active-display ingredient test harness now aligns with the module-backed display adapter path
+### AUD-020 Resolved: The active-display ingredient test harness now aligns with the module-backed display adapter path
 
-The earlier targeted failure was traced to adapter-scope drift in the test harness rather than a confirmed active-display runtime defect.
+The earlier targeted failure was traced to adapter-scope drift and catalog-state coupling in the test harness rather than a confirmed active-display runtime defect.
 
 Evidence:
 
 - `tests/IngredientTestSupport.ps1`
+- `src/ParsecEventExecutor/Private/Ingredients/display-set-activedisplays/test.ps1`
 - `tests/Profile.Tests.ps1`
 - `tests/ExecutorState.Tests.ps1`
 
 Impact:
 
-- this is no longer a confirmed targeted runtime blocker
+- this is no longer a confirmed runtime blocker in the automated suites
 - active-display control remains high risk until live restore validation is completed
 
-### AUD-023 Medium: Token-backed `process.start` reset still has one unresolved standalone assertion
+### AUD-023 Resolved: Token-backed `process.start` reset is now proven through the standalone invocation path
 
-The targeted standalone suite is down to one remaining failure. Token-backed reset for `process.start` returns `Succeeded`, but the current standalone assertion still cannot prove that the persisted `process_id` is being consumed through the expected lookup path.
+The standalone suite now proves that a persisted `process_id` from the token document is consumed successfully during reset by terminating a real disposable PowerShell process through the token-backed invocation path.
 
 Evidence:
 
@@ -464,8 +471,8 @@ Evidence:
 
 Impact:
 
-- this does not currently block the broader migration batch
-- it remains a cleanup item for either stricter runtime confirmation or a less brittle test contract
+- token-backed process reset is no longer a known automated-runtime drift
+- live process-management validation is still separate from this test proof
 
 ### AUD-021 Medium: Process and service management still lack restart as a first-class ingredient capability
 
@@ -503,21 +510,19 @@ Impact:
 
 ## Recommended Next Actions
 
-1. Run a dedicated live restore audit for:
+1. Run a dedicated cooperative live restore audit for:
    - `display.set-enabled`
    - `display.set-activedisplays`
    - `display.set-primary`
    - `display.persist-topology`
    - `display.snapshot reset`
 2. Add reversible `reset` behavior for `process.stop` and `service.stop`, or replace them with explicitly reversible management ingredients that satisfy the project contract.
-3. Resolve the remaining `process.start` token-reset assertion drift and confirm whether the runtime or the test contract should own the final fix.
-4. Decide whether wallpaper/background persistence should remain snapshot-only or be promoted into a dedicated personalization ingredient.
-5. Split the display domain internally before it becomes the next maintainability monolith.
-6. Expose a reliable live audit command for scale and text-scale so rollback drift can be verified directly.
-7. Update `README.md` and any stale public docs to remove compatibility-era wording.
-8. Rerun the broader aggregate ingredient suite to confirm that the targeted wiring repairs hold across every ingredient entrypoint.
-9. Decide whether restart should be promoted into dedicated `process.restart` and `service.restart` ingredients instead of remaining recipe-composed behavior.
-10. Introduce a dedicated `sound` domain and decide which first-class reversible ingredients it should expose, then add capture/apply/verify/reset coverage for the default playback device rather than embedding audio endpoint restore implicitly inside unrelated topology flows.
+3. Decide whether wallpaper/background persistence should remain snapshot-only or be promoted into a dedicated personalization ingredient.
+4. Split the display domain internally before it becomes the next maintainability monolith.
+5. Expose a reliable live audit command for scale and text-scale so rollback drift can be verified directly.
+6. Update `README.md` and any stale public docs to remove compatibility-era wording.
+7. Decide whether restart should be promoted into dedicated `process.restart` and `service.restart` ingredients instead of remaining recipe-composed behavior.
+8. Introduce a dedicated `sound` domain and decide which first-class reversible ingredients it should expose, then add capture/apply/verify/reset coverage for the default playback device rather than embedding audio endpoint restore implicitly inside unrelated topology flows.
 
 ## References
 

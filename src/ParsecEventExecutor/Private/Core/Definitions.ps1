@@ -184,6 +184,8 @@ function Assert-ParsecCoreIngredientDomainNaming {
         '^nvidia\.' { $expectedDomain = 'nvidia'; break }
         '^window\.' { $expectedDomain = 'window'; break }
         '^command\.' { $expectedDomain = 'command'; break }
+        '^personalization\.' { $expectedDomain = 'personalization'; break }
+        '^sound\.' { $expectedDomain = 'sound'; break }
         '^system\.set-theme$' { $expectedDomain = 'personalization'; break }
     }
 

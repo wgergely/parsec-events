@@ -34,6 +34,7 @@ return @{
 
             switch ($Method) {
                 'GetInventory' { return Get-ParsecDisplayDomainInventory -StateRoot $StateRoot }
+                'GetAuditState' { return Get-ParsecDisplayDomainAuditState -StateRoot $StateRoot }
                 'CaptureMonitorState' { return Invoke-ParsecDisplayDomainCaptureMonitorState -Domain ([string] $Arguments.domain) -Arguments $Arguments -StateRoot $StateRoot }
                 'ApplyResolution' { return Invoke-ParsecDisplayDomainApplyResolution -Arguments $Arguments -StateRoot $StateRoot }
                 'WaitResolution' { return Invoke-ParsecDisplayDomainWaitResolution -Arguments $Arguments -StateRoot $StateRoot }
