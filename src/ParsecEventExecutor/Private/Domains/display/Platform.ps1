@@ -1889,7 +1889,7 @@ function Resolve-ParsecActiveDisplayTargetState {
     $requestedIdentityKeys = New-Object System.Collections.Generic.HashSet[string]
     $requestedDeviceNames = New-Object System.Collections.Generic.HashSet[string]
     foreach ($screenId in $requestedScreenIds) {
-    $monitor = Resolve-ParsecDisplayDomainMonitorByScreenId -ObservedState $ObservedState -ScreenId ([int] $screenId) -StateRoot $StateRoot
+        $monitor = Resolve-ParsecDisplayDomainMonitorByScreenId -ObservedState $ObservedState -ScreenId ([int] $screenId) -StateRoot $StateRoot
         if ($null -eq $monitor) {
             return New-ParsecResult -Status 'Failed' -Message "Screen id '$screenId' could not be resolved." -Observed $ObservedState -Errors @('MonitorNotFound')
         }

@@ -266,7 +266,7 @@ function Initialize-ParsecNvidiaDomain {
                 }
             }
 
-    $topologyState = Get-ParsecDisplayDomainTopologyCaptureState -ObservedState $context.observed
+            $topologyState = Get-ParsecDisplayDomainTopologyCaptureState -ObservedState $context.observed
             $result = Invoke-ParsecNvidiaAdapter -Method 'AddCustomResolution' -Arguments @{
                 device_name = $context.device_name
                 normalized_display_name = $context.display_target.normalized_display_name
@@ -277,7 +277,7 @@ function Initialize-ParsecNvidiaDomain {
                 bits_per_pel = $context.bits_per_pel
                 library_path = $context.display_target.library_path
             }
-    $topologyRestore = Invoke-ParsecDisplayDomainTopologyReset -TopologyState $topologyState -SnapshotName 'nvidia-custom-resolution-restore'
+            $topologyRestore = Invoke-ParsecDisplayDomainTopologyReset -TopologyState $topologyState -SnapshotName 'nvidia-custom-resolution-restore'
             $result.Requested = [ordered]@{
                 device_name = $context.device_name
                 normalized_display_name = $context.display_target.normalized_display_name

@@ -103,16 +103,16 @@ $newResult = {
     }
 
     return [pscustomobject]@{
-        PSTypeName    = 'ParsecEventExecutor.Result'
-        Status        = $Status
-        Message       = $Message
-        Requested     = & $toPlain $Requested
-        Observed      = & $toPlain $Observed
-        Outputs       = & $toPlain $Outputs
-        Warnings      = @($Warnings)
-        Errors        = @($Errors)
+        PSTypeName = 'ParsecEventExecutor.Result'
+        Status = $Status
+        Message = $Message
+        Requested = & $toPlain $Requested
+        Observed = & $toPlain $Observed
+        Outputs = & $toPlain $Outputs
+        Warnings = @($Warnings)
+        Errors = @($Errors)
         CanCompensate = $CanCompensate
-        Timestamp     = [DateTimeOffset]::UtcNow.ToString('o')
+        Timestamp = [DateTimeOffset]::UtcNow.ToString('o')
     }
 }.GetNewClosure()
 

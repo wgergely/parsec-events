@@ -7,8 +7,8 @@ Context 'display.ensure-resolution' {
 
         $capture = Invoke-ParsecCoreIngredientOperation -Name 'display.ensure-resolution' -Operation 'capture' -Arguments @{} -RunState @{}
         $apply = Invoke-ParsecCoreIngredientOperation -Name 'display.ensure-resolution' -Operation 'apply' -Arguments @{
-            width       = 2000
-            height      = 3000
+            width = 2000
+            height = 3000
             orientation = 'Portrait'
         } -RunState @{}
 

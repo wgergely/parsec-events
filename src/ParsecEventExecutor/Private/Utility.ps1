@@ -94,7 +94,7 @@ function ConvertTo-ParsecPlainObject {
             ConvertTo-ParsecPlainObject -InputObject $item
         }
 
-        return ,@($values)
+        return , @($values)
     }
 
     if ($InputObject -is [psobject] -and $null -ne $InputObject.PSObject -and @($InputObject.PSObject.Properties).Count -gt 0) {
@@ -249,9 +249,9 @@ function New-ParsecStateEnvelope {
 
     return [ordered]@{
         schema_version = 1
-        document_type  = $DocumentType
-        written_at     = [DateTimeOffset]::UtcNow.ToString('o')
-        payload        = ConvertTo-ParsecPlainObject -InputObject $Payload
+        document_type = $DocumentType
+        written_at = [DateTimeOffset]::UtcNow.ToString('o')
+        payload = ConvertTo-ParsecPlainObject -InputObject $Payload
     }
 }
 
@@ -291,7 +291,7 @@ function Read-ParsecStateDocument {
 
     return [ordered]@{
         envelope = $plain
-        payload  = ConvertTo-ParsecPlainObject -InputObject $plain.payload
+        payload = ConvertTo-ParsecPlainObject -InputObject $plain.payload
     }
 }
 
@@ -367,16 +367,16 @@ function New-ParsecResult {
     )
 
     return [pscustomobject]@{
-        PSTypeName    = 'ParsecEventExecutor.Result'
-        Status        = $Status
-        Message       = $Message
-        Requested     = ConvertTo-ParsecPlainObject -InputObject $Requested
-        Observed      = ConvertTo-ParsecPlainObject -InputObject $Observed
-        Outputs       = ConvertTo-ParsecPlainObject -InputObject $Outputs
-        Warnings      = @($Warnings)
-        Errors        = @($Errors)
+        PSTypeName = 'ParsecEventExecutor.Result'
+        Status = $Status
+        Message = $Message
+        Requested = ConvertTo-ParsecPlainObject -InputObject $Requested
+        Observed = ConvertTo-ParsecPlainObject -InputObject $Observed
+        Outputs = ConvertTo-ParsecPlainObject -InputObject $Outputs
+        Warnings = @($Warnings)
+        Errors = @($Errors)
         CanCompensate = $CanCompensate
-        Timestamp     = [DateTimeOffset]::UtcNow.ToString('o')
+        Timestamp = [DateTimeOffset]::UtcNow.ToString('o')
     }
 }
 
