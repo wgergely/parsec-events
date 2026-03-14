@@ -275,14 +275,14 @@ function Resolve-ParsecRecipeExecutionPlan {
     )
 
     $steps = @($Recipe.steps)
-    $validationErrors = New-Object System.Collections.Generic.List[string]
+    $validationErrors = @()
     $stepMap = @{}
     $incomingCounts = @{}
     $dependents = @{}
 
     foreach ($step in $steps) {
         if ($stepMap.ContainsKey($step.id)) {
-            $validationErrors.Add("Recipe '$($Recipe.name)' contains duplicate step id '$($step.id)'.")
+            $validationErrors += "Recipe '$($Recipe.name)' contains duplicate step id '$($step.id)'."
             continue
         }
 
@@ -298,12 +298,12 @@ function Resolve-ParsecRecipeExecutionPlan {
 
         foreach ($dependency in @($step.depends_on)) {
             if ($dependency -eq $step.id) {
-                $validationErrors.Add("Recipe '$($Recipe.name)' step '$($step.id)' cannot depend on itself.")
+                $validationErrors += "Recipe '$($Recipe.name)' step '$($step.id)' cannot depend on itself."
                 continue
             }
 
             if (-not $stepMap.ContainsKey($dependency)) {
-                $validationErrors.Add("Recipe '$($Recipe.name)' step '$($step.id)' depends on unknown step '$dependency'.")
+                $validationErrors += "Recipe '$($Recipe.name)' step '$($step.id)' depends on unknown step '$dependency'."
                 continue
             }
 
@@ -320,29 +320,30 @@ function Resolve-ParsecRecipeExecutionPlan {
         }
     }
 
-    $ready = New-Object System.Collections.ArrayList
+    $ready = @()
     foreach ($step in ($steps | Sort-Object sequence, id)) {
         if ([int] $incomingCounts[$step.id] -eq 0) {
-            [void] $ready.Add($step)
+            $ready += , $step
         }
     }
 
-    $orderedSteps = New-Object System.Collections.Generic.List[object]
+    $orderedSteps = @()
     while ($ready.Count -gt 0) {
-        $next = @($ready | Sort-Object sequence, id | Select-Object -First 1)[0]
-        [void] $ready.Remove($next)
-        $orderedSteps.Add($next) | Out-Null
+        $sortedReady = @($ready | Sort-Object sequence, id)
+        $next = $sortedReady[0]
+        $ready = @($sortedReady | Select-Object -Skip 1)
+        $orderedSteps += , $next
 
         foreach ($dependentId in @($dependents[$next.id])) {
             $incomingCounts[$dependentId] = [int] $incomingCounts[$dependentId] - 1
             if ([int] $incomingCounts[$dependentId] -eq 0) {
-                [void] $ready.Add($stepMap[$dependentId])
+                $ready += , $stepMap[$dependentId]
             }
         }
     }
 
     if ($orderedSteps.Count -ne $steps.Count) {
-        $validationErrors.Add("Recipe '$($Recipe.name)' contains a dependency cycle.")
+        $validationErrors += "Recipe '$($Recipe.name)' contains a dependency cycle."
     }
 
     return [ordered]@{
@@ -396,13 +397,13 @@ function Invoke-ParsecRunStateRollback {
         [System.Collections.IDictionary] $FailedStepResult,
 
         [Parameter(Mandatory)]
-        [hashtable[]] $ExecutedSteps,
+        [object[]] $ExecutedSteps,
 
         [Parameter(Mandatory)]
         [string] $StateRoot
     )
 
-    $rollbackResults = New-Object System.Collections.Generic.List[object]
+    $rollbackResults = @()
     $rollbackCandidates = @()
     foreach ($step in @($ExecutedSteps | Sort-Object sequence -Descending)) {
         $stepResult = Get-ParsecStepResultById -RunState $RunState -StepId $step.id
@@ -444,10 +445,10 @@ function Invoke-ParsecRunStateRollback {
             message = if ($null -ne $resetResult) { $resetResult.Message } else { 'Rollback reset returned no result.' }
         }
         $RunState.compensation_logs += $resetResult
-        $rollbackResults.Add($rollbackEntry) | Out-Null
+        $rollbackResults += , $rollbackEntry
     }
 
-    return @($rollbackResults)
+    return , @($rollbackResults)
 }
 
 function Invoke-ParsecRunRecordRollback {
@@ -460,13 +461,13 @@ function Invoke-ParsecRunRecordRollback {
         [System.Collections.IDictionary] $FailedStepResult,
 
         [Parameter(Mandatory)]
-        [hashtable[]] $ExecutedSteps,
+        [object[]] $ExecutedSteps,
 
         [Parameter(Mandatory)]
         [string] $StateRoot
     )
 
-    $rollbackResults = New-Object System.Collections.Generic.List[object]
+    $rollbackResults = @()
     foreach ($step in @($ExecutedSteps | Sort-Object sequence -Descending)) {
         $stepResult = Get-ParsecStepResultById -RunState $RunRecord -StepId $step.id
         if ($null -eq $stepResult) {
@@ -502,10 +503,10 @@ function Invoke-ParsecRunRecordRollback {
             token_id = $stepResult.token_id
         }
         $RunRecord.compensation_logs += $invocation
-        $rollbackResults.Add($rollbackEntry) | Out-Null
+        $rollbackResults += , $rollbackEntry
     }
 
-    return @($rollbackResults)
+    return , @($rollbackResults)
 }
 
 function Resolve-ParsecRunTerminalStatus {
@@ -904,7 +905,7 @@ function Invoke-ParsecRecipeSequence {
     }
 
     $orderedSteps = @($executionPlan.ordered_steps)
-    $executedSteps = New-Object System.Collections.Generic.List[object]
+    $executedSteps = @()
     $stopExecution = $false
     foreach ($step in $orderedSteps) {
         if ($stopExecution) {
@@ -914,10 +915,10 @@ function Invoke-ParsecRecipeSequence {
 
         $stepResult = Invoke-ParsecRecipeSequenceStep -Step $step -RunRecord $runRecord -StateRoot $stateRoot
         $runRecord.step_results += $stepResult
-        $executedSteps.Add($step) | Out-Null
+        $executedSteps += , $step
 
         if ($stepResult.status -eq 'Failed' -or $stepResult.status -eq 'Ambiguous') {
-            $runRecord.rollback_results = Invoke-ParsecRunRecordRollback -RunRecord $runRecord -FailedStepResult $stepResult -ExecutedSteps @($executedSteps) -StateRoot $stateRoot
+            $runRecord.rollback_results = Invoke-ParsecRunRecordRollback -RunRecord $runRecord -FailedStepResult $stepResult -ExecutedSteps $executedSteps -StateRoot $stateRoot
             $runRecord.rollback_status = Resolve-ParsecRollbackStatus -RollbackResults $runRecord.rollback_results
             $stopExecution = $true
         }
@@ -972,7 +973,7 @@ function Invoke-ParsecRecipeInternal {
     }
 
     $orderedSteps = @($executionPlan.ordered_steps)
-    $executedSteps = New-Object System.Collections.Generic.List[object]
+    $executedSteps = @()
     $stopExecution = $false
     foreach ($step in $orderedSteps) {
         if ($stopExecution) {
@@ -983,7 +984,7 @@ function Invoke-ParsecRecipeInternal {
         $runState.transition_phase = "Executing:$($step.id)"
         $stepResult = Invoke-ParsecStep -Step $step -RunState $runState -StateRoot $stateRoot
         $runState.step_results += $stepResult
-        $executedSteps.Add($step) | Out-Null
+        $executedSteps += , $step
         if ($null -ne $stepResult.operation_result) {
             $stepOutputs = ConvertTo-ParsecPlainObject -InputObject $stepResult.operation_result.Outputs
             if ($stepOutputs -is [System.Collections.IDictionary] -and $stepOutputs.Contains('snapshot_name') -and $stepOutputs['snapshot_name']) {
@@ -1015,7 +1016,7 @@ function Invoke-ParsecRecipeInternal {
         }
 
         if ($stepResult.status -eq 'Failed' -or $stepResult.status -eq 'Ambiguous') {
-            $runState.rollback_results = Invoke-ParsecRunStateRollback -RunState $runState -FailedStepResult $stepResult -ExecutedSteps @($executedSteps) -StateRoot $stateRoot
+            $runState.rollback_results = Invoke-ParsecRunStateRollback -RunState $runState -FailedStepResult $stepResult -ExecutedSteps $executedSteps -StateRoot $stateRoot
             $runState.rollback_status = Resolve-ParsecRollbackStatus -RollbackResults $runState.rollback_results
             $stopExecution = $true
         }
