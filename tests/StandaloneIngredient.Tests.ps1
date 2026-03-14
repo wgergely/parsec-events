@@ -107,10 +107,44 @@ Describe 'Standalone ingredient surface' {
             $displayDefinition = Get-ParsecCoreIngredientDefinition -Name 'display.set-resolution'
             $commandDefinition = Get-ParsecCoreIngredientDefinition -Name 'command.invoke'
 
+            $displayDefinition.Domain | Should -Be 'display'
             $displayDefinition.Metadata.package_format | Should -Be 'entry'
             $displayDefinition.Metadata.ingredient_path | Should -Match 'display-set-resolution'
+            $commandDefinition.Domain | Should -Be 'command'
             $commandDefinition.Metadata.package_format | Should -Be 'entry'
             $commandDefinition.Metadata.ingredient_path | Should -Match 'command-invoke'
+        }
+
+        It 'requires domain metadata in ingredient schemas' {
+            {
+                Get-ParsecCoreRequiredIngredientDomain -Schema @{
+                    name = 'display.set-resolution'
+                    kind = 'display'
+                }
+            } | Should -Throw "*missing required 'domain' metadata*"
+        }
+
+        It 'rejects ingredient domain declarations that do not match the public naming contract' {
+            {
+                Get-ParsecCoreRequiredIngredientDomain -Schema @{
+                    name = 'display.set-resolution'
+                    domain = 'process'
+                    kind = 'display'
+                }
+            } | Should -Throw "*public name requires domain 'display'*"
+        }
+
+        It 'does not expose the retired core observed-state bridge' {
+            Get-Command -Name 'Get-ParsecObservedState' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        }
+
+        It 'keeps the window ingredient as a thin domain consumer' {
+            $entryPath = Join-Path $PSScriptRoot '..\src\ParsecEventExecutor\Private\Ingredients\window-cycle-activation\entry.ps1'
+            $entry = Get-Content -LiteralPath $entryPath -Raw
+
+            $entry | Should -Match 'DomainApi\.Invoke'
+            $entry | Should -Not -Match 'GetForegroundWindowInfo'
+            $entry | Should -Not -Match 'ActivateWindow'
         }
 
         It 'accepts a flat ingredient alias and persists a reusable token on apply' {
