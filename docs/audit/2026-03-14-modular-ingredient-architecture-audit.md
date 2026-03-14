@@ -10,13 +10,20 @@ Rewrite Scope: Identify remaining regressions, misses, skips, stubs, and legacy 
 
 The monolithic runtime has been retired from the live path, and the modular `Core + Domains + Ingredients` architecture is active. The current runtime is functional enough to load ingredients lazily, execute standalone ingredients, and execute recipes through the new executor.
 
-The rewrite is not fully complete from an architectural perspective. The main remaining gaps are:
+The migration moved materially forward in this cycle. The following architecture gaps were closed in code:
 
-- domain ownership is still inferred instead of declared in ingredient manifests
+- ingredient manifests now declare domain ownership explicitly and the loader validates the declaration
+- recipe execution now performs graph validation and deterministic topological scheduling before running steps
+- explicit-compensation flows now support chain-wide reverse rollback of earlier successful steps
+- the retired core observed-state bridge is no longer used by active domain/runtime paths
+- `window.cycle-activation` is now a thin domain consumer instead of a duplicate implementation surface
+
+The rewrite is still not complete from a live-operability perspective. The main remaining gaps are:
+
 - live restore fidelity for real display topology changes is still not trustworthy
-- recipe compensation is step-local rather than chain-wide
-- event chaining is implemented and tested, but it is still a linear dependency-gated executor rather than a true dependency scheduler
-- some domain boundaries still leak or duplicate behavior
+- display remains the main complexity hotspot and still needs internal decomposition
+- scale/text-scale audit visibility still needs a stronger live inspection surface
+- the broader test suite still contains adjacent failures outside the targeted executor/standalone migration surfaces
 
 ## Current Development State
 
@@ -77,8 +84,9 @@ This observed state still does not match the user-reported expected desktop base
 
 | Surface | Result | Date | Notes |
 | --- | --- | --- | --- |
-| `tests/StandaloneIngredient.Tests.ps1` | `30 passed, 0 failed, 0 skipped` | 2026-03-14 | Full standalone ingredient suite passed in `1544s` |
-| `tests/Executor.Tests.ps1` + `tests/RecipeParsing.Tests.ps1` | `21 passed, 0 failed, 0 skipped` | 2026-03-14 | Recipe parsing and executor flow passed in `174.92s` |
+| `tests/StandaloneIngredient.Tests.ps1` | `34 passed, 0 failed, 0 skipped` | 2026-03-14 | Standalone ingredient surface now includes domain-manifest and window-thinness assertions |
+| `tests/Executor.Tests.ps1` | `15 passed, 0 failed, 0 skipped` | 2026-03-14 | Executor flow now covers DAG validation, deterministic ordering, and chain-wide rollback |
+| `tests` | `93 passed, 12 failed, 0 skipped` | 2026-03-14 | Full suite still has adjacent failures outside the targeted migration batch |
 
 ### Test-surface observations
 
@@ -160,18 +168,20 @@ Assessment:
 
 ## Findings
 
-### AUD-001 High: Ingredient manifests still do not declare their domain explicitly
+### AUD-001 Resolved: Ingredient manifests now declare and enforce their domain explicitly
 
-Every ingredient `schema.toml` currently omits `domain = ...`. Domain ownership is still inferred from naming and folder structure instead of being declared by manifest contract.
+Every active ingredient manifest now carries `domain = ...`, and loader/catalog registration fails when the field is missing or does not match the public ingredient naming contract.
 
 Evidence:
 
-- all files under `src/ParsecEventExecutor/Private/Ingredients/*/schema.toml` were checked and none contained a `domain =` declaration
+- active ingredient manifests under `src/ParsecEventExecutor/Private/Ingredients/*/schema.toml`
+- `src/ParsecEventExecutor/Private/Core/Definitions.ps1`
+- `src/ParsecEventExecutor/Private/Core/Loader.ps1`
 
 Impact:
 
-- this violates the intended manifest-driven architecture
-- loader behavior still depends on convention rather than explicit package metadata
+- manifest ownership is now explicit and enforceable
+- loader behavior no longer needs active fallback inference during registration
 
 ### AUD-002 High: Live restore fidelity remains unproven and a real regression has already been observed
 
@@ -187,9 +197,9 @@ Impact:
 - snapshot and token-based reset cannot yet be treated as trustworthy on real hardware
 - topology-changing ingredients remain high risk until live restore validation is completed
 
-### AUD-003 High: Recipe compensation is step-local, not chain-wide
+### AUD-003 Resolved: Recipe compensation now supports chain-wide reverse rollback
 
-The executor compensates the current failed step when policy is `explicit` and `reset` is supported, but it does not unwind already successful earlier steps in reverse order after a later step failure.
+The executor now validates the step graph first, executes in deterministic topological order, and performs reverse-order rollback of earlier successful explicit-compensation steps when a later step fails and cannot self-compensate cleanly.
 
 Evidence:
 
@@ -198,26 +208,26 @@ Evidence:
 
 Impact:
 
-- multi-step event flows can still leave the desktop in drift if a later step fails after earlier steps succeeded
-- this is directly relevant to enter-mobile and return-desktop reliability
+- multi-step flows now have structural validation plus chain rollback coverage
+- live restore correctness for display topology is still an open hardware-validation concern
 
-### AUD-004 Medium: Event chaining is linear and dependency-gated, not a true graph scheduler
+### AUD-004 Resolved: Event chaining is now graph-validated and topologically ordered
 
-`depends_on` is implemented as blocking logic in the linear executor. There is no evidence of dependency graph construction, topological ordering, or cycle detection.
+`depends_on` is now treated as a graph contract. Duplicate ids, unknown dependencies, self-dependencies, and cycles are rejected before execution. Ready steps are scheduled in deterministic topological order using recipe order as the tie-breaker.
 
 Evidence:
 
 - `src/ParsecEventExecutor/Private/Execution.ps1`
-- no scheduler/graph/cycle handling was found in the runtime
+- `tests/Executor.Tests.ps1`
 
 Impact:
 
-- the executor is functional, but its architecture is narrower than a true dependency engine
-- dependency mistakes may only surface at runtime as blocked steps rather than being rejected structurally
+- dependency mistakes now fail at preflight instead of surfacing only as runtime blockage
+- execution is still intentionally single-threaded in this migration
 
-### AUD-005 Medium: Core still owns the shared observed-state bridge
+### AUD-005 Resolved: Active runtime paths no longer depend on the core observed-state bridge
 
-Domains still call `Get-ParsecObservedState`, which currently lives in `src/ParsecEventExecutor/Private/Core/StateHelpers.ps1`. This keeps an important capability bridge in core instead of pushing state observation fully behind domain APIs.
+Active domain/runtime callers were rewired away from `Get-ParsecObservedState`, and the helper was removed from `Core/StateHelpers.ps1`.
 
 Evidence:
 
@@ -229,12 +239,12 @@ Evidence:
 
 Impact:
 
-- the old mixed-runtime instinct still survives in one shared bridge
-- this weakens strict domain ownership
+- runtime-core no longer exposes this domain behavior
+- remaining live restore issues are no longer attributable to this ownership leak
 
-### AUD-006 Medium: The window capability violates the intended domain-consumer split
+### AUD-006 Resolved: The window ingredient is now a thin consumer of the window domain
 
-`window.cycle-activation` still appears to duplicate a substantial amount of behavior already present in the `window` domain entrypoint instead of remaining a thin concrete consumer of that domain.
+`window.cycle-activation` now delegates its operational behavior to the `window` domain instead of carrying an embedded copy of the domain logic.
 
 Evidence:
 
@@ -243,8 +253,8 @@ Evidence:
 
 Impact:
 
-- duplicated logic creates drift risk
-- this is the clearest remaining example of the old pattern reappearing inside the new architecture
+- duplicated window behavior has been collapsed
+- future window work can stay domain-first
 
 ### AUD-007 Medium: Snapshot and personalization are still underexposed as concrete ingredient surfaces
 
@@ -300,20 +310,21 @@ Impact:
 
 ## Recommended Next Actions
 
-1. Add explicit `domain = ...` declarations to every ingredient manifest and enforce them in the loader.
-2. Run a dedicated live restore audit for:
+1. Run a dedicated live restore audit for:
    - `display.set-enabled`
    - `display.set-activedisplays`
    - `display.set-primary`
    - `display.persist-topology`
    - `display.snapshot reset`
-3. Upgrade compensation from step-local reset to ordered chain-wide rollback for explicit-compensation recipes.
-4. Decide whether the executor should remain linear or be upgraded into a true dependency-graph scheduler with cycle detection.
-5. Move shared observed-state capture behind domain-owned APIs and remove the remaining core bridge.
-6. Collapse duplicated `window` capability logic so the ingredient becomes a thin consumer of the domain.
-7. Split the display domain internally before it becomes the next maintainability monolith.
-8. Expose a reliable live audit command for scale and text-scale so rollback drift can be verified directly.
-9. Update `README.md` and any stale public docs to remove compatibility-era wording.
+2. Triage the current non-targeted failing test surfaces:
+   - executor-state snapshot flow
+   - profile/snapshot wallpaper verification
+   - service ingredient tests
+   - scaling and active-display ingredient tests
+   - NVIDIA readiness tests
+3. Split the display domain internally before it becomes the next maintainability monolith.
+4. Expose a reliable live audit command for scale and text-scale so rollback drift can be verified directly.
+5. Update `README.md` and any stale public docs to remove compatibility-era wording.
 
 ## References
 

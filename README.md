@@ -24,7 +24,9 @@ The ingredient system is operation-based. Ingredients expose capabilities such a
 - `reset`
 - `verify`
 
-Built-in ingredients currently cover display, process, service, and command execution surfaces.
+Built-in ingredients currently cover display, process, service, command, NVIDIA, personalization, snapshot, and window execution surfaces.
+
+All built-in ingredient manifests now declare their owning `domain`, and recipe execution now validates `depends_on` as a DAG before running steps.
 
 ## Exported Commands
 
@@ -38,19 +40,14 @@ Built-in ingredients currently cover display, process, service, and command exec
 - `Get-ParsecExecutorState`
 - `Start-ParsecExecutor`
 
-Compatibility aliases:
-
-- `Capture-ParsecSnapshot`
-- `Capture-ParsecProfile`
-
-`Save-ParsecProfile` and `Test-ParsecProfile` are compatibility shims over snapshot behavior.
-
 ## Verification
 
-Current verification status on March 11, 2026:
+Current verification status on March 14, 2026:
 
-- `Invoke-Pester` passes `14` tests
-- `Invoke-ScriptAnalyzer` passes with `PSScriptAnalyzerSettings.psd1`
+- targeted migration suites are green:
+  - `tests/StandaloneIngredient.Tests.ps1`
+  - `tests/Executor.Tests.ps1`
+- the full `tests/` suite still has adjacent failures under active triage
 
 Run them with:
 
@@ -61,8 +58,9 @@ Run them with:
 
 ## Remaining Work
 
-- wire the real `DisplayConfig` backend
-- encode the actual mobile recipe steps in `recipes/enter-mobile.toml`
+- complete live validation for topology-changing and scaling-changing restore paths
+- reduce display-domain complexity through internal decomposition
+- finish triaging the remaining non-targeted failing test surfaces
 - add daemon hosting and later Parsec log ingestion
 
 The implementation detail summary is in `docs/plan/implementation-plan.md`.
