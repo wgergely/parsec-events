@@ -1,0 +1,21 @@
+name = "condition-skips"
+description = "Thin recipe runner fixture that skips a step when the mode condition does not match."
+target_mode = "DESKTOP"
+
+[[steps]]
+id = "skip-mobile-only-step"
+ingredient = "set-resolution"
+operation = "apply"
+depends_on = []
+verify = true
+compensation_policy = "explicit"
+retry_count = 0
+retry_delay_ms = 0
+allow_diagnostics = false
+
+[steps.condition]
+mode_is = "MOBILE"
+
+[steps.arguments]
+width = 1280
+height = 720

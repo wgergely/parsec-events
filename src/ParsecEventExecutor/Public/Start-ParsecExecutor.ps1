@@ -14,8 +14,14 @@ function Start-ParsecExecutor {
     }
 
     switch ($EventName) {
-        'SwitchToMobile' { return Invoke-ParsecRecipe -NameOrPath 'enter-mobile' -StateRoot $StateRoot }
-        'SwitchToDesktop' { return Invoke-ParsecRecipe -NameOrPath 'return-desktop' -StateRoot $StateRoot }
+        'SwitchToMobile' {
+            $recipe = Get-ParsecRecipeDocument -NameOrPath 'enter-mobile'
+            return Invoke-ParsecRecipeInternal -Recipe $recipe -StateRoot $StateRoot
+        }
+        'SwitchToDesktop' {
+            $recipe = Get-ParsecRecipeDocument -NameOrPath 'return-desktop'
+            return Invoke-ParsecRecipeInternal -Recipe $recipe -StateRoot $StateRoot
+        }
         'VerifyOnly' {
             return [pscustomobject]@{
                 event_name = $EventName

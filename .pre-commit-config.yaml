@@ -1,0 +1,37 @@
+minimum_pre_commit_version: "3.7.0"
+default_stages:
+  - pre-commit
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        files: \.(ps1|psd1|psm1|toml|ya?ml)$
+      - id: end-of-file-fixer
+        files: \.(ps1|psd1|psm1|toml|ya?ml)$
+      - id: check-yaml
+        files: \.(ya?ml)$
+  - repo: local
+    hooks:
+      - id: powershell-format
+        name: PowerShell format
+        language: system
+        entry: pwsh
+        args:
+          - -NoProfile
+          - -File
+          - tools/Invoke-PowerShellFormatter.ps1
+        files: \.(ps1|psd1|psm1)$
+        pass_filenames: true
+        require_serial: true
+      - id: powershell-lint
+        name: PowerShell lint
+        language: system
+        entry: pwsh
+        args:
+          - -NoProfile
+          - -File
+          - tools/Invoke-PowerShellLint.ps1
+        files: \.(ps1|psd1|psm1)$
+        pass_filenames: true
+        require_serial: true

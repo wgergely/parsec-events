@@ -7,12 +7,21 @@ $privateLoadOrder = @(
     'Utility.ps1',
     'Toml.ps1',
     'State.ps1',
-    'IngredientRuntime.ps1',
+    'NvidiaInterop.ps1',
+    'IngredientInvocation.ps1',
     'Execution.ps1'
 )
 
 foreach ($privateFile in $privateLoadOrder) {
     . (Join-Path -Path $privateRoot -ChildPath $privateFile)
+}
+
+$coreRoot = Join-Path -Path $privateRoot -ChildPath 'Core'
+if (Test-Path -LiteralPath $coreRoot) {
+    . (Join-Path -Path $coreRoot -ChildPath 'Bootstrap.ps1')
+    foreach ($coreFile in @(Get-ParsecCoreLoadOrder)) {
+        . (Join-Path -Path $coreRoot -ChildPath $coreFile)
+    }
 }
 
 Get-ChildItem -Path $publicRoot -Filter '*.ps1' -File | Sort-Object Name | ForEach-Object {
@@ -23,8 +32,12 @@ if (-not (Get-Variable -Name ParsecIngredientRegistry -Scope Script -ErrorAction
     $script:ParsecIngredientRegistry = @{}
 }
 
+if (-not (Get-Variable -Name ParsecIngredientAliasRegistry -Scope Script -ErrorAction SilentlyContinue)) {
+    $script:ParsecIngredientAliasRegistry = @{}
+}
+
 if (-not (Get-Variable -Name ParsecStatusSuccessSet -Scope Script -ErrorAction SilentlyContinue)) {
     $script:ParsecStatusSuccessSet = @('Succeeded', 'SucceededWithDrift', 'Compensated')
 }
 
-Initialize-ParsecIngredientRegistry
+Initialize-ParsecCoreRuntime

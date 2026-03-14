@@ -1,0 +1,12 @@
+name = "active-display-sequence"
+description = "Keeps only the primary display active."
+
+[[steps]]
+id = "set-active-displays"
+ingredient = "set-activedisplays"
+verify = true
+retry_count = 0
+retry_delay_ms = 0
+
+[steps.arguments]
+screen_ids = [1]

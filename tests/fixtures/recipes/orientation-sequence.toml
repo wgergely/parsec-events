@@ -1,0 +1,12 @@
+name = "orientation-sequence"
+description = "Sets the primary display orientation."
+
+[[steps]]
+id = "set-orientation"
+ingredient = "set-orientation"
+verify = true
+retry_count = 0
+retry_delay_ms = 0
+
+[steps.arguments]
+orientation = "Portrait"

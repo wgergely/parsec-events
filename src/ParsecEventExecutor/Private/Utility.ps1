@@ -27,7 +27,7 @@ function Initialize-ParsecStateRoot {
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)
     )
 
-    foreach ($relative in @('.', 'snapshots', 'runs', 'logs', 'events')) {
+    foreach ($relative in @('.', 'snapshots', 'runs', 'logs', 'events', 'ingredient-invocations', 'ingredient-tokens')) {
         $path = if ($relative -eq '.') { $StateRoot } else { Join-Path -Path $StateRoot -ChildPath $relative }
         if (-not (Test-Path -LiteralPath $path)) {
             New-Item -ItemType Directory -Path $path -Force | Out-Null
@@ -94,7 +94,7 @@ function ConvertTo-ParsecPlainObject {
             ConvertTo-ParsecPlainObject -InputObject $item
         }
 
-        return ,@($values)
+        return , @($values)
     }
 
     if ($InputObject -is [psobject] -and $null -ne $InputObject.PSObject -and @($InputObject.PSObject.Properties).Count -gt 0) {
@@ -111,6 +111,80 @@ function ConvertTo-ParsecPlainObject {
     }
 
     return $InputObject
+}
+
+function Get-ParsecModuleVariableValue {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $Name
+    )
+
+    $module = $ExecutionContext.SessionState.Module
+    if ($null -eq $module) {
+        $module = Get-Module -Name 'ParsecEventExecutor'
+    }
+    if ($null -ne $module) {
+        $moduleValue = & $module {
+            param($VariableName)
+            $variable = Get-Variable -Name $VariableName -Scope Script -ErrorAction SilentlyContinue
+            if ($null -eq $variable) {
+                return $null
+            }
+
+            return $variable.Value
+        } $Name
+        if ($null -ne $moduleValue) {
+            return $moduleValue
+        }
+
+        $globalVariable = Get-Variable -Name $Name -Scope Global -ErrorAction SilentlyContinue
+        if ($null -ne $globalVariable) {
+            return $globalVariable.Value
+        }
+
+        return $null
+    }
+
+    $variable = Get-Variable -Name $Name -Scope Script -ErrorAction SilentlyContinue
+    if ($null -eq $variable) {
+        $globalVariable = Get-Variable -Name $Name -Scope Global -ErrorAction SilentlyContinue
+        if ($null -eq $globalVariable) {
+            return $null
+        }
+
+        return $globalVariable.Value
+    }
+
+    return $variable.Value
+}
+
+function Set-ParsecModuleVariableValue {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $Name,
+
+        [Parameter()]
+        $Value
+    )
+
+    $module = $ExecutionContext.SessionState.Module
+    if ($null -eq $module) {
+        $module = Get-Module -Name 'ParsecEventExecutor'
+    }
+    if ($null -ne $module) {
+        & $module {
+            param($VariableName, $VariableValue)
+            Set-Variable -Name $VariableName -Scope Script -Value $VariableValue -Force
+        } $Name $Value | Out-Null
+        Set-Variable -Name $Name -Scope Global -Value $Value -Force
+        return $Value
+    }
+
+    Set-Variable -Name $Name -Scope Script -Value $Value -Force
+    Set-Variable -Name $Name -Scope Global -Value $Value -Force
+    return $Value
 }
 
 function Read-ParsecJsonFile {
@@ -175,9 +249,9 @@ function New-ParsecStateEnvelope {
 
     return [ordered]@{
         schema_version = 1
-        document_type  = $DocumentType
-        written_at     = [DateTimeOffset]::UtcNow.ToString('o')
-        payload        = ConvertTo-ParsecPlainObject -InputObject $Payload
+        document_type = $DocumentType
+        written_at = [DateTimeOffset]::UtcNow.ToString('o')
+        payload = ConvertTo-ParsecPlainObject -InputObject $Payload
     }
 }
 
@@ -217,7 +291,7 @@ function Read-ParsecStateDocument {
 
     return [ordered]@{
         envelope = $plain
-        payload  = ConvertTo-ParsecPlainObject -InputObject $plain.payload
+        payload = ConvertTo-ParsecPlainObject -InputObject $plain.payload
     }
 }
 
@@ -293,16 +367,16 @@ function New-ParsecResult {
     )
 
     return [pscustomobject]@{
-        PSTypeName    = 'ParsecEventExecutor.Result'
-        Status        = $Status
-        Message       = $Message
-        Requested     = ConvertTo-ParsecPlainObject -InputObject $Requested
-        Observed      = ConvertTo-ParsecPlainObject -InputObject $Observed
-        Outputs       = ConvertTo-ParsecPlainObject -InputObject $Outputs
-        Warnings      = @($Warnings)
-        Errors        = @($Errors)
+        PSTypeName = 'ParsecEventExecutor.Result'
+        Status = $Status
+        Message = $Message
+        Requested = ConvertTo-ParsecPlainObject -InputObject $Requested
+        Observed = ConvertTo-ParsecPlainObject -InputObject $Observed
+        Outputs = ConvertTo-ParsecPlainObject -InputObject $Outputs
+        Warnings = @($Warnings)
+        Errors = @($Errors)
         CanCompensate = $CanCompensate
-        Timestamp     = [DateTimeOffset]::UtcNow.ToString('o')
+        Timestamp = [DateTimeOffset]::UtcNow.ToString('o')
     }
 }
 
@@ -313,7 +387,12 @@ function Test-ParsecSuccessfulStatus {
         [string] $Status
     )
 
-    return $script:ParsecStatusSuccessSet -contains $Status
+    $successSet = $script:ParsecStatusSuccessSet
+    if ($null -eq $successSet -or @($successSet).Count -eq 0) {
+        $successSet = @('Succeeded', 'SucceededWithDrift', 'Compensated')
+    }
+
+    return @($successSet) -contains $Status
 }
 
 function New-ParsecRunIdentifier {

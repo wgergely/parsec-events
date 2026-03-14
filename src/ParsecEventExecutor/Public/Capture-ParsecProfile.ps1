@@ -12,7 +12,7 @@ function Save-ParsecSnapshot {
         return
     }
 
-    $result = Invoke-ParsecIngredientOperation -Name 'display.snapshot' -Operation 'capture' -Arguments @{ snapshot_name = $Name } -StateRoot $StateRoot -RunState @{}
+    $result = Invoke-ParsecCoreIngredientOperation -Name 'display.snapshot' -Operation 'capture' -Arguments @{ snapshot_name = $Name } -StateRoot $StateRoot -RunState @{}
     if (-not (Test-ParsecSuccessfulStatus -Status $result.Status)) {
         $exception = New-Object System.InvalidOperationException("Unable to capture snapshot '$Name': $($result.Message)")
         $errorRecord = New-Object System.Management.Automation.ErrorRecord($exception, 'SnapshotCaptureFailed', [System.Management.Automation.ErrorCategory]::InvalidOperation, $Name)

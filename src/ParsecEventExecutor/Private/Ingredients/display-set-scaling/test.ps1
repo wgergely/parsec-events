@@ -1,6 +1,6 @@
 Context 'display.set-scaling' {
     It 'captures display and font scaling through the scaling ingredient' {
-        $capture = Invoke-ParsecIngredientOperation -Name 'display.set-scaling' -Operation 'capture' -Arguments @{
+        $capture = Invoke-ParsecCoreIngredientOperation -Name 'display.set-scaling' -Operation 'capture' -Arguments @{
             device_name = '\\.\DISPLAY1'
         } -RunState @{}
 

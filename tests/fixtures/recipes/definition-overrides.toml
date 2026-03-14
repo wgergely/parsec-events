@@ -1,7 +1,5 @@
 name = "definition-overrides"
 description = "Exercise recipe ingredient definitions and step overrides."
-initial_mode = "DESKTOP"
-target_mode = "MOBILE"
 
 [ingredient_definitions.base-command]
 ingredient = "command.invoke"

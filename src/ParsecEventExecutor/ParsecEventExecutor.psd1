@@ -8,7 +8,9 @@
     Description       = 'Mission-focused recipe executor for Parsec desktop/mobile transitions.'
     PowerShellVersion = '7.0'
     FunctionsToExport = @(
+        'Invoke-ParsecIngredient',
         'Invoke-ParsecRecipe',
+        'Get-ParsecDisplay',
         'Get-ParsecRecipe',
         'Get-ParsecIngredient',
         'Save-ParsecSnapshot',

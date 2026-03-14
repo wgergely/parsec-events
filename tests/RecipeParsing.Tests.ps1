@@ -14,6 +14,8 @@ Describe 'Get-ParsecRecipe' {
         $recipe = Get-ParsecRecipe -NameOrPath $recipePath
 
         $recipe.name | Should -Be 'command-success'
+        $recipe.initial_mode | Should -BeNullOrEmpty
+        $recipe.target_mode | Should -BeNullOrEmpty
         $recipe.steps.Count | Should -Be 1
         $recipe.steps[0].operation | Should -Be 'apply'
         $recipe.steps[0].arguments.arguments.Count | Should -Be 3
@@ -29,6 +31,55 @@ Describe 'Get-ParsecRecipe' {
         $recipe.steps[0].ingredient | Should -Be 'command.invoke'
         $recipe.steps[0].retry_count | Should -Be 2
         $recipe.steps[0].arguments.arguments[2] | Should -Be "Write-Output 'override'"
+    }
+
+    It 'parses a direct no-mode recipe that uses a flat ingredient alias' {
+        $recipePath = Join-Path $PSScriptRoot 'fixtures\recipes\resolution-sequence.toml'
+        $recipe = Get-ParsecRecipe -NameOrPath $recipePath
+
+        $recipe.initial_mode | Should -BeNullOrEmpty
+        $recipe.target_mode | Should -BeNullOrEmpty
+        $recipe.steps.Count | Should -Be 1
+        $recipe.steps[0].ingredient | Should -Be 'set-resolution'
+        $recipe.steps[0].arguments.width | Should -Be 1280
+        $recipe.steps[0].arguments.height | Should -Be 720
+    }
+
+    It 'parses an array argument for the active-display ingredient' {
+        $recipePath = Join-Path $PSScriptRoot 'fixtures\recipes\active-display-sequence.toml'
+        $recipe = Get-ParsecRecipe -NameOrPath $recipePath
+
+        $recipe.steps.Count | Should -Be 1
+        $recipe.steps[0].ingredient | Should -Be 'set-activedisplays'
+        @($recipe.steps[0].arguments.screen_ids).Count | Should -Be 1
+        $recipe.steps[0].arguments.screen_ids[0] | Should -Be 1
+    }
+
+    It 'parses a direct orientation recipe that uses the flat alias' {
+        $recipePath = Join-Path $PSScriptRoot 'fixtures\recipes\orientation-sequence.toml'
+        $recipe = Get-ParsecRecipe -NameOrPath $recipePath
+
+        $recipe.steps.Count | Should -Be 1
+        $recipe.steps[0].ingredient | Should -Be 'set-orientation'
+        $recipe.steps[0].arguments.orientation | Should -Be 'Portrait'
+    }
+
+    It 'parses a direct text-scale recipe that uses the flat alias' {
+        $recipePath = Join-Path $PSScriptRoot 'fixtures\recipes\textscale-sequence.toml'
+        $recipe = Get-ParsecRecipe -NameOrPath $recipePath
+
+        $recipe.steps.Count | Should -Be 1
+        $recipe.steps[0].ingredient | Should -Be 'set-textscale'
+        $recipe.steps[0].arguments.text_scale_percent | Should -Be 150
+    }
+
+    It 'parses a direct ui-scale recipe that uses the flat alias' {
+        $recipePath = Join-Path $PSScriptRoot 'fixtures\recipes\uiscale-sequence.toml'
+        $recipe = Get-ParsecRecipe -NameOrPath $recipePath
+
+        $recipe.steps.Count | Should -Be 1
+        $recipe.steps[0].ingredient | Should -Be 'set-uiscale'
+        $recipe.steps[0].arguments.ui_scale_percent | Should -Be 125
     }
 
     It 'parses the mission recipes as mobile preset and snapshot reset flows' {

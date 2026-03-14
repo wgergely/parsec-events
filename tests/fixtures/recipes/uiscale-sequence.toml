@@ -1,0 +1,10 @@
+name = "uiscale-sequence"
+description = "Apply UI scale through the standalone ingredient runner."
+
+[[steps]]
+id = "ui-scale"
+ingredient = "set-uiscale"
+operation = "apply"
+
+[steps.arguments]
+ui_scale_percent = 125

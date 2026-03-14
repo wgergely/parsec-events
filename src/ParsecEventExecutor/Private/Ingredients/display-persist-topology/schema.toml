@@ -1,0 +1,25 @@
+name = "display.persist-topology"
+aliases = ["persist-topology"]
+kind = "display"
+description = "Capture, restore, or verify monitor topology and layout without touching theme or scaling."
+capabilities = ["capture", "reset", "verify"]
+required_backends = ["DisplayAdapter"]
+safety_class = "ReversibleSystemChange"
+success_signals = ["topology-written", "topology-restored"]
+failure_signals = ["snapshot-missing", "reset-failed"]
+wait_conditions = []
+
+[operation_schemas.capture]
+required = []
+[operation_schemas.capture.types]
+snapshot_name = "string"
+
+[operation_schemas.reset]
+required = []
+[operation_schemas.reset.types]
+snapshot_name = "string"
+
+[operation_schemas.verify]
+required = []
+[operation_schemas.verify.types]
+snapshot_name = "string"

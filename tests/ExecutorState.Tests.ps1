@@ -13,35 +13,45 @@ Describe 'Executor state entrypoints' {
     InModuleScope ParsecEventExecutor {
         BeforeAll {
             $script:ExecutorThemeState = [ordered]@{
-                mode        = 'Light'
-                app_mode    = 'Light'
+                mode = 'Light'
+                app_mode = 'Light'
                 system_mode = 'Light'
             }
             $script:ExecutorTextScalePercent = 100
             $script:ExecutorUiScalePercent = 100
+            $script:ExecutorWallpaperState = [ordered]@{
+                path = 'C:\wallpapers\executor-test.jpg'
+                wallpaper_style = '10'
+                tile_wallpaper = '0'
+                background_color = '0 0 0'
+            }
             $script:ExecutorObservedState = [ordered]@{
-                captured_at      = [DateTimeOffset]::UtcNow.ToString('o')
-                computer_name    = 'TESTHOST'
-                display_backend  = 'TestAdapter'
+                captured_at = [DateTimeOffset]::UtcNow.ToString('o')
+                computer_name = 'TESTHOST'
+                display_backend = 'TestAdapter'
                 monitor_identity = 'device_name'
-                monitors         = @(
+                monitors = @(
                     [ordered]@{
-                        device_name  = '\\.\DISPLAY1'
-                        is_primary   = $true
-                        enabled      = $true
-                        bounds       = [ordered]@{ x = 0; y = 0; width = 1920; height = 1080 }
+                        device_name = '\\.\DISPLAY1'
+                        is_primary = $true
+                        enabled = $true
+                        bounds = [ordered]@{ x = 0; y = 0; width = 1920; height = 1080 }
                         working_area = [ordered]@{ x = 0; y = 0; width = 1920; height = 1040 }
-                        orientation  = 'Landscape'
+                        orientation = 'Landscape'
                     }
                 )
-                scaling          = [ordered]@{ status = 'Captured'; ui_scale_percent = 100; text_scale_percent = 100; monitors = @() }
-                font_scaling     = [ordered]@{ text_scale_percent = 100 }
-                theme            = $script:ExecutorThemeState
+                scaling = [ordered]@{ status = 'Captured'; ui_scale_percent = 100; text_scale_percent = 100; monitors = @() }
+                font_scaling = [ordered]@{ text_scale_percent = 100 }
+                theme = $script:ExecutorThemeState
+                wallpaper = $script:ExecutorWallpaperState
             }
 
             $script:ParsecPersonalizationAdapter = @{
                 GetThemeState = {
                     return $script:ExecutorThemeState
+                }
+                GetWallpaperState = {
+                    return $script:ExecutorWallpaperState
                 }
                 SetThemeState = {
                     param($Arguments)
@@ -53,8 +63,8 @@ Describe 'Executor state entrypoints' {
                         $appMode = if ($Arguments.ContainsKey('app_mode')) { [string] $Arguments.app_mode } elseif ($mode -in @('Dark', 'Light')) { $mode } else { 'Light' }
                         $systemMode = if ($Arguments.ContainsKey('system_mode')) { [string] $Arguments.system_mode } elseif ($mode -in @('Dark', 'Light')) { $mode } else { 'Light' }
                         [ordered]@{
-                            mode        = $mode
-                            app_mode    = $appMode
+                            mode = $mode
+                            app_mode = $appMode
                             system_mode = $systemMode
                         }
                     }
@@ -62,7 +72,24 @@ Describe 'Executor state entrypoints' {
                     $script:ExecutorObservedState.theme = $themeState
                     New-ParsecResult -Status 'Succeeded' -Message 'theme' -Observed $themeState -Outputs @{ theme_state = $themeState }
                 }
-                SetTextScale  = {
+                SetWallpaperState = {
+                    param($Arguments)
+                    $wallpaperState = if ($Arguments.ContainsKey('wallpaper_state')) {
+                        $Arguments.wallpaper_state
+                    }
+                    else {
+                        [ordered]@{
+                            path = [string] $Arguments.path
+                            wallpaper_style = [string] $Arguments.wallpaper_style
+                            tile_wallpaper = [string] $Arguments.tile_wallpaper
+                            background_color = [string] $Arguments.background_color
+                        }
+                    }
+                    $script:ExecutorWallpaperState = $wallpaperState
+                    $script:ExecutorObservedState.wallpaper = $wallpaperState
+                    New-ParsecResult -Status 'Succeeded' -Message 'wallpaper' -Observed $wallpaperState -Outputs @{ wallpaper_state = $wallpaperState }
+                }
+                SetTextScale = {
                     param($Arguments)
                     $value = if ($Arguments.ContainsKey('text_scale_percent')) { [int] $Arguments.text_scale_percent } else { [int] $Arguments.value }
                     $script:ExecutorTextScalePercent = $value
@@ -77,30 +104,30 @@ Describe 'Executor state entrypoints' {
                     $script:ExecutorObservedState.captured_at = [DateTimeOffset]::UtcNow.ToString('o')
                     return $script:ExecutorObservedState
                 }
-                SetEnabled      = {
+                SetEnabled = {
                     param($Arguments)
                     $monitor = $script:ExecutorObservedState.monitors[0]
                     $monitor.enabled = [bool] $Arguments.enabled
                     New-ParsecResult -Status 'Succeeded' -Message 'enabled' -Requested $Arguments
                 }
-                SetPrimary      = {
+                SetPrimary = {
                     param($Arguments)
                     $script:ExecutorObservedState.monitors[0].is_primary = $true
                     New-ParsecResult -Status 'Succeeded' -Message 'primary' -Requested $Arguments
                 }
-                SetResolution   = {
+                SetResolution = {
                     param($Arguments)
                     $monitor = $script:ExecutorObservedState.monitors[0]
                     $monitor.bounds.width = [int] $Arguments.width
                     $monitor.bounds.height = [int] $Arguments.height
                     New-ParsecResult -Status 'Succeeded' -Message 'resolution' -Requested $Arguments
                 }
-                SetOrientation  = {
+                SetOrientation = {
                     param($Arguments)
                     $script:ExecutorObservedState.monitors[0].orientation = [string] $Arguments.orientation
                     New-ParsecResult -Status 'Succeeded' -Message 'orientation' -Requested $Arguments
                 }
-                SetScaling      = {
+                SetScaling = {
                     param($Arguments)
                     if ($Arguments.ContainsKey('ui_scale_percent')) {
                         $script:ExecutorUiScalePercent = [int] $Arguments.ui_scale_percent
