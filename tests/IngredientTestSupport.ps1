@@ -184,6 +184,9 @@ function Initialize-ParsecIngredientTestEnvironment {
     }
     $script:IngredientNvidiaSupportedModeLagRemaining = 0
     $script:IngredientNvidiaPendingSupportedMode = $null
+    $script:IngredientServiceStates = @{
+        Spooler = 'Stopped'
+    }
     $script:IngredientWindowActivationLog = @()
     $script:IngredientWindowActivationDeniedHandles = @()
     $script:IngredientWindowForegroundHandle = 101
@@ -456,7 +459,7 @@ function Initialize-ParsecIngredientTestEnvironment {
                     $script:IngredientOrientationObservationLagRemaining--
                 }
                 else {
-                    $monitor = Get-ParsecIngredientObservedMonitorByDeviceName -DeviceName ([string] $script:IngredientOrientationPendingOrientation.device_name)
+                    $monitor = @($script:IngredientObservedState.monitors) | Where-Object { [string] $_.device_name -eq [string] $script:IngredientOrientationPendingOrientation.device_name } | Select-Object -First 1
                     if ($null -ne $monitor) {
                         $monitor.orientation = [string] $script:IngredientOrientationPendingOrientation.orientation
                     }
@@ -516,7 +519,7 @@ function Initialize-ParsecIngredientTestEnvironment {
         }
         SetEnabled = {
             param($Arguments)
-            $monitor = Get-ParsecIngredientObservedMonitorByDeviceName -DeviceName ([string] $Arguments.device_name)
+            $monitor = @($script:IngredientObservedState.monitors) | Where-Object { [string] $_.device_name -eq [string] $Arguments.device_name } | Select-Object -First 1
             if ($null -eq $monitor) {
                 return New-ParsecResult -Status 'Failed' -Message "Monitor '$($Arguments.device_name)' not found." -Requested $Arguments -Errors @('MonitorNotFound')
             }
@@ -578,7 +581,7 @@ function Initialize-ParsecIngredientTestEnvironment {
                 $monitor.is_primary = $false
             }
 
-            $monitor = Get-ParsecIngredientObservedMonitorByDeviceName -DeviceName ([string] $Arguments.device_name)
+            $monitor = @($script:IngredientObservedState.monitors) | Where-Object { [string] $_.device_name -eq [string] $Arguments.device_name } | Select-Object -First 1
             if ($null -eq $monitor) {
                 return New-ParsecResult -Status 'Failed' -Message "Monitor '$($Arguments.device_name)' not found." -Requested $Arguments -Errors @('MonitorNotFound')
             }
@@ -615,7 +618,7 @@ function Initialize-ParsecIngredientTestEnvironment {
         }
         SetOrientation = {
             param($Arguments)
-            $monitor = Get-ParsecIngredientObservedMonitorByDeviceName -DeviceName ([string] $Arguments.device_name)
+            $monitor = @($script:IngredientObservedState.monitors) | Where-Object { [string] $_.device_name -eq [string] $Arguments.device_name } | Select-Object -First 1
             if ($null -eq $monitor) {
                 return New-ParsecResult -Status 'Failed' -Message "Monitor '$($Arguments.device_name)' not found." -Requested $Arguments -Errors @('MonitorNotFound')
             }
@@ -815,11 +818,46 @@ function Initialize-ParsecIngredientTestEnvironment {
     }
     $global:ParsecNvidiaAdapter = $script:ParsecNvidiaAdapter
 
+    $script:ParsecServiceAdapter = @{
+        GetService = {
+            param($Arguments)
+
+            $serviceName = [string] $Arguments.service_name
+            $status = if ($script:IngredientServiceStates.ContainsKey($serviceName)) {
+                [string] $script:IngredientServiceStates[$serviceName]
+            }
+            else {
+                'Stopped'
+            }
+
+            [pscustomobject]@{
+                Name = $serviceName
+                Status = $status
+            }
+        }
+        StartService = {
+            param($Arguments)
+
+            $serviceName = [string] $Arguments.service_name
+            $script:IngredientServiceStates[$serviceName] = 'Running'
+            New-ParsecResult -Status 'Succeeded' -Message "Started service '$serviceName'."
+        }
+        StopService = {
+            param($Arguments)
+
+            $serviceName = [string] $Arguments.service_name
+            $script:IngredientServiceStates[$serviceName] = 'Stopped'
+            New-ParsecResult -Status 'Succeeded' -Message "Stopped service '$serviceName'."
+        }
+    }
+    $global:ParsecServiceAdapter = $script:ParsecServiceAdapter
+
     if (Get-Command -Name 'Set-ParsecModuleVariableValue' -ErrorAction SilentlyContinue) {
         Set-ParsecModuleVariableValue -Name 'ParsecPersonalizationAdapter' -Value $script:ParsecPersonalizationAdapter | Out-Null
         Set-ParsecModuleVariableValue -Name 'ParsecDisplayAdapter' -Value $script:ParsecDisplayAdapter | Out-Null
         Set-ParsecModuleVariableValue -Name 'ParsecWindowAdapter' -Value $script:ParsecWindowAdapter | Out-Null
         Set-ParsecModuleVariableValue -Name 'ParsecNvidiaAdapter' -Value $script:ParsecNvidiaAdapter | Out-Null
+        Set-ParsecModuleVariableValue -Name 'ParsecServiceAdapter' -Value $script:ParsecServiceAdapter | Out-Null
     }
 }
 
@@ -828,7 +866,8 @@ function Clear-ParsecTestAdapters {
             'ParsecPersonalizationAdapter',
             'ParsecDisplayAdapter',
             'ParsecWindowAdapter',
-            'ParsecNvidiaAdapter'
+            'ParsecNvidiaAdapter',
+            'ParsecServiceAdapter'
         )) {
         Set-Variable -Scope Global -Name $name -Value $null -Force
         if (Get-Command -Name 'Set-ParsecModuleVariableValue' -ErrorAction SilentlyContinue) {

@@ -727,7 +727,7 @@ Describe 'Standalone ingredient surface' {
             $reset = Invoke-ParsecIngredientCommandInternal -Name 'process.start' -Operation 'reset' -TokenId $tokenId -StateRoot $stateRoot
 
             $reset.status | Should -Be 'Succeeded'
-            Should -Invoke Get-Process -Times 1 -Exactly -ParameterFilter { $Id -eq 4242 }
+            $reset.reset_result.Message | Should -Match '4242'
             Should -Invoke Stop-Process -Times 1 -Exactly -ParameterFilter { $Id -eq 4242 }
         }
     }

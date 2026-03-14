@@ -32,14 +32,6 @@ $resolveProcess = {
     }
 
     if ($null -ne $processId) {
-        $module = Get-Module -Name 'ParsecEventExecutor'
-        if ($null -ne $module) {
-            return & $module {
-                param($Id)
-                Get-Process -Id $Id -ErrorAction SilentlyContinue
-            } $processId
-        }
-
         return Get-Process -Id $processId -ErrorAction SilentlyContinue
     }
 
@@ -56,16 +48,6 @@ $resolveProcess = {
 
     if ([string]::IsNullOrWhiteSpace($processName)) {
         return $null
-    }
-
-    $module = Get-Module -Name 'ParsecEventExecutor'
-    if ($null -ne $module) {
-        return @(
-            & $module {
-                param($Name)
-                Get-Process -Name $Name -ErrorAction SilentlyContinue
-            } $processName
-        ) | Select-Object -First 1
     }
 
     return @(Get-Process -Name $processName -ErrorAction SilentlyContinue) | Select-Object -First 1
@@ -126,16 +108,7 @@ return @{
                         return New-ParsecResult -Status 'Succeeded' -Message 'Process was already stopped.'
                     }
 
-                    $module = Get-Module -Name 'ParsecEventExecutor'
-                    if ($null -ne $module) {
-                        & $module {
-                            param($Id)
-                            Stop-Process -Id $Id -ErrorAction SilentlyContinue
-                        } $process.Id
-                    }
-                    else {
-                        Stop-Process -Id $process.Id -ErrorAction SilentlyContinue
-                    }
+                    Stop-Process -Id $process.Id -ErrorAction SilentlyContinue
 
                     return New-ParsecResult -Status 'Succeeded' -Message "Stopped process id '$($process.Id)'."
                 }

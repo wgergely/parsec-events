@@ -120,10 +120,8 @@ function Get-ParsecModuleVariableValue {
         [string] $Name
     )
 
-    $module = $ExecutionContext.SessionState.Module
-    if ($null -eq $module) {
-        $module = Get-Module -Name 'ParsecEventExecutor'
-    }
+    $rootModule = Get-Module -Name 'ParsecEventExecutor'
+    $module = if ($null -ne $rootModule) { $rootModule } else { $ExecutionContext.SessionState.Module }
     if ($null -ne $module) {
         $moduleValue = & $module {
             param($VariableName)
@@ -169,10 +167,8 @@ function Set-ParsecModuleVariableValue {
         $Value
     )
 
-    $module = $ExecutionContext.SessionState.Module
-    if ($null -eq $module) {
-        $module = Get-Module -Name 'ParsecEventExecutor'
-    }
+    $rootModule = Get-Module -Name 'ParsecEventExecutor'
+    $module = if ($null -ne $rootModule) { $rootModule } else { $ExecutionContext.SessionState.Module }
     if ($null -ne $module) {
         & $module {
             param($VariableName, $VariableValue)

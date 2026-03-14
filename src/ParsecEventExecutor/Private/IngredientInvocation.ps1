@@ -590,6 +590,48 @@ function Get-ParsecIngredientInvocationMessage {
     return $null
 }
 
+function Get-ParsecPersistedApplyOutputValue {
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        $ApplyResult,
+
+        [Parameter(Mandatory)]
+        [string] $Name
+    )
+
+    if ($null -eq $ApplyResult) {
+        return $null
+    }
+
+    $outputs = $null
+    if ($ApplyResult -is [System.Collections.IDictionary]) {
+        if ($ApplyResult.Contains('Outputs')) {
+            $outputs = $ApplyResult.Outputs
+        }
+        elseif ($ApplyResult.Contains('outputs')) {
+            $outputs = $ApplyResult.outputs
+        }
+    }
+    elseif ($ApplyResult.PSObject.Properties.Name -contains 'Outputs') {
+        $outputs = $ApplyResult.Outputs
+    }
+    elseif ($ApplyResult.PSObject.Properties.Name -contains 'outputs') {
+        $outputs = $ApplyResult.outputs
+    }
+
+    if ($outputs -is [System.Collections.IDictionary]) {
+        if ($outputs.Contains($Name)) {
+            return $outputs[$Name]
+        }
+    }
+    elseif ($null -ne $outputs -and $outputs.PSObject.Properties.Name -contains $Name) {
+        return $outputs.$Name
+    }
+
+    return $null
+}
+
 function Get-ParsecIngredientReadinessConfiguration {
     [CmdletBinding()]
     param(
@@ -635,6 +677,7 @@ function Wait-ParsecIngredientReadiness {
 
     $configuration = Get-ParsecIngredientReadinessConfiguration -Definition $definition
     $deadline = [DateTimeOffset]::UtcNow.AddMilliseconds([double] $configuration.timeout_ms)
+    $minimumAttempts = [Math]::Max(1, [int] $configuration.success_count + 2)
     $attempt = 0
     $successStreak = 0
     $maxSuccessStreak = 0
@@ -665,7 +708,7 @@ function Wait-ParsecIngredientReadiness {
             }
         }
 
-        if ([DateTimeOffset]::UtcNow -ge $deadline) {
+        if ([DateTimeOffset]::UtcNow -ge $deadline -and $attempt -ge $minimumAttempts) {
             break
         }
 
@@ -811,6 +854,14 @@ function Invoke-ParsecIngredientCommandInternal {
                 $null
             }
             $resetArguments = Merge-ParsecRecipeMap -Base ([ordered]@{ captured_state = $tokenDocument.captured_state }) -Override (Merge-ParsecRecipeMap -Base $tokenDocument.requested_arguments -Override $Arguments)
+            $persistedProcessId = Get-ParsecPersistedApplyOutputValue -ApplyResult $tokenDocument.apply_result -Name 'process_id'
+            if ($null -eq $persistedProcessId) {
+                $persistedProcessId = Get-ParsecPersistedApplyOutputValue -ApplyResult $resetExecutionResult -Name 'process_id'
+            }
+
+            if ($null -ne $persistedProcessId -and -not $resetArguments.Contains('process_id')) {
+                $resetArguments['process_id'] = [int] $persistedProcessId
+            }
             $operationResult = Invoke-ParsecCoreIngredientOperation -Name $definition.Name -Operation 'reset' -Arguments $resetArguments -Prior $resetExecutionResult -StateRoot $stateRoot -RunState @{}
             $resetResult = $operationResult
             $finalStatus = [string] $operationResult.Status

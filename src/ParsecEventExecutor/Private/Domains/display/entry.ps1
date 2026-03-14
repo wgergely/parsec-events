@@ -18,6 +18,16 @@ return @{
                 [System.Collections.IDictionary] $RunState = @{}
             )
 
+            $module = Get-Module -Name 'ParsecEventExecutor'
+            if ($null -ne $module) {
+                & $module {
+                    param($files)
+                    foreach ($file in @($files)) {
+                        . $file
+                    }
+                } $supportFiles
+            }
+
             foreach ($file in @($supportFiles)) {
                 . $file
             }
@@ -49,9 +59,9 @@ return @{
                 'WaitActiveDisplays' { return Invoke-ParsecDisplayDomainWaitActiveDisplays -Arguments $Arguments -ExecutionResult $Prior -StateRoot $StateRoot }
                 'VerifyActiveDisplays' { return Invoke-ParsecDisplayDomainVerifyActiveDisplays -Arguments $Arguments -ExecutionResult $Prior -StateRoot $StateRoot }
                 'ResetActiveDisplays' { return Invoke-ParsecDisplayDomainResetActiveDisplays -Arguments $Arguments -ExecutionResult $Prior }
-                'CaptureScaling' { return Invoke-ParsecDisplayDomainCaptureScaling -Arguments $Arguments -StateRoot $StateRoot }
-                'ApplyScaling' { return Invoke-ParsecDisplayDomainApplyScaling -Arguments $Arguments -ExecutionResult $Prior }
-                'VerifyScaling' { return Invoke-ParsecDisplayDomainVerifyScaling -Arguments $Arguments -ExecutionResult $Prior }
+                'CaptureScaling' { return Invoke-ParsecDisplayDomainCaptureScaling -Arguments $Arguments }
+                'ApplyScaling' { return Invoke-ParsecDisplayDomainApplyScaling -Arguments $Arguments }
+                'VerifyScaling' { return Invoke-ParsecDisplayDomainVerifyScaling -Arguments $Arguments }
                 'ResetScaling' { return Invoke-ParsecDisplayDomainResetScaling -Arguments $Arguments -ExecutionResult $Prior }
                 'CaptureTextScale' { return Invoke-ParsecDisplayDomainCaptureTextScale }
                 'ApplyTextScale' { return Invoke-ParsecDisplayDomainApplyTextScale -Arguments $Arguments -ExecutionResult $Prior }

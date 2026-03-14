@@ -4,20 +4,6 @@ $supportFiles = @(
     (Join-Path -Path $PSScriptRoot -ChildPath 'Personalization.Domain.ps1')
 )
 
-$loadSupportFiles = {
-    param($files)
-    $module = $ExecutionContext.SessionState.Module
-    if ($null -ne $module) {
-        & $module {
-            param($innerFiles)
-            foreach ($file in @($innerFiles)) { . $file }
-        } $files
-        return
-    }
-
-    foreach ($file in @($files)) { . $file }
-}.GetNewClosure()
-
 return @{
     Name = 'personalization'
     Api = [pscustomobject]@{
@@ -30,7 +16,9 @@ return @{
                 [System.Collections.IDictionary] $RunState = @{}
             )
 
-            & $loadSupportFiles $supportFiles
+            foreach ($file in @($supportFiles)) {
+                . $file
+            }
 
             switch ($Method) {
                 'CaptureTheme' { return Get-ParsecThemeCaptureResult }

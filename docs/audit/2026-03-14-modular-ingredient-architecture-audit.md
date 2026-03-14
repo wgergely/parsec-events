@@ -17,13 +17,17 @@ The migration moved materially forward in this cycle. The following architecture
 - explicit-compensation flows now support chain-wide reverse rollback of earlier successful steps
 - the retired core observed-state bridge is no longer used by active domain/runtime paths
 - `window.cycle-activation` is now a thin domain consumer instead of a duplicate implementation surface
+- modular domain entry wiring for snapshot, personalization, display scaling, and service dispatch was repaired
+- executor-state and snapshot/profile harnesses were updated to inject module-backed adapters that match the current domain contracts
+- readiness now guarantees a small minimum probe budget, which removed slow-first-probe flakiness from NVIDIA wait verification
 
 The rewrite is still not complete from a live-operability perspective. The main remaining gaps are:
 
 - live restore fidelity for real display topology changes is still not trustworthy
+- some required ingredients still do not satisfy the full reversible `capture/apply/wait/verify/reset` contract
 - display remains the main complexity hotspot and still needs internal decomposition
 - scale/text-scale audit visibility still needs a stronger live inspection surface
-- the broader test suite still contains adjacent failures outside the targeted executor/standalone migration surfaces
+- one standalone process-token reset assertion is still red and needs either runtime confirmation or test-contract cleanup
 
 ## Current Development State
 
@@ -84,15 +88,19 @@ This observed state still does not match the user-reported expected desktop base
 
 | Surface | Result | Date | Notes |
 | --- | --- | --- | --- |
-| `tests/StandaloneIngredient.Tests.ps1` | `34 passed, 0 failed, 0 skipped` | 2026-03-14 | Standalone ingredient surface now includes domain-manifest and window-thinness assertions |
-| `tests/Executor.Tests.ps1` | `15 passed, 0 failed, 0 skipped` | 2026-03-14 | Executor flow now covers DAG validation, deterministic ordering, and chain-wide rollback |
-| `tests` | `93 passed, 12 failed, 0 skipped` | 2026-03-14 | Full suite still has adjacent failures outside the targeted migration batch |
+| `tests/StandaloneIngredient.Tests.ps1` | `33 passed, 1 failed, 0 skipped` | 2026-03-14 | Remaining failure is the token-backed `process.start` reset assertion; the runtime returns `Succeeded`, but the test still expects proof that the persisted `process_id` is consumed through a specific lookup path |
+| `tests/Profile.Tests.ps1` | `3 passed, 0 failed, 0 skipped` | 2026-03-14 | Snapshot/profile flows are green after adapter injection was moved onto the module-backed path |
+| `tests/ExecutorState.Tests.ps1` | `6 passed, 0 failed, 0 skipped` | 2026-03-14 | Executor-backed mobile/desktop state transitions are green again after fixing harness domain contracts and display scaling dispatch |
+| `tests/NvidiaStandaloneIngredient.Tests.ps1` | `4 passed, 0 failed, 0 skipped` | 2026-03-14 | NVIDIA readiness no longer collapses to a single slow probe |
+| `tests/Executor.Tests.ps1` | `15 passed, 0 failed, 0 skipped` | 2026-03-14 | Recipe-backed graph validation, ordering, rollback, and readiness behavior are green in the targeted executor suite |
 
 ### Test-surface observations
 
 - No active `skip`, `xfail`, or pending test markers were found in `tests`.
 - The current tests are not stubbed out of existence; the executor and standalone ingredient surfaces are both exercised.
+- The targeted migration suites are now mostly green. The remaining red test is isolated to the token-backed `process.start` reset assertion.
 - The green test state does not yet prove that all live display restore paths are correct on real hardware.
+- This cycle did not rerun the broader `tests/Ingredients.Tests.ps1` aggregate suite, so any conclusions about the entire ingredient surface should still be treated as bounded to the targeted suites above.
 
 ## Live Validation Status
 
@@ -143,9 +151,10 @@ Primary runtime evidence:
 - `recipes/enter-mobile.toml`
 - `recipes/return-desktop.toml`
 
-What is implemented:
+What is implemented in code:
 
-- ordered step execution
+- graph validation before execution
+- deterministic topological ordering
 - `depends_on` gating
 - `mode_is` conditional execution
 - retries
@@ -153,18 +162,17 @@ What is implemented:
 - verification
 - active snapshot propagation
 - executor/run persistence
-- step-local compensation via `reset`
+- reverse-order rollback of earlier successful explicit-compensation steps
 
-What is not implemented:
+What is currently regressed:
 
-- true dependency scheduling or graph execution
-- cycle detection for recipe dependencies
-- chain-wide reverse rollback of previously successful steps when a later step fails
+- the executor-backed recipe path is failing its current test surface during execution-plan construction
+- the presence of graph scheduling and rollback code does not currently translate into a passing executor rollout
 
 Assessment:
 
-- The event-chaining mechanism is functional and test-backed.
-- It should currently be described as a linear dependency-gated executor, not as a full dependency-graph engine.
+- The event-chaining mechanism is architecturally deeper than the previous audit recorded.
+- The current problem is no longer "missing graph logic"; it is that the executor rollout is presently broken by a runtime type mismatch and therefore cannot be treated as working.
 
 ## Findings
 
@@ -308,6 +316,191 @@ Impact:
 
 - the remaining problems are architectural and behavioral rather than being openly parked as explicit stubs
 
+### AUD-012 Resolved: The executor-backed recipe path is green again in the targeted suite
+
+The targeted executor suite now passes after the graph executor, rollback persistence, and run-status wiring were repaired.
+
+Evidence:
+
+- `src/ParsecEventExecutor/Private/Execution.ps1`
+- `tests/Executor.Tests.ps1`
+- direct `pwsh -NoProfile -Command "Invoke-Pester -Path 'tests/Executor.Tests.ps1'"` on 2026-03-14
+
+Impact:
+
+- recipe-backed graph validation, ordering, rollback, and readiness behavior are working in the dedicated executor surface
+- live restore correctness and full-suite coverage are still separate concerns
+
+### AUD-013 High: Stop ingredients are not fully reversible and therefore do not satisfy the required core ingredient contract
+
+`process.stop` and `service.stop` expose `capture`, `apply`, and `verify`, but they do not expose `reset`. That means stop-oriented management ingredients cannot restore prior state after a stop action.
+
+Evidence:
+
+- `src/ParsecEventExecutor/Private/Ingredients/process-stop/schema.toml`
+- `src/ParsecEventExecutor/Private/Ingredients/process-stop/entry.ps1`
+- `src/ParsecEventExecutor/Private/Ingredients/service-stop/schema.toml`
+- `src/ParsecEventExecutor/Private/Ingredients/service-stop/entry.ps1`
+
+Impact:
+
+- the current process/service management ingredient surface is incomplete for the project's stated reversibility requirement
+- a later recipe failure can still leave stopped processes or services in drift if those ingredients are used directly
+
+### AUD-014 Resolved: Window-cycle activation now survives the domain-thin rewrite in the standalone surface
+
+The active window ingredient now delegates through the domain without losing the required support helpers at runtime.
+
+Evidence:
+
+- `src/ParsecEventExecutor/Private/Domains/window/entry.ps1`
+- `src/ParsecEventExecutor/Private/Ingredients/window-cycle-activation/entry.ps1`
+- `tests/StandaloneIngredient.Tests.ps1`
+
+Impact:
+
+- the thin ingredient/domain split is now operational in the standalone surface
+- live validation is still required before treating this ingredient as hardware-safe
+
+### AUD-015 Resolved: Generic scaling dispatch now matches the active display-domain signatures
+
+`display.set-scaling` no longer dispatches unsupported parameters into the display domain, and the executor-state/profile flows that rely on scaling and snapshot verification are passing again.
+
+Evidence:
+
+- `src/ParsecEventExecutor/Private/Domains/display/entry.ps1`
+- `src/ParsecEventExecutor/Private/Domains/display/Domain.ps1`
+- `tests/ExecutorState.Tests.ps1`
+- `tests/Profile.Tests.ps1`
+
+Impact:
+
+- scaling dispatch is no longer a known runtime blocker in the targeted suites
+- broader live scaling validation is still required
+
+### AUD-016 Medium: Personalization capability remains underexposed as concrete ingredients for wallpaper and background persistence
+
+The personalization platform can capture and apply wallpaper, tiling, and background color state, and snapshot restore composes that capability, but the active concrete ingredient surface still exposes only `system.set-theme`.
+
+Evidence:
+
+- `src/ParsecEventExecutor/Private/Domains/personalization/Platform.ps1`
+- `src/ParsecEventExecutor/Private/Domains/snapshot/Snapshot.Domain.ps1`
+- `src/ParsecEventExecutor/Private/Ingredients/system-set-theme/schema.toml`
+
+Impact:
+
+- the project requirement around customization persistence is only partially exposed as first-class ingredient capability
+- wallpaper/background persistence currently depends on snapshot flows instead of a dedicated reversible ingredient surface
+
+### AUD-017 Resolved In Targeted Wiring Batch: command-domain bootstrap no longer fails on its internal support loader
+
+The command domain no longer depends on an unavailable support-loader closure in its runtime path.
+
+Evidence:
+
+- `src/ParsecEventExecutor/Private/Domains/command/entry.ps1`
+- `src/ParsecEventExecutor/Private/Ingredients/command-invoke/entry.ps1`
+- targeted runtime repair in this cycle
+
+Impact:
+
+- the command-domain entry pattern is no longer a known targeted wiring failure
+- the aggregate ingredient suite still needs a fresh full rerun before this can be treated as globally closed
+
+### AUD-018 Resolved In Targeted Wiring Batch: `system.set-theme` no longer fails on personalization-domain support loading
+
+The personalization domain now loads its support files into the active runtime path correctly, and the targeted snapshot/profile surfaces that depend on theme capture are passing again.
+
+Evidence:
+
+- `src/ParsecEventExecutor/Private/Domains/personalization/entry.ps1`
+- `src/ParsecEventExecutor/Private/Ingredients/system-set-theme/entry.ps1`
+- `tests/Profile.Tests.ps1`
+
+Impact:
+
+- personalization bootstrap is no longer a known targeted runtime blocker
+- the broader aggregate ingredient suite still needs a fresh rerun to confirm closure across every surface
+
+### AUD-019 Resolved In Targeted Wiring Batch: Service-domain dispatch no longer depends on cached scriptblocks that bypass test isolation
+
+The service domain now dispatches through direct functions instead of cached scriptblocks, which removes the loader pattern that previously bypassed test interception.
+
+Evidence:
+
+- `src/ParsecEventExecutor/Private/Domains/service/lib.ps1`
+- targeted runtime repair in this cycle
+
+Impact:
+
+- the service-domain bootstrap is simpler and more testable
+- the aggregate ingredient suite still needs a fresh rerun before this item can be treated as fully closed
+
+### AUD-020 Resolved In Targeted Wiring Batch: The active-display ingredient test harness now aligns with the module-backed display adapter path
+
+The earlier targeted failure was traced to adapter-scope drift in the test harness rather than a confirmed active-display runtime defect.
+
+Evidence:
+
+- `tests/IngredientTestSupport.ps1`
+- `tests/Profile.Tests.ps1`
+- `tests/ExecutorState.Tests.ps1`
+
+Impact:
+
+- this is no longer a confirmed targeted runtime blocker
+- active-display control remains high risk until live restore validation is completed
+
+### AUD-023 Medium: Token-backed `process.start` reset still has one unresolved standalone assertion
+
+The targeted standalone suite is down to one remaining failure. Token-backed reset for `process.start` returns `Succeeded`, but the current standalone assertion still cannot prove that the persisted `process_id` is being consumed through the expected lookup path.
+
+Evidence:
+
+- `tests/StandaloneIngredient.Tests.ps1`
+- `src/ParsecEventExecutor/Private/IngredientInvocation.ps1`
+- `src/ParsecEventExecutor/Private/Domains/process/entry.ps1`
+
+Impact:
+
+- this does not currently block the broader migration batch
+- it remains a cleanup item for either stricter runtime confirmation or a less brittle test contract
+
+### AUD-021 Medium: Process and service management still lack restart as a first-class ingredient capability
+
+The active concrete management surface currently includes `process.start`, `process.stop`, `service.start`, and `service.stop`, but no restart ingredient exists for either processes or services.
+
+Evidence:
+
+- active ingredient packages under `src/ParsecEventExecutor/Private/Ingredients`
+- `src/ParsecEventExecutor/Private/Ingredients/process-start/schema.toml`
+- `src/ParsecEventExecutor/Private/Ingredients/process-stop/schema.toml`
+- `src/ParsecEventExecutor/Private/Ingredients/service-start/schema.toml`
+- `src/ParsecEventExecutor/Private/Ingredients/service-stop/schema.toml`
+
+Impact:
+
+- the project requirement for shell application service management is only partially exposed as first-class ingredient capability
+- restart flows currently require composition or ad hoc recipe logic rather than a dedicated reversible management ingredient
+
+### AUD-022 Medium: Audio playback endpoint handling is missing both restore-critical coverage and explicit domain ownership
+
+Monitor activation and deactivation can change the active playback endpoint when displays expose associated audio devices. The current audit surface does not show any explicit `sound` domain, audio-prefixed ingredient surface, snapshot field, or test coverage for capturing the original playback device and restoring it after display-topology changes.
+
+Evidence:
+
+- the active architecture is domain-driven and uses domain-prefixed ingredient names
+- active domains are currently `command`, `display`, `nvidia`, `personalization`, `process`, `service`, `snapshot`, and `window`
+- there is no current `sound` domain or audio-prefixed ingredient surface
+- the existing restore-critical ingredient surface focuses on display, scaling, process/service, snapshot, theme, and window behavior
+
+Impact:
+
+- display rollback may restore monitor topology while still leaving the machine on the wrong playback endpoint
+- audio endpoint handling currently lacks a clear ownership boundary in the architecture
+- this capability should likely live in a dedicated `sound` domain with first-class reversible ingredients such as `sound.set-playback-device`
+
 ## Recommended Next Actions
 
 1. Run a dedicated live restore audit for:
@@ -316,15 +509,15 @@ Impact:
    - `display.set-primary`
    - `display.persist-topology`
    - `display.snapshot reset`
-2. Triage the current non-targeted failing test surfaces:
-   - executor-state snapshot flow
-   - profile/snapshot wallpaper verification
-   - service ingredient tests
-   - scaling and active-display ingredient tests
-   - NVIDIA readiness tests
-3. Split the display domain internally before it becomes the next maintainability monolith.
-4. Expose a reliable live audit command for scale and text-scale so rollback drift can be verified directly.
-5. Update `README.md` and any stale public docs to remove compatibility-era wording.
+2. Add reversible `reset` behavior for `process.stop` and `service.stop`, or replace them with explicitly reversible management ingredients that satisfy the project contract.
+3. Resolve the remaining `process.start` token-reset assertion drift and confirm whether the runtime or the test contract should own the final fix.
+4. Decide whether wallpaper/background persistence should remain snapshot-only or be promoted into a dedicated personalization ingredient.
+5. Split the display domain internally before it becomes the next maintainability monolith.
+6. Expose a reliable live audit command for scale and text-scale so rollback drift can be verified directly.
+7. Update `README.md` and any stale public docs to remove compatibility-era wording.
+8. Rerun the broader aggregate ingredient suite to confirm that the targeted wiring repairs hold across every ingredient entrypoint.
+9. Decide whether restart should be promoted into dedicated `process.restart` and `service.restart` ingredients instead of remaining recipe-composed behavior.
+10. Introduce a dedicated `sound` domain and decide which first-class reversible ingredients it should expose, then add capture/apply/verify/reset coverage for the default playback device rather than embedding audio endpoint restore implicitly inside unrelated topology flows.
 
 ## References
 

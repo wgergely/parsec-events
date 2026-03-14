@@ -23,21 +23,20 @@ return @{
                 [System.Collections.IDictionary] $RunState = @{}
             )
 
-            $module = $ExecutionContext.SessionState.Module
-            if ($null -ne $module) {
-                return & $module {
-                    param($innerFiles, $innerMethod, $innerArguments, $innerStateRoot)
-                    foreach ($file in @($innerFiles)) {
-                        . $file
-                    }
+            if (-not (Get-Command -Name 'Invoke-ParsecNvidiaDomain' -ErrorAction SilentlyContinue)) {
+                $module = Get-Module -Name 'ParsecEventExecutor'
+                if ($null -ne $module) {
+                    & $module {
+                        param($files)
+                        foreach ($file in @($files)) {
+                            . $file
+                        }
+                    } $supportFiles
+                }
 
-                    switch ($innerMethod) {
-                        'ApplyCustomResolution' { return Invoke-ParsecNvidiaDomain -Method 'ApplyCustomResolution' -Arguments $innerArguments -StateRoot $innerStateRoot }
-                        'WaitCustomResolution' { return Invoke-ParsecNvidiaDomain -Method 'WaitForCustomResolution' -Arguments $innerArguments -StateRoot $innerStateRoot }
-                        'VerifyCustomResolution' { return Invoke-ParsecNvidiaDomain -Method 'VerifyCustomResolution' -Arguments $innerArguments -StateRoot $innerStateRoot }
-                        default { throw "NVIDIA domain method '$innerMethod' is not available." }
-                    }
-                } $supportFiles $Method $Arguments $StateRoot
+                foreach ($file in @($supportFiles)) {
+                    . $file
+                }
             }
 
             switch ($Method) {

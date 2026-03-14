@@ -38,6 +38,12 @@ Describe 'Executor state entrypoints' {
                         bounds = [ordered]@{ x = 0; y = 0; width = 1920; height = 1080 }
                         working_area = [ordered]@{ x = 0; y = 0; width = 1920; height = 1040 }
                         orientation = 'Landscape'
+                        display = [ordered]@{
+                            width = 1920
+                            height = 1080
+                            scale_percent = 100
+                            text_scale_percent = 100
+                        }
                     }
                 )
                 scaling = [ordered]@{ status = 'Captured'; ui_scale_percent = 100; text_scale_percent = 100; monitors = @() }
@@ -89,12 +95,21 @@ Describe 'Executor state entrypoints' {
                     $script:ExecutorObservedState.wallpaper = $wallpaperState
                     New-ParsecResult -Status 'Succeeded' -Message 'wallpaper' -Observed $wallpaperState -Outputs @{ wallpaper_state = $wallpaperState }
                 }
+                SetUiScale = {
+                    param($Arguments)
+                    $value = if ($Arguments.ContainsKey('ui_scale_percent')) { [int] $Arguments.ui_scale_percent } elseif ($Arguments.ContainsKey('scale_percent')) { [int] $Arguments.scale_percent } else { [int] $Arguments.value }
+                    $script:ExecutorUiScalePercent = $value
+                    $script:ExecutorObservedState.scaling.ui_scale_percent = $value
+                    $script:ExecutorObservedState.monitors[0].display.scale_percent = $value
+                    New-ParsecResult -Status 'Succeeded' -Message 'ui-scale' -Observed @{ ui_scale_percent = $value } -Outputs @{ ui_scale_percent = $value; requires_signout = $true }
+                }
                 SetTextScale = {
                     param($Arguments)
                     $value = if ($Arguments.ContainsKey('text_scale_percent')) { [int] $Arguments.text_scale_percent } else { [int] $Arguments.value }
                     $script:ExecutorTextScalePercent = $value
                     $script:ExecutorObservedState.font_scaling.text_scale_percent = $value
                     $script:ExecutorObservedState.scaling.text_scale_percent = $value
+                    $script:ExecutorObservedState.monitors[0].display.text_scale_percent = $value
                     New-ParsecResult -Status 'Succeeded' -Message 'text-scale' -Observed @{ text_scale_percent = $value } -Outputs @{ text_scale_percent = $value }
                 }
             }
@@ -103,6 +118,12 @@ Describe 'Executor state entrypoints' {
                 GetObservedState = {
                     $script:ExecutorObservedState.captured_at = [DateTimeOffset]::UtcNow.ToString('o')
                     return $script:ExecutorObservedState
+                }
+                GetSupportedModes = {
+                    @(
+                        [ordered]@{ width = 1920; height = 1080; bits_per_pel = 32; refresh_rate_hz = 60; orientation = 'Landscape' },
+                        [ordered]@{ width = 2000; height = 3000; bits_per_pel = 32; refresh_rate_hz = 60; orientation = 'Portrait' }
+                    )
                 }
                 SetEnabled = {
                     param($Arguments)
@@ -120,6 +141,8 @@ Describe 'Executor state entrypoints' {
                     $monitor = $script:ExecutorObservedState.monitors[0]
                     $monitor.bounds.width = [int] $Arguments.width
                     $monitor.bounds.height = [int] $Arguments.height
+                    $monitor.display.width = [int] $Arguments.width
+                    $monitor.display.height = [int] $Arguments.height
                     New-ParsecResult -Status 'Succeeded' -Message 'resolution' -Requested $Arguments
                 }
                 SetOrientation = {
@@ -132,15 +155,20 @@ Describe 'Executor state entrypoints' {
                     if ($Arguments.ContainsKey('ui_scale_percent')) {
                         $script:ExecutorUiScalePercent = [int] $Arguments.ui_scale_percent
                         $script:ExecutorObservedState.scaling.ui_scale_percent = [int] $Arguments.ui_scale_percent
+                        $script:ExecutorObservedState.monitors[0].display.scale_percent = [int] $Arguments.ui_scale_percent
                     }
                     elseif ($Arguments.ContainsKey('text_scale_percent')) {
                         $script:ExecutorTextScalePercent = [int] $Arguments.text_scale_percent
                         $script:ExecutorObservedState.font_scaling.text_scale_percent = [int] $Arguments.text_scale_percent
                         $script:ExecutorObservedState.scaling.text_scale_percent = [int] $Arguments.text_scale_percent
+                        $script:ExecutorObservedState.monitors[0].display.text_scale_percent = [int] $Arguments.text_scale_percent
                     }
                     New-ParsecResult -Status 'Succeeded' -Message 'scaling' -Requested $Arguments
                 }
             }
+
+            Set-ParsecModuleVariableValue -Name 'ParsecPersonalizationAdapter' -Value $script:ParsecPersonalizationAdapter | Out-Null
+            Set-ParsecModuleVariableValue -Name 'ParsecDisplayAdapter' -Value $script:ParsecDisplayAdapter | Out-Null
         }
 
         It 'captures a transient snapshot when switching to mobile' {
