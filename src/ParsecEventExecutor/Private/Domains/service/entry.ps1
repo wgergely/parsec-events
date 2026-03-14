@@ -1,5 +1,7 @@
-$domainFile = Join-Path -Path $PSScriptRoot -ChildPath 'lib.ps1'
-. $domainFile
+$supportFiles = @(
+    (Join-Path -Path (Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent) -ChildPath 'Core\HostSupport.ps1'),
+    (Join-Path -Path $PSScriptRoot -ChildPath 'lib.ps1')
+)
 
 return @{
     Name = 'service'
@@ -7,8 +9,15 @@ return @{
         Invoke = {
             param(
                 [string] $Method,
-                [System.Collections.IDictionary] $Arguments = @{}
+                [System.Collections.IDictionary] $Arguments = @{},
+                $Prior,
+                [string] $StateRoot = (Get-ParsecDefaultStateRoot),
+                [System.Collections.IDictionary] $RunState = @{}
             )
+
+            foreach ($file in @($supportFiles)) {
+                . $file
+            }
 
             switch ($Method) {
                 'Capture' { return Invoke-ParsecServiceDomain -Method 'Capture' -Arguments $Arguments }
@@ -18,6 +27,6 @@ return @{
                 'VerifyStopped' { return Invoke-ParsecServiceDomain -Method 'VerifyStopped' -Arguments $Arguments }
                 default { throw "Service domain method '$Method' is not available." }
             }
-        }
+        }.GetNewClosure()
     }
 }

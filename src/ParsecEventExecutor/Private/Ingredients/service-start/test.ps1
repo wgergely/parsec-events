@@ -9,8 +9,8 @@ Context 'service.start' {
             }
         } -ParameterFilter { $Name -eq 'Spooler' }
 
-        $start = Invoke-ParsecIngredientOperation -Name 'service.start' -Operation 'apply' -Arguments @{ service_name = 'Spooler' } -RunState @{}
-        $verify = Invoke-ParsecIngredientOperation -Name 'service.start' -Operation 'verify' -Arguments @{ service_name = 'Spooler' } -ExecutionResult $start -RunState @{}
+        $start = Invoke-ParsecCoreIngredientOperation -Name 'service.start' -Operation 'apply' -Arguments @{ service_name = 'Spooler' } -RunState @{}
+        $verify = Invoke-ParsecCoreIngredientOperation -Name 'service.start' -Operation 'verify' -Arguments @{ service_name = 'Spooler' } -Prior $start -RunState @{}
 
         $start.Status | Should -Be 'Succeeded'
         $verify.Status | Should -Be 'Succeeded'
@@ -25,7 +25,7 @@ Context 'service.start' {
             }
         } -ParameterFilter { $Name -eq 'Spooler' }
 
-        $capture = Invoke-ParsecIngredientOperation -Name 'service.start' -Operation 'capture' -Arguments @{
+        $capture = Invoke-ParsecCoreIngredientOperation -Name 'service.start' -Operation 'capture' -Arguments @{
             service_name = 'Spooler'
         } -RunState @{}
 
