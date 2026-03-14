@@ -11,8 +11,23 @@ function Initialize-ParsecProcessDomain {
             param([hashtable] $Arguments, $ExecutionResult)
 
             $processId = $null
-            if ($null -ne $ExecutionResult -and $null -ne $ExecutionResult.Outputs -and $ExecutionResult.Outputs.process_id) {
-                $processId = [int] $ExecutionResult.Outputs.process_id
+            $executionOutputs = $null
+            if ($ExecutionResult -is [System.Collections.IDictionary]) {
+                if ($ExecutionResult.Contains('Outputs')) {
+                    $executionOutputs = $ExecutionResult['Outputs']
+                }
+            }
+            elseif ($null -ne $ExecutionResult -and $ExecutionResult.PSObject.Properties.Name -contains 'Outputs') {
+                $executionOutputs = $ExecutionResult.Outputs
+            }
+
+            if ($executionOutputs -is [System.Collections.IDictionary]) {
+                if ($executionOutputs.Contains('process_id') -and $null -ne $executionOutputs.process_id) {
+                    $processId = [int] $executionOutputs.process_id
+                }
+            }
+            elseif ($null -ne $executionOutputs -and $executionOutputs.PSObject.Properties.Name -contains 'process_id' -and $null -ne $executionOutputs.process_id) {
+                $processId = [int] $executionOutputs.process_id
             }
             elseif ($Arguments.ContainsKey('process_id')) {
                 $processId = [int] $Arguments.process_id
