@@ -5,8 +5,8 @@ Context 'display.ensure-resolution' {
             [ordered]@{ width = 2000; height = 3000; refresh_rate_hz = 60; bits_per_pel = 32; orientation = 'Portrait' }
         )
 
-        $capture = Invoke-ParsecIngredientOperation -Name 'display.ensure-resolution' -Operation 'capture' -Arguments @{} -RunState @{}
-        $apply = Invoke-ParsecIngredientOperation -Name 'display.ensure-resolution' -Operation 'apply' -Arguments @{
+        $capture = Invoke-ParsecCoreIngredientOperation -Name 'display.ensure-resolution' -Operation 'capture' -Arguments @{} -RunState @{}
+        $apply = Invoke-ParsecCoreIngredientOperation -Name 'display.ensure-resolution' -Operation 'apply' -Arguments @{
             width       = 2000
             height      = 3000
             orientation = 'Portrait'

@@ -1,6 +1,6 @@
 Context 'display.set-primary' {
     It 'captures primary-display state for a target monitor' {
-        $capture = Invoke-ParsecIngredientOperation -Name 'display.set-primary' -Operation 'capture' -Arguments @{
+        $capture = Invoke-ParsecCoreIngredientOperation -Name 'display.set-primary' -Operation 'capture' -Arguments @{
             device_name = '\\.\DISPLAY1'
         } -RunState @{}
 
@@ -10,10 +10,10 @@ Context 'display.set-primary' {
     }
 
     It 'resets primary-display state from captured state' {
-        $capture = Invoke-ParsecIngredientOperation -Name 'display.set-primary' -Operation 'capture' -Arguments @{
+        $capture = Invoke-ParsecCoreIngredientOperation -Name 'display.set-primary' -Operation 'capture' -Arguments @{
             device_name = '\\.\DISPLAY1'
         } -RunState @{}
-        $reset = Invoke-ParsecIngredientOperation -Name 'display.set-primary' -Operation 'reset' -Arguments @{} -ExecutionResult $capture -RunState @{}
+        $reset = Invoke-ParsecCoreIngredientOperation -Name 'display.set-primary' -Operation 'reset' -Arguments @{} -Prior $capture -RunState @{}
 
         $reset.Status | Should -Be 'Succeeded'
         $reset.Requested.device_name | Should -Be '\\.\DISPLAY1'

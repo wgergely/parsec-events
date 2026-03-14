@@ -1,6 +1,6 @@
 Context 'display.persist-topology' {
     It 'captures and restores topology without touching theme or scaling' {
-        $capture = Invoke-ParsecIngredientOperation -Name 'display.persist-topology' -Operation 'capture' -Arguments @{
+        $capture = Invoke-ParsecCoreIngredientOperation -Name 'display.persist-topology' -Operation 'capture' -Arguments @{
             snapshot_name = 'topology-fixture'
         } -StateRoot $TestDrive -RunState @{}
 
@@ -12,11 +12,11 @@ Context 'display.persist-topology' {
         $script:IngredientObservedState.monitors[0].display.height = 720
         $script:IngredientObservedState.monitors[0].orientation = 'Portrait'
 
-        $reset = Invoke-ParsecIngredientOperation -Name 'display.persist-topology' -Operation 'reset' -Arguments @{
+        $reset = Invoke-ParsecCoreIngredientOperation -Name 'display.persist-topology' -Operation 'reset' -Arguments @{
             snapshot_name = 'topology-fixture'
         } -StateRoot $TestDrive -RunState @{}
 
-        $verify = Invoke-ParsecIngredientOperation -Name 'display.persist-topology' -Operation 'verify' -Arguments @{
+        $verify = Invoke-ParsecCoreIngredientOperation -Name 'display.persist-topology' -Operation 'verify' -Arguments @{
             snapshot_name = 'topology-fixture'
         } -StateRoot $TestDrive -RunState @{}
 

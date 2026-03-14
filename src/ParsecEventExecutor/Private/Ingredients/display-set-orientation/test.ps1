@@ -1,6 +1,6 @@
 Context 'display.set-orientation' {
     It 'captures orientation for a target monitor' {
-        $capture = Invoke-ParsecIngredientOperation -Name 'display.set-orientation' -Operation 'capture' -Arguments @{
+        $capture = Invoke-ParsecCoreIngredientOperation -Name 'display.set-orientation' -Operation 'capture' -Arguments @{
             device_name = '\\.\DISPLAY1'
         } -RunState @{}
 
@@ -9,10 +9,10 @@ Context 'display.set-orientation' {
     }
 
     It 'resets orientation from captured state' {
-        $capture = Invoke-ParsecIngredientOperation -Name 'display.set-orientation' -Operation 'capture' -Arguments @{
+        $capture = Invoke-ParsecCoreIngredientOperation -Name 'display.set-orientation' -Operation 'capture' -Arguments @{
             device_name = '\\.\DISPLAY1'
         } -RunState @{}
-        $reset = Invoke-ParsecIngredientOperation -Name 'display.set-orientation' -Operation 'reset' -Arguments @{} -ExecutionResult $capture -RunState @{}
+        $reset = Invoke-ParsecCoreIngredientOperation -Name 'display.set-orientation' -Operation 'reset' -Arguments @{} -Prior $capture -RunState @{}
 
         $reset.Status | Should -Be 'Succeeded'
         $reset.Requested.device_name | Should -Be '\\.\DISPLAY1'

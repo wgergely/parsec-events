@@ -1,7 +1,7 @@
 Context 'display.set-resolution' {
     It 'captures resolution state for a mutating monitor ingredient' {
         $ingredient = Get-ParsecIngredient -Name 'display.set-resolution'
-        $capture = Invoke-ParsecIngredientOperation -Name 'display.set-resolution' -Operation 'capture' -Arguments @{
+        $capture = Invoke-ParsecCoreIngredientOperation -Name 'display.set-resolution' -Operation 'capture' -Arguments @{
             device_name = '\\.\DISPLAY1'
         } -RunState @{}
 
@@ -14,10 +14,10 @@ Context 'display.set-resolution' {
     }
 
     It 'resets resolution from captured state' {
-        $capture = Invoke-ParsecIngredientOperation -Name 'display.set-resolution' -Operation 'capture' -Arguments @{
+        $capture = Invoke-ParsecCoreIngredientOperation -Name 'display.set-resolution' -Operation 'capture' -Arguments @{
             device_name = '\\.\DISPLAY1'
         } -RunState @{}
-        $reset = Invoke-ParsecIngredientOperation -Name 'display.set-resolution' -Operation 'reset' -Arguments @{} -ExecutionResult $capture -RunState @{}
+        $reset = Invoke-ParsecCoreIngredientOperation -Name 'display.set-resolution' -Operation 'reset' -Arguments @{} -Prior $capture -RunState @{}
 
         $reset.Status | Should -Be 'Succeeded'
         $reset.Requested.device_name | Should -Be '\\.\DISPLAY1'

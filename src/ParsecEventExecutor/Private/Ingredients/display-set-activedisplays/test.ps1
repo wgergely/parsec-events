@@ -2,15 +2,15 @@ Context 'display.set-activedisplays' {
     It 'captures and restores the active display topology' {
         Enable-ParsecIngredientDualMonitorEnvironment
 
-        $capture = Invoke-ParsecIngredientOperation -Name 'display.set-activedisplays' -Operation 'capture' -Arguments @{
+        $capture = Invoke-ParsecCoreIngredientOperation -Name 'display.set-activedisplays' -Operation 'capture' -Arguments @{
             screen_ids = @(1)
         } -RunState @{}
 
-        $apply = Invoke-ParsecIngredientOperation -Name 'display.set-activedisplays' -Operation 'apply' -Arguments @{
+        $apply = Invoke-ParsecCoreIngredientOperation -Name 'display.set-activedisplays' -Operation 'apply' -Arguments @{
             screen_ids = @(1)
         } -RunState @{}
 
-        $reset = Invoke-ParsecIngredientOperation -Name 'display.set-activedisplays' -Operation 'reset' -Arguments @{} -ExecutionResult $capture -RunState @{}
+        $reset = Invoke-ParsecCoreIngredientOperation -Name 'display.set-activedisplays' -Operation 'reset' -Arguments @{} -Prior $capture -RunState @{}
 
         $capture.Status | Should -Be 'Succeeded'
         $apply.Status | Should -Be 'Succeeded'
@@ -20,7 +20,7 @@ Context 'display.set-activedisplays' {
     }
 
     It 'fails when a requested screen id cannot be resolved' {
-        $result = Invoke-ParsecIngredientOperation -Name 'display.set-activedisplays' -Operation 'apply' -Arguments @{
+        $result = Invoke-ParsecCoreIngredientOperation -Name 'display.set-activedisplays' -Operation 'apply' -Arguments @{
             screen_ids = @(99)
         } -RunState @{}
 

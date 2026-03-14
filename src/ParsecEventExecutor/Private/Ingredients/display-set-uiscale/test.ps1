@@ -1,14 +1,14 @@
 Context 'display.set-uiscale' {
     It 'captures UI scaling state' {
-        $capture = Invoke-ParsecIngredientOperation -Name 'display.set-uiscale' -Operation 'capture' -Arguments @{} -RunState @{}
+        $capture = Invoke-ParsecCoreIngredientOperation -Name 'display.set-uiscale' -Operation 'capture' -Arguments @{} -RunState @{}
 
         $capture.Status | Should -Be 'Succeeded'
         $capture.Outputs.captured_state.ui_scale_percent | Should -Be 150
     }
 
     It 'resets UI scaling from captured state' {
-        $capture = Invoke-ParsecIngredientOperation -Name 'display.set-uiscale' -Operation 'capture' -Arguments @{} -RunState @{}
-        $reset = Invoke-ParsecIngredientOperation -Name 'display.set-uiscale' -Operation 'reset' -Arguments @{} -ExecutionResult $capture -RunState @{}
+        $capture = Invoke-ParsecCoreIngredientOperation -Name 'display.set-uiscale' -Operation 'capture' -Arguments @{} -RunState @{}
+        $reset = Invoke-ParsecCoreIngredientOperation -Name 'display.set-uiscale' -Operation 'reset' -Arguments @{} -Prior $capture -RunState @{}
 
         $reset.Status | Should -Be 'Succeeded'
         $reset.Outputs.ui_scale_percent | Should -Be 150
@@ -18,15 +18,15 @@ Context 'display.set-uiscale' {
         $script:IngredientUiScaleMinimum = 100
         $script:IngredientUiScaleMaximum = 125
 
-        $apply = Invoke-ParsecIngredientOperation -Name 'display.set-uiscale' -Operation 'apply' -Arguments @{
+        $apply = Invoke-ParsecCoreIngredientOperation -Name 'display.set-uiscale' -Operation 'apply' -Arguments @{
             ui_scale_percent = 80
         } -RunState @{}
-        $wait = Invoke-ParsecIngredientOperation -Name 'display.set-uiscale' -Operation 'wait' -Arguments @{
+        $wait = Invoke-ParsecCoreIngredientOperation -Name 'display.set-uiscale' -Operation 'wait' -Arguments @{
             ui_scale_percent = 80
-        } -ExecutionResult $apply -RunState @{}
-        $verify = Invoke-ParsecIngredientOperation -Name 'display.set-uiscale' -Operation 'verify' -Arguments @{
+        } -Prior $apply -RunState @{}
+        $verify = Invoke-ParsecCoreIngredientOperation -Name 'display.set-uiscale' -Operation 'verify' -Arguments @{
             ui_scale_percent = 80
-        } -ExecutionResult $apply -RunState @{}
+        } -Prior $apply -RunState @{}
 
         $apply.Status | Should -Be 'Succeeded'
         $apply.Outputs.ui_scale_percent | Should -Be 100
