@@ -1,11 +1,11 @@
 Context 'nvidia.add-custom-resolution' {
     It 'adds a custom resolution through the NVIDIA adapter' {
-        $apply = Invoke-ParsecIngredientOperation -Name 'nvidia.add-custom-resolution' -Operation 'apply' -Arguments @{
+        $apply = Invoke-ParsecCoreIngredientOperation -Name 'nvidia.add-custom-resolution' -Operation 'apply' -Arguments @{
             width = 2000
             height = 1125
         } -RunState @{}
 
-        $verify = Invoke-ParsecIngredientOperation -Name 'nvidia.add-custom-resolution' -Operation 'verify' -Arguments @{
+        $verify = Invoke-ParsecCoreIngredientOperation -Name 'nvidia.add-custom-resolution' -Operation 'verify' -Arguments @{
             width = 2000
             height = 1125
         } -RunState @{}
@@ -23,7 +23,7 @@ Context 'nvidia.add-custom-resolution' {
     It 'reports capability unavailable when the NVIDIA adapter is absent' {
         $script:IngredientNvidiaAvailable = $false
 
-        $apply = Invoke-ParsecIngredientOperation -Name 'nvidia.add-custom-resolution' -Operation 'apply' -Arguments @{
+        $apply = Invoke-ParsecCoreIngredientOperation -Name 'nvidia.add-custom-resolution' -Operation 'apply' -Arguments @{
             width = 2000
             height = 3000
         } -RunState @{}
@@ -33,7 +33,7 @@ Context 'nvidia.add-custom-resolution' {
     }
 
     It 'fails early when the requested orientation does not match the monitor orientation' {
-        $apply = Invoke-ParsecIngredientOperation -Name 'nvidia.add-custom-resolution' -Operation 'apply' -Arguments @{
+        $apply = Invoke-ParsecCoreIngredientOperation -Name 'nvidia.add-custom-resolution' -Operation 'apply' -Arguments @{
             width = 1125
             height = 2000
         } -RunState @{}
@@ -45,7 +45,7 @@ Context 'nvidia.add-custom-resolution' {
     It 'accepts flipped monitor orientations when the orientation class matches' {
         $script:IngredientObservedState.monitors[0].orientation = 'LandscapeFlipped'
 
-        $apply = Invoke-ParsecIngredientOperation -Name 'nvidia.add-custom-resolution' -Operation 'apply' -Arguments @{
+        $apply = Invoke-ParsecCoreIngredientOperation -Name 'nvidia.add-custom-resolution' -Operation 'apply' -Arguments @{
             width = 2000
             height = 1125
         } -RunState @{}
@@ -57,12 +57,12 @@ Context 'nvidia.add-custom-resolution' {
     It 'fails wait and verify with capability unavailable when NVIDIA support is absent' {
         $script:IngredientNvidiaAvailable = $false
 
-        $wait = Invoke-ParsecIngredientOperation -Name 'nvidia.add-custom-resolution' -Operation 'wait' -Arguments @{
+        $wait = Invoke-ParsecCoreIngredientOperation -Name 'nvidia.add-custom-resolution' -Operation 'wait' -Arguments @{
             width = 2000
             height = 1125
         } -RunState @{}
 
-        $verify = Invoke-ParsecIngredientOperation -Name 'nvidia.add-custom-resolution' -Operation 'verify' -Arguments @{
+        $verify = Invoke-ParsecCoreIngredientOperation -Name 'nvidia.add-custom-resolution' -Operation 'verify' -Arguments @{
             width = 2000
             height = 1125
         } -RunState @{}
