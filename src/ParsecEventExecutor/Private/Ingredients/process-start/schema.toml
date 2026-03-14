@@ -1,4 +1,5 @@
 name = "process.start"
+domain = "process"
 kind = "process"
 description = "Start a process and capture its id."
 capabilities = ["capture", "apply", "verify", "reset"]

@@ -1,4 +1,5 @@
 name = "process.stop"
+domain = "process"
 kind = "process"
 description = "Stop a running process."
 capabilities = ["capture", "apply", "verify"]

@@ -1,4 +1,5 @@
 name = "command.invoke"
+domain = "command"
 kind = "command"
 description = "Run an external command and capture stdout, stderr, and exit code."
 capabilities = ["apply"]

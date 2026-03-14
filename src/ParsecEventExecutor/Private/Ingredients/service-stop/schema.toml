@@ -1,4 +1,5 @@
 name = "service.stop"
+domain = "service"
 kind = "service"
 description = "Stop a Windows service."
 capabilities = ["capture", "apply", "verify"]
