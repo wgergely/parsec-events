@@ -1,5 +1,22 @@
-$domainFile = Join-Path -Path $PSScriptRoot -ChildPath 'Personalization.Domain.ps1'
-. $domainFile
+$supportFiles = @(
+    (Join-Path -Path (Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent) -ChildPath 'Core\HostSupport.ps1'),
+    (Join-Path -Path $PSScriptRoot -ChildPath 'Platform.ps1'),
+    (Join-Path -Path $PSScriptRoot -ChildPath 'Personalization.Domain.ps1')
+)
+
+$loadSupportFiles = {
+    param($files)
+    $module = $ExecutionContext.SessionState.Module
+    if ($null -ne $module) {
+        & $module {
+            param($innerFiles)
+            foreach ($file in @($innerFiles)) { . $file }
+        } $files
+        return
+    }
+
+    foreach ($file in @($files)) { . $file }
+}.GetNewClosure()
 
 return @{
     Name = 'personalization'
@@ -9,8 +26,11 @@ return @{
                 [string] $Method,
                 [System.Collections.IDictionary] $Arguments = @{},
                 $Prior,
-                [string] $StateRoot = (Get-ParsecDefaultStateRoot)
+                [string] $StateRoot = (Get-ParsecDefaultStateRoot),
+                [System.Collections.IDictionary] $RunState = @{}
             )
+
+            & $loadSupportFiles $supportFiles
 
             switch ($Method) {
                 'CaptureTheme' { return Get-ParsecThemeCaptureResult }
@@ -29,6 +49,6 @@ return @{
                 'ResetUiScale' { return Invoke-ParsecUiScaleReset -Arguments $Arguments -ExecutionResult $Prior }
                 default { throw "Personalization domain method '$Method' is not available." }
             }
-        }
+        }.GetNewClosure()
     }
 }

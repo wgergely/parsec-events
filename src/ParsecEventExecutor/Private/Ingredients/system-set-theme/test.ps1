@@ -1,9 +1,9 @@
 Context 'system.set-theme' {
     It 'captures and restores theme through the theme ingredient' {
-        $capture = Invoke-ParsecIngredientOperation -Name 'system.set-theme' -Operation 'capture' -Arguments @{} -RunState @{}
-        $apply = Invoke-ParsecIngredientOperation -Name 'system.set-theme' -Operation 'apply' -Arguments @{ mode = 'Dark' } -RunState @{}
-        $verify = Invoke-ParsecIngredientOperation -Name 'system.set-theme' -Operation 'verify' -Arguments @{ mode = 'Dark' } -RunState @{}
-        $reset = Invoke-ParsecIngredientOperation -Name 'system.set-theme' -Operation 'reset' -Arguments @{ captured_state = $capture.Outputs.captured_state } -RunState @{}
+        $capture = Invoke-ParsecCoreIngredientOperation -Name 'system.set-theme' -Operation 'capture' -Arguments @{} -RunState @{}
+        $apply = Invoke-ParsecCoreIngredientOperation -Name 'system.set-theme' -Operation 'apply' -Arguments @{ mode = 'Dark' } -RunState @{}
+        $verify = Invoke-ParsecCoreIngredientOperation -Name 'system.set-theme' -Operation 'verify' -Arguments @{ mode = 'Dark' } -RunState @{}
+        $reset = Invoke-ParsecCoreIngredientOperation -Name 'system.set-theme' -Operation 'reset' -Arguments @{ captured_state = $capture.Outputs.captured_state } -RunState @{}
 
         $capture.Status | Should -Be 'Succeeded'
         $capture.Outputs.captured_state.mode | Should -Be 'Dark'
