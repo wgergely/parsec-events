@@ -1,5 +1,6 @@
 name = "display.persist-topology"
 aliases = ["persist-topology"]
+domain = "display"
 kind = "display"
 description = "Capture, restore, or verify monitor topology and layout without touching theme or scaling."
 capabilities = ["capture", "reset", "verify"]

@@ -1,4 +1,5 @@
 name = "display.set-scaling"
+domain = "display"
 kind = "display"
 description = "Set display or font scaling."
 capabilities = ["capture", "apply", "verify", "reset"]
