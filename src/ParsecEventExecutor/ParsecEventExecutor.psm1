@@ -8,7 +8,6 @@ $privateLoadOrder = @(
     'Toml.ps1',
     'State.ps1',
     'NvidiaInterop.ps1',
-    'IngredientRuntime.ps1',
     'IngredientInvocation.ps1',
     'Execution.ps1'
 )
@@ -23,7 +22,6 @@ if (Test-Path -LiteralPath $coreRoot) {
     foreach ($coreFile in @(Get-ParsecCoreLoadOrder)) {
         . (Join-Path -Path $coreRoot -ChildPath $coreFile)
     }
-    . (Join-Path -Path $coreRoot -ChildPath 'Compat.ps1')
 }
 
 Get-ChildItem -Path $publicRoot -Filter '*.ps1' -File | Sort-Object Name | ForEach-Object {
@@ -42,4 +40,4 @@ if (-not (Get-Variable -Name ParsecStatusSuccessSet -Scope Script -ErrorAction S
     $script:ParsecStatusSuccessSet = @('Succeeded', 'SucceededWithDrift', 'Compensated')
 }
 
-Initialize-ParsecIngredientRegistry
+Initialize-ParsecCoreRuntime

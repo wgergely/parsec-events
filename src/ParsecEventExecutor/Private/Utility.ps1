@@ -113,6 +113,80 @@ function ConvertTo-ParsecPlainObject {
     return $InputObject
 }
 
+function Get-ParsecModuleVariableValue {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $Name
+    )
+
+    $module = $ExecutionContext.SessionState.Module
+    if ($null -eq $module) {
+        $module = Get-Module -Name 'ParsecEventExecutor'
+    }
+    if ($null -ne $module) {
+        $moduleValue = & $module {
+            param($VariableName)
+            $variable = Get-Variable -Name $VariableName -Scope Script -ErrorAction SilentlyContinue
+            if ($null -eq $variable) {
+                return $null
+            }
+
+            return $variable.Value
+        } $Name
+        if ($null -ne $moduleValue) {
+            return $moduleValue
+        }
+
+        $globalVariable = Get-Variable -Name $Name -Scope Global -ErrorAction SilentlyContinue
+        if ($null -ne $globalVariable) {
+            return $globalVariable.Value
+        }
+
+        return $null
+    }
+
+    $variable = Get-Variable -Name $Name -Scope Script -ErrorAction SilentlyContinue
+    if ($null -eq $variable) {
+        $globalVariable = Get-Variable -Name $Name -Scope Global -ErrorAction SilentlyContinue
+        if ($null -eq $globalVariable) {
+            return $null
+        }
+
+        return $globalVariable.Value
+    }
+
+    return $variable.Value
+}
+
+function Set-ParsecModuleVariableValue {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $Name,
+
+        [Parameter()]
+        $Value
+    )
+
+    $module = $ExecutionContext.SessionState.Module
+    if ($null -eq $module) {
+        $module = Get-Module -Name 'ParsecEventExecutor'
+    }
+    if ($null -ne $module) {
+        & $module {
+            param($VariableName, $VariableValue)
+            Set-Variable -Name $VariableName -Scope Script -Value $VariableValue -Force
+        } $Name $Value | Out-Null
+        Set-Variable -Name $Name -Scope Global -Value $Value -Force
+        return $Value
+    }
+
+    Set-Variable -Name $Name -Scope Script -Value $Value -Force
+    Set-Variable -Name $Name -Scope Global -Value $Value -Force
+    return $Value
+}
+
 function Read-ParsecJsonFile {
     [CmdletBinding()]
     param(
@@ -313,7 +387,12 @@ function Test-ParsecSuccessfulStatus {
         [string] $Status
     )
 
-    return $script:ParsecStatusSuccessSet -contains $Status
+    $successSet = $script:ParsecStatusSuccessSet
+    if ($null -eq $successSet -or @($successSet).Count -eq 0) {
+        $successSet = @('Succeeded', 'SucceededWithDrift', 'Compensated')
+    }
+
+    return @($successSet) -contains $Status
 }
 
 function New-ParsecRunIdentifier {
