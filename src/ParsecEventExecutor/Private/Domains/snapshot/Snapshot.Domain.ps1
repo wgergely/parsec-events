@@ -34,6 +34,25 @@ function Resolve-ParsecSnapshotDomainName {
     throw 'No active snapshot is available.'
 }
 
+function Invoke-ParsecSnapshotDomainResolveName {
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        [hashtable] $Arguments = @{},
+
+        [Parameter()]
+        [string] $StateRoot = (Get-ParsecDefaultStateRoot),
+
+        [Parameter()]
+        [System.Collections.IDictionary] $RunState = @{},
+
+        [Parameter()]
+        [bool] $UseDefaultCaptureName = $false
+    )
+
+    return Resolve-ParsecSnapshotDomainName -Arguments $Arguments -StateRoot $StateRoot -RunState $RunState -UseDefaultCaptureName:$UseDefaultCaptureName
+}
+
 function Get-ParsecSnapshotDomainTarget {
     [CmdletBinding()]
     param(
@@ -93,7 +112,7 @@ function Invoke-ParsecSnapshotDomainReset {
         [System.Collections.IDictionary] $SnapshotDocument
     )
 
-    $topologyResult = Invoke-ParsecDisplayTopologyReset -TopologyState (Get-ParsecDisplayTopologyCaptureState -ObservedState $SnapshotDocument.display) -SnapshotName ([string] $SnapshotDocument.name)
+    $topologyResult = Invoke-ParsecDisplayDomainTopologyReset -TopologyState (Get-ParsecDisplayDomainTopologyCaptureState -ObservedState $SnapshotDocument.display) -SnapshotName ([string] $SnapshotDocument.name)
     $actions = New-Object System.Collections.Generic.List[object]
     foreach ($actionResult in @($topologyResult.Outputs.actions)) {
         $actions.Add($actionResult)
@@ -106,7 +125,9 @@ function Invoke-ParsecSnapshotDomainReset {
     }
 
     if ($SnapshotDocument.display.Contains('theme')) {
-        $actions.Add((Invoke-ParsecThemeReset -Arguments @{ captured_state = $SnapshotDocument.display.theme }))
+        $actions.Add((Invoke-ParsecPersonalizationAdapter -Method 'SetThemeState' -Arguments @{
+                    theme_state = $SnapshotDocument.display.theme
+                }))
     }
 
     if ($SnapshotDocument.display.Contains('wallpaper')) {
@@ -145,7 +166,7 @@ function Invoke-ParsecSnapshotDomainVerify {
 
     $target = Get-ParsecSnapshotDomainTarget -Arguments $Arguments -StateRoot $StateRoot -RunState $RunState
     $observed = Get-ParsecObservedState
-    $verification = Compare-ParsecDisplayState -TargetState $target.snapshot.display -ObservedState $observed
+    $verification = Compare-ParsecDisplayDomainState -TargetState $target.snapshot.display -ObservedState $observed
     $verification.Outputs.snapshot_name = $target.snapshot_name
     return $verification
 }
