@@ -213,14 +213,14 @@ width = 1280
 height = 720
 
 [[steps]]
-id = "set-bad-resolution"
-ingredient = "set-resolution"
+id = "fail-command"
+ingredient = "command.invoke"
 depends_on = ["set-good-resolution"]
 compensation_policy = "explicit"
 
 [steps.arguments]
-width = 1600
-height = 900
+file_path = "cmd.exe"
+arguments = ["/c", "exit", "7"]
 "@ | Set-Content -LiteralPath $recipePath -Encoding UTF8
             $recipe = Get-ParsecRecipeDocument -NameOrPath $recipePath
 
