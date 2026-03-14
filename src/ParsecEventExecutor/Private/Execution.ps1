@@ -295,7 +295,7 @@ function Invoke-ParsecStep {
     $operationResult = $null
     do {
         $attempt++
-        $operationResult = Invoke-ParsecIngredientOperation -Name $Step.ingredient -Operation $Step.operation -Arguments $Step.arguments -StateRoot $StateRoot -RunState $RunState
+        $operationResult = Invoke-ParsecCoreIngredientOperation -Name $Step.ingredient -Operation $Step.operation -Arguments $Step.arguments -StateRoot $StateRoot -RunState $RunState
         if ((Test-ParsecSuccessfulStatus -Status $operationResult.Status) -or $attempt -gt $Step.retry_count) {
             break
         }
@@ -309,29 +309,29 @@ function Invoke-ParsecStep {
     $verificationResult = $null
     $readinessResult = $null
     $finalStatus = $operationResult.Status
-    $definition = Get-ParsecIngredientDefinition -Name $Step.ingredient
+    $definition = Get-ParsecCoreIngredientDefinition -Name $Step.ingredient
     $operationOutputs = ConvertTo-ParsecPlainObject -InputObject $operationResult.Outputs
     if ($operationOutputs -is [System.Collections.IDictionary] -and $operationOutputs.Contains('snapshot_name') -and $operationOutputs['snapshot_name']) {
         $RunState.active_snapshot = [string] $operationOutputs['snapshot_name']
     }
 
-    if ($Step.operation -eq 'apply' -and (Test-ParsecSuccessfulStatus -Status $operationResult.Status) -and (Test-ParsecIngredientOperationSupported -Definition $definition -Operation 'wait')) {
+    if ($Step.operation -eq 'apply' -and (Test-ParsecSuccessfulStatus -Status $operationResult.Status) -and (Test-ParsecCoreIngredientOperationSupported -Definition $definition -Operation 'wait')) {
         $readinessResult = Wait-ParsecIngredientReadiness -Name $Step.ingredient -Arguments $Step.arguments -ExecutionResult $operationResult -StateRoot $StateRoot -RunState $RunState
         if ($null -ne $readinessResult -and -not (Test-ParsecSuccessfulStatus -Status $readinessResult.Status)) {
             $finalStatus = if ($readinessResult.Status -eq 'Ambiguous') { 'Ambiguous' } else { 'Failed' }
         }
     }
 
-    if ($Step.verify -and (Test-ParsecSuccessfulStatus -Status $finalStatus) -and (Test-ParsecIngredientOperationSupported -Definition $definition -Operation 'verify')) {
-        $verificationResult = Invoke-ParsecIngredientOperation -Name $Step.ingredient -Operation 'verify' -Arguments $Step.arguments -ExecutionResult $operationResult -StateRoot $StateRoot -RunState $RunState
+    if ($Step.verify -and (Test-ParsecSuccessfulStatus -Status $finalStatus) -and (Test-ParsecCoreIngredientOperationSupported -Definition $definition -Operation 'verify')) {
+        $verificationResult = Invoke-ParsecCoreIngredientOperation -Name $Step.ingredient -Operation 'verify' -Arguments $Step.arguments -Prior $operationResult -StateRoot $StateRoot -RunState $RunState
         if ($null -ne $verificationResult -and -not (Test-ParsecSuccessfulStatus -Status $verificationResult.Status)) {
             $finalStatus = if ($verificationResult.Status -eq 'Ambiguous') { 'Ambiguous' } else { 'SucceededWithDrift' }
         }
     }
 
     $compensationResult = $null
-    if (($finalStatus -eq 'Failed' -or $finalStatus -eq 'Ambiguous') -and $Step.compensation_policy -eq 'explicit' -and (Test-ParsecIngredientOperationSupported -Definition $definition -Operation 'reset')) {
-        $compensationResult = Invoke-ParsecIngredientOperation -Name $Step.ingredient -Operation 'reset' -Arguments $Step.arguments -ExecutionResult $operationResult -StateRoot $StateRoot -RunState $RunState
+    if (($finalStatus -eq 'Failed' -or $finalStatus -eq 'Ambiguous') -and $Step.compensation_policy -eq 'explicit' -and (Test-ParsecCoreIngredientOperationSupported -Definition $definition -Operation 'reset')) {
+        $compensationResult = Invoke-ParsecCoreIngredientOperation -Name $Step.ingredient -Operation 'reset' -Arguments $Step.arguments -Prior $operationResult -StateRoot $StateRoot -RunState $RunState
         if ($null -ne $compensationResult) {
             $RunState.compensation_logs += $compensationResult
             if (Test-ParsecSuccessfulStatus -Status $compensationResult.Status) {
@@ -453,7 +453,7 @@ function Invoke-ParsecRecipeSequenceStep {
     }
 
     if ($Step.operation -eq 'apply') {
-        $definition = Get-ParsecIngredientDefinition -Name $Step.ingredient
+        $definition = Get-ParsecCoreIngredientDefinition -Name $Step.ingredient
         $attempt = 0
         $invocation = $null
         do {
@@ -471,7 +471,7 @@ function Invoke-ParsecRecipeSequenceStep {
 
         $finalStatus = [string] $invocation.status
         $compensationInvocation = $null
-        if (($finalStatus -eq 'Failed' -or $finalStatus -eq 'Ambiguous') -and $Step.compensation_policy -eq 'explicit' -and -not [string]::IsNullOrWhiteSpace([string] $invocation.token_id) -and (Test-ParsecIngredientOperationSupported -Definition $definition -Operation 'reset')) {
+        if (($finalStatus -eq 'Failed' -or $finalStatus -eq 'Ambiguous') -and $Step.compensation_policy -eq 'explicit' -and -not [string]::IsNullOrWhiteSpace([string] $invocation.token_id) -and (Test-ParsecCoreIngredientOperationSupported -Definition $definition -Operation 'reset')) {
             $compensationInvocation = Invoke-ParsecIngredientCommandInternal -Name $Step.ingredient -Operation 'reset' -TokenId $invocation.token_id -StateRoot $StateRoot
             if (Test-ParsecSuccessfulStatus -Status $compensationInvocation.status) {
                 $finalStatus = 'Compensated'
@@ -500,12 +500,12 @@ function Invoke-ParsecRecipeSequenceStep {
         }
     }
 
-    $definition = Get-ParsecIngredientDefinition -Name $Step.ingredient
+    $definition = Get-ParsecCoreIngredientDefinition -Name $Step.ingredient
     $attempt = 0
     $operationResult = $null
     do {
         $attempt++
-        $operationResult = Invoke-ParsecIngredientOperation -Name $definition.Name -Operation $Step.operation -Arguments $Step.arguments -StateRoot $StateRoot -RunState $RunRecord
+        $operationResult = Invoke-ParsecCoreIngredientOperation -Name $definition.Name -Operation $Step.operation -Arguments $Step.arguments -StateRoot $StateRoot -RunState $RunRecord
         if ((Test-ParsecSuccessfulStatus -Status $operationResult.Status) -or $attempt -gt $Step.retry_count) {
             break
         }
@@ -518,8 +518,8 @@ function Invoke-ParsecRecipeSequenceStep {
 
     $verificationResult = $null
     $finalStatus = [string] $operationResult.Status
-    if ($Step.verify -and $Step.operation -ne 'verify' -and (Test-ParsecSuccessfulStatus -Status $operationResult.Status) -and (Test-ParsecIngredientOperationSupported -Definition $definition -Operation 'verify')) {
-        $verificationResult = Invoke-ParsecIngredientOperation -Name $definition.Name -Operation 'verify' -Arguments $Step.arguments -ExecutionResult $operationResult -StateRoot $StateRoot -RunState $RunRecord
+    if ($Step.verify -and $Step.operation -ne 'verify' -and (Test-ParsecSuccessfulStatus -Status $operationResult.Status) -and (Test-ParsecCoreIngredientOperationSupported -Definition $definition -Operation 'verify')) {
+        $verificationResult = Invoke-ParsecCoreIngredientOperation -Name $definition.Name -Operation 'verify' -Arguments $Step.arguments -Prior $operationResult -StateRoot $StateRoot -RunState $RunRecord
         if ($null -ne $verificationResult -and -not (Test-ParsecSuccessfulStatus -Status $verificationResult.Status)) {
             $finalStatus = if ($verificationResult.Status -eq 'Ambiguous') { 'Ambiguous' } else { 'Failed' }
         }

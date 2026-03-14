@@ -500,6 +500,10 @@ function Get-ParsecDisplayInventory {
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)
     )
 
+    if (Get-Command -Name Get-ParsecCoreDomainDefinition -ErrorAction SilentlyContinue) {
+        Get-ParsecCoreDomainDefinition -Name 'display' | Out-Null
+    }
+
     $observed = Get-ParsecObservedState
     $catalog = Sync-ParsecDisplayCatalog -ObservedState $observed -StateRoot $StateRoot
     return @(
@@ -624,8 +628,8 @@ function Wait-ParsecIngredientReadiness {
         [System.Collections.IDictionary] $RunState = @{}
     )
 
-    $definition = Get-ParsecIngredientDefinition -Name $Name
-    if (-not (Test-ParsecIngredientOperationSupported -Definition $definition -Operation 'wait')) {
+    $definition = Get-ParsecCoreIngredientDefinition -Name $Name
+    if (-not (Test-ParsecCoreIngredientOperationSupported -Definition $definition -Operation 'wait')) {
         return $null
     }
 
@@ -638,7 +642,7 @@ function Wait-ParsecIngredientReadiness {
 
     while ($true) {
         $attempt++
-        $lastProbe = Invoke-ParsecIngredientOperation -Name $definition.Name -Operation 'wait' -Arguments $Arguments -ExecutionResult $ExecutionResult -StateRoot $StateRoot -RunState $RunState
+        $lastProbe = Invoke-ParsecCoreIngredientOperation -Name $definition.Name -Operation 'wait' -Arguments $Arguments -Prior $ExecutionResult -StateRoot $StateRoot -RunState $RunState
         if (Test-ParsecSuccessfulStatus -Status $lastProbe.Status) {
             $successStreak++
             if ($successStreak -gt $maxSuccessStreak) {
@@ -706,7 +710,7 @@ function Invoke-ParsecIngredientCommandInternal {
     $stateRoot = Initialize-ParsecStateRoot -StateRoot $StateRoot
     $invocationId = New-ParsecRunIdentifier
     $startedAt = [DateTimeOffset]::UtcNow.ToString('o')
-    $definition = Get-ParsecIngredientDefinition -Name $Name
+    $definition = Get-ParsecCoreIngredientDefinition -Name $Name
     $captureResult = $null
     $operationResult = $null
     $readinessResult = $null
@@ -721,8 +725,8 @@ function Invoke-ParsecIngredientCommandInternal {
 
     switch ($Operation) {
         'apply' {
-            if (Test-ParsecIngredientOperationSupported -Definition $definition -Operation 'capture') {
-                $captureResult = Invoke-ParsecIngredientOperation -Name $definition.Name -Operation 'capture' -Arguments $Arguments -StateRoot $stateRoot -RunState @{}
+            if (Test-ParsecCoreIngredientOperationSupported -Definition $definition -Operation 'capture') {
+                $captureResult = Invoke-ParsecCoreIngredientOperation -Name $definition.Name -Operation 'capture' -Arguments $Arguments -StateRoot $stateRoot -RunState @{}
                 if (-not (Test-ParsecSuccessfulStatus -Status $captureResult.Status)) {
                     $operationResult = $captureResult
                     $finalStatus = [string] $captureResult.Status
@@ -751,18 +755,18 @@ function Invoke-ParsecIngredientCommandInternal {
                 $persistApplyToken = $true
             }
 
-            $operationResult = Invoke-ParsecIngredientOperation -Name $definition.Name -Operation 'apply' -Arguments $Arguments -StateRoot $stateRoot -RunState @{}
+            $operationResult = Invoke-ParsecCoreIngredientOperation -Name $definition.Name -Operation 'apply' -Arguments $Arguments -StateRoot $stateRoot -RunState @{}
             $finalStatus = [string] $operationResult.Status
 
-            if ((Test-ParsecSuccessfulStatus -Status $operationResult.Status) -and (Test-ParsecIngredientOperationSupported -Definition $definition -Operation 'wait')) {
+            if ((Test-ParsecSuccessfulStatus -Status $operationResult.Status) -and (Test-ParsecCoreIngredientOperationSupported -Definition $definition -Operation 'wait')) {
                 $readinessResult = Wait-ParsecIngredientReadiness -Name $definition.Name -Arguments $Arguments -ExecutionResult $operationResult -StateRoot $stateRoot -RunState @{}
                 if (-not (Test-ParsecSuccessfulStatus -Status $readinessResult.Status)) {
                     $finalStatus = if ($readinessResult.Status -eq 'Ambiguous') { 'Ambiguous' } else { 'Failed' }
                 }
             }
 
-            if ($Verify -and (Test-ParsecSuccessfulStatus -Status $finalStatus) -and (Test-ParsecIngredientOperationSupported -Definition $definition -Operation 'verify')) {
-                $verificationResult = Invoke-ParsecIngredientOperation -Name $definition.Name -Operation 'verify' -Arguments $Arguments -ExecutionResult $operationResult -StateRoot $stateRoot -RunState @{}
+            if ($Verify -and (Test-ParsecSuccessfulStatus -Status $finalStatus) -and (Test-ParsecCoreIngredientOperationSupported -Definition $definition -Operation 'verify')) {
+                $verificationResult = Invoke-ParsecCoreIngredientOperation -Name $definition.Name -Operation 'verify' -Arguments $Arguments -Prior $operationResult -StateRoot $stateRoot -RunState @{}
                 if (-not (Test-ParsecSuccessfulStatus -Status $verificationResult.Status)) {
                     $finalStatus = if ($verificationResult.Status -eq 'Ambiguous') { 'Ambiguous' } else { 'SucceededWithDrift' }
                 }
@@ -781,12 +785,12 @@ function Invoke-ParsecIngredientCommandInternal {
             }
         }
         'capture' {
-            $operationResult = Invoke-ParsecIngredientOperation -Name $definition.Name -Operation 'capture' -Arguments $Arguments -StateRoot $stateRoot -RunState @{}
+            $operationResult = Invoke-ParsecCoreIngredientOperation -Name $definition.Name -Operation 'capture' -Arguments $Arguments -StateRoot $stateRoot -RunState @{}
             $resolvedTargetIdentity = Get-ParsecInvocationResolvedTargetIdentity -ExecutionResult $operationResult
             $finalStatus = [string] $operationResult.Status
         }
         'verify' {
-            $operationResult = Invoke-ParsecIngredientOperation -Name $definition.Name -Operation 'verify' -Arguments $Arguments -StateRoot $stateRoot -RunState @{}
+            $operationResult = Invoke-ParsecCoreIngredientOperation -Name $definition.Name -Operation 'verify' -Arguments $Arguments -StateRoot $stateRoot -RunState @{}
             $finalStatus = [string] $operationResult.Status
         }
         'reset' {
@@ -807,7 +811,7 @@ function Invoke-ParsecIngredientCommandInternal {
                 $null
             }
             $resetArguments = Merge-ParsecRecipeMap -Base ([ordered]@{ captured_state = $tokenDocument.captured_state }) -Override (Merge-ParsecRecipeMap -Base $tokenDocument.requested_arguments -Override $Arguments)
-            $operationResult = Invoke-ParsecIngredientOperation -Name $definition.Name -Operation 'reset' -Arguments $resetArguments -ExecutionResult $resetExecutionResult -StateRoot $stateRoot -RunState @{}
+            $operationResult = Invoke-ParsecCoreIngredientOperation -Name $definition.Name -Operation 'reset' -Arguments $resetArguments -Prior $resetExecutionResult -StateRoot $stateRoot -RunState @{}
             $resetResult = $operationResult
             $finalStatus = [string] $operationResult.Status
 
