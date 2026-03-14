@@ -1,5 +1,7 @@
 function Get-ParsecCoreLoadOrder {
     [CmdletBinding()]
+    [OutputType([string[]])]
+    [OutputType([System.Object[]])]
     param()
 
     return @(

@@ -23,6 +23,10 @@ return @{
                 [System.Collections.IDictionary] $RunState = @{}
             )
 
+            # Prior, RunState required by domain Invoke contract
+            $null = $Prior
+            $null = $RunState
+
             if (-not (Get-Command -Name 'Invoke-ParsecNvidiaDomain' -ErrorAction SilentlyContinue)) {
                 $module = Get-Module -Name 'ParsecEventExecutor'
                 if ($null -ne $module) {

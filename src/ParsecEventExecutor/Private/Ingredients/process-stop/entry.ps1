@@ -6,6 +6,10 @@ param(
     [string] $IngredientPath
 )
 
+# Schema, IngredientPath required by ingredient entry contract
+$null = $Schema
+$null = $IngredientPath
+
 return @{
     Domain = 'process'
     Operations = @{

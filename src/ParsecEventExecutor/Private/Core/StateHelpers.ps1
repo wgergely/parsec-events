@@ -1,5 +1,6 @@
 function Get-ParsecCapturedStateFromResult {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter()]
         [hashtable] $Arguments = @{},
@@ -21,6 +22,7 @@ function Get-ParsecCapturedStateFromResult {
 
 function Get-ParsecDisplayResetMonitorState {
     [CmdletBinding()]
+    [OutputType([object])]
     param(
         [Parameter()]
         [hashtable] $Arguments = @{},
@@ -50,6 +52,7 @@ function Get-ParsecDisplayResetMonitorState {
 
 function Get-ParsecObservedMonitor {
     [CmdletBinding()]
+    [OutputType([object])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $ObservedState,
@@ -63,6 +66,7 @@ function Get-ParsecObservedMonitor {
 
 function Resolve-ParsecDisplayTargetMonitor {
     [CmdletBinding()]
+    [OutputType([object])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $ObservedState,
@@ -91,6 +95,7 @@ function Resolve-ParsecDisplayTargetMonitor {
 
 function Resolve-ParsecDisplayTargetDeviceName {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter()]
         [hashtable] $Arguments = @{},
@@ -112,8 +117,10 @@ function Resolve-ParsecDisplayTargetDeviceName {
     return [string] $targetMonitor.device_name
 }
 
-function Get-ParsecSupportedDisplayModes {
+function Get-ParsecSupportedDisplayMode {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary[]])]
+    [OutputType([System.Object[]])]
     param(
         [Parameter(Mandatory)]
         [string] $DeviceName
@@ -141,6 +148,7 @@ function Get-ParsecSupportedDisplayModes {
 
 function Get-ParsecDisplayCaptureResult {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $ObservedState,

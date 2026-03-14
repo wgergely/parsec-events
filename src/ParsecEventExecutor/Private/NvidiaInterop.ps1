@@ -1,5 +1,6 @@
 function Initialize-ParsecNvidiaInterop {
     [CmdletBinding()]
+    [OutputType([void])]
     param()
 
     if ('ParsecEventExecutor.NvidiaApiNative' -as [type]) {
@@ -338,6 +339,7 @@ namespace ParsecEventExecutor {
 
 function Get-ParsecNvidiaApiLibraryPath {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter()]
         [string] $PreferredPath
@@ -368,6 +370,7 @@ function Get-ParsecNvidiaApiLibraryPath {
 
 function ConvertTo-ParsecNvidiaDisplayName {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [string] $DeviceName
@@ -386,6 +389,7 @@ function ConvertTo-ParsecNvidiaDisplayName {
 
 function Get-ParsecNvidiaBackendAvailability {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter()]
         [string] $LibraryPath
@@ -426,6 +430,7 @@ function Get-ParsecNvidiaBackendAvailability {
 
 function Get-ParsecNvidiaDisplayTargetInternal {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [string] $DeviceName,
@@ -450,8 +455,10 @@ function Get-ParsecNvidiaDisplayTargetInternal {
     }
 }
 
-function Get-ParsecNvidiaCustomResolutionsInternal {
+function Get-ParsecNvidiaCustomResolutionInternal {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary[]])]
+    [OutputType([System.Object[]])]
     param(
         [Parameter(Mandatory)]
         [uint32] $DisplayId,
@@ -482,7 +489,8 @@ function Get-ParsecNvidiaCustomResolutionsInternal {
 }
 
 function Add-ParsecNvidiaCustomResolutionInternal {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $Arguments
@@ -494,6 +502,10 @@ function Add-ParsecNvidiaCustomResolutionInternal {
     $refreshRateHz = [single] $Arguments.refresh_rate_hz
     $depth = if ($Arguments.ContainsKey('bits_per_pel')) { [uint32] $Arguments.bits_per_pel } else { [uint32] 32 }
     $libraryPath = if ($Arguments.ContainsKey('library_path')) { [string] $Arguments.library_path } else { $null }
+
+    if (-not $PSCmdlet.ShouldProcess("NVIDIA display $displayId", "Add custom resolution ${width}x${height}@${refreshRateHz}")) {
+        return New-ParsecResult -Status 'Skipped' -Message 'Operation skipped by ShouldProcess.' -Requested $Arguments
+    }
 
     try {
         $availability = Get-ParsecNvidiaBackendAvailability -LibraryPath $libraryPath

@@ -1,5 +1,6 @@
 function Get-ParsecThemeState {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param()
 
     $path = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize'
@@ -35,6 +36,7 @@ function Get-ParsecThemeState {
 
 function Get-ParsecWallpaperState {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param()
 
     $desktopPath = 'HKCU:\Control Panel\Desktop'
@@ -91,13 +93,15 @@ function Get-ParsecWallpaperState {
 
 function Initialize-ParsecPersonalizationInterop {
     [CmdletBinding()]
+    [OutputType([void])]
     param()
 
     Initialize-ParsecDisplayInterop
 }
 
 function Set-ParsecThemeStateInternal {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $Arguments
@@ -136,6 +140,11 @@ function Set-ParsecThemeStateInternal {
 
     $appsUseLightTheme = if ($appMode -ieq 'Dark') { 0 } else { 1 }
     $systemUsesLightTheme = if ($systemMode -ieq 'Dark') { 0 } else { 1 }
+
+    if (-not $PSCmdlet.ShouldProcess("Theme (app=$appMode, system=$systemMode)", 'Set theme state')) {
+        return New-ParsecResult -Status 'Skipped' -Message 'Operation skipped by ShouldProcess.'
+    }
+
     $path = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize'
     if (-not (Test-Path -LiteralPath $path)) {
         New-Item -Path $path -Force | Out-Null
@@ -154,7 +163,8 @@ function Set-ParsecThemeStateInternal {
 }
 
 function Set-ParsecWallpaperStateInternal {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $Arguments
@@ -207,6 +217,10 @@ function Set-ParsecWallpaperStateInternal {
         ''
     }
 
+    if (-not $PSCmdlet.ShouldProcess("Wallpaper '$wallpaperPath'", 'Set wallpaper state')) {
+        return New-ParsecResult -Status 'Skipped' -Message 'Operation skipped by ShouldProcess.'
+    }
+
     $desktopPath = 'HKCU:\Control Panel\Desktop'
     $colorsPath = 'HKCU:\Control Panel\Colors'
     if (-not (Test-Path -LiteralPath $desktopPath)) {
@@ -236,7 +250,8 @@ function Set-ParsecWallpaperStateInternal {
 }
 
 function Set-ParsecTextScaleStateInternal {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $Arguments
@@ -259,6 +274,10 @@ function Set-ParsecTextScaleStateInternal {
         throw 'Text scaling percent must be between 100 and 225.'
     }
 
+    if (-not $PSCmdlet.ShouldProcess("Text scale to ${textScalePercent}%", 'Set text scale')) {
+        return New-ParsecResult -Status 'Skipped' -Message 'Operation skipped by ShouldProcess.'
+    }
+
     $path = 'HKCU:\SOFTWARE\Microsoft\Accessibility'
     if (-not (Test-Path -LiteralPath $path)) {
         New-Item -Path $path -Force | Out-Null
@@ -278,7 +297,8 @@ function Set-ParsecTextScaleStateInternal {
 }
 
 function Set-ParsecUiScaleStateInternal {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $Arguments
@@ -304,6 +324,10 @@ function Set-ParsecUiScaleStateInternal {
         throw 'UI scaling percent must be between 100 and 500.'
     }
 
+    if (-not $PSCmdlet.ShouldProcess("UI scale to ${scalePercent}%", 'Set UI scale')) {
+        return New-ParsecResult -Status 'Skipped' -Message 'Operation skipped by ShouldProcess.'
+    }
+
     $deviceName = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments
     Initialize-ParsecDisplayInterop
     $appliedScalePercent = [int] [ParsecEventExecutor.DisplayNative]::SetDpiScaleForDevice($deviceName, [uint32] $scalePercent)
@@ -321,6 +345,7 @@ function Set-ParsecUiScaleStateInternal {
 
 function Initialize-ParsecPersonalizationAdapter {
     [CmdletBinding()]
+    [OutputType([void])]
     param()
 
     if ($null -ne (Get-ParsecModuleVariableValue -Name 'ParsecPersonalizationAdapter')) {
@@ -355,6 +380,7 @@ function Initialize-ParsecPersonalizationAdapter {
 
 function Invoke-ParsecPersonalizationAdapter {
     [CmdletBinding()]
+    [OutputType([object])]
     param(
         [Parameter(Mandatory)]
         [string] $Method,

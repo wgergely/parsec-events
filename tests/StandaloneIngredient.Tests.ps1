@@ -5,7 +5,7 @@ Describe 'Standalone ingredient surface' {
     InModuleScope ParsecEventExecutor {
         BeforeAll {
             . (Join-Path $PSScriptRoot 'IngredientTestSupport.ps1')
-            Clear-ParsecTestAdapters
+            Clear-ParsecTestAdapter
         }
 
         BeforeEach {
@@ -15,7 +15,7 @@ Describe 'Standalone ingredient surface' {
         }
 
         AfterEach {
-            Clear-ParsecTestAdapters
+            Clear-ParsecTestAdapter
             Initialize-ParsecCoreRuntime -Force
         }
 

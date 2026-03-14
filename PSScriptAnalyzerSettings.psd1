@@ -1,12 +1,6 @@
 @{
     IncludeDefaultRules = $true
-    ExcludeRules = @(
-        'PSAvoidGlobalVars',
-        'PSReviewUnusedParameter',
-        'PSUseOutputTypeCorrectly',
-        'PSUseShouldProcessForStateChangingFunctions',
-        'PSUseSingularNouns'
-    )
+    ExcludeRules = @()
     Rules = @{
         PSPlaceOpenBrace = @{
             Enable = $true

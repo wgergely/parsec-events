@@ -1,5 +1,6 @@
 function ConvertTo-ParsecRecipe {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Document,
@@ -12,7 +13,7 @@ function ConvertTo-ParsecRecipe {
         throw "Recipe file '$Path' is missing a name."
     }
 
-    $definitions = Get-ParsecRecipeIngredientDefinitions -Document $Document
+    $definitions = Get-ParsecRecipeIngredientDefinition -Document $Document
     $steps = @()
     if ($Document.Contains('steps')) {
         $sequence = 0
@@ -35,6 +36,7 @@ function ConvertTo-ParsecRecipe {
 
 function Get-ParsecRecipeDocument {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [string] $NameOrPath
@@ -47,6 +49,7 @@ function Get-ParsecRecipeDocument {
 
 function Merge-ParsecRecipeMap {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Base = @{},
@@ -77,8 +80,9 @@ function Merge-ParsecRecipeMap {
     return $result
 }
 
-function Get-ParsecRecipeIngredientDefinitions {
+function Get-ParsecRecipeIngredientDefinition {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Document
@@ -97,6 +101,7 @@ function Get-ParsecRecipeIngredientDefinitions {
 
 function Resolve-ParsecRecipeStep {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Step,
@@ -171,6 +176,7 @@ function Resolve-ParsecRecipeStep {
 
 function Test-ParsecStepCondition {
     [CmdletBinding()]
+    [OutputType([bool])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $Step,
@@ -192,6 +198,7 @@ function Test-ParsecStepCondition {
 
 function Get-ParsecStepResultById {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $RunState,
@@ -210,7 +217,9 @@ function Get-ParsecStepResultById {
 }
 
 function New-ParsecBlockedStepResult {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $Step,
@@ -237,7 +246,9 @@ function New-ParsecBlockedStepResult {
 }
 
 function New-ParsecBlockedSequenceStepResult {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $Step,
@@ -269,6 +280,7 @@ function New-ParsecBlockedSequenceStepResult {
 
 function Resolve-ParsecRecipeExecutionPlan {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $Recipe
@@ -354,7 +366,9 @@ function Resolve-ParsecRecipeExecutionPlan {
 }
 
 function Resolve-ParsecRollbackStatus {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '')]
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter()]
         [object[]] $RollbackResults = @()
@@ -379,6 +393,7 @@ function Resolve-ParsecRollbackStatus {
 
 function Test-ParsecStepResultRollbackEligible {
     [CmdletBinding()]
+    [OutputType([bool])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $StepResult
@@ -389,6 +404,8 @@ function Test-ParsecStepResultRollbackEligible {
 
 function Invoke-ParsecRunStateRollback {
     [CmdletBinding()]
+    [OutputType([hashtable])]
+    [OutputType([System.Object[]])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $RunState,
@@ -453,6 +470,8 @@ function Invoke-ParsecRunStateRollback {
 
 function Invoke-ParsecRunRecordRollback {
     [CmdletBinding()]
+    [OutputType([hashtable])]
+    [OutputType([System.Object[]])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $RunRecord,
@@ -510,7 +529,9 @@ function Invoke-ParsecRunRecordRollback {
 }
 
 function Resolve-ParsecRunTerminalStatus {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '')]
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $RunState
@@ -554,6 +575,7 @@ function Resolve-ParsecRunTerminalStatus {
 
 function Invoke-ParsecStep {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $Step,
@@ -671,7 +693,9 @@ function Invoke-ParsecStep {
 }
 
 function Resolve-ParsecRecipeSequenceTerminalStatus {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '')]
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $RunRecord
@@ -715,6 +739,7 @@ function Resolve-ParsecRecipeSequenceTerminalStatus {
 
 function Invoke-ParsecRecipeSequenceStep {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $Step,
@@ -869,6 +894,7 @@ function Invoke-ParsecRecipeSequenceStep {
 
 function Invoke-ParsecRecipeSequence {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $Recipe,
@@ -931,6 +957,7 @@ function Invoke-ParsecRecipeSequence {
 
 function Invoke-ParsecRecipeInternal {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $Recipe,

@@ -1,12 +1,15 @@
 function Get-ParsecSoundDomainAdapter {
     [CmdletBinding()]
+    [OutputType([object])]
     param()
 
     return Get-ParsecModuleVariableValue -Name 'ParsecSoundAdapter'
 }
 
-function Get-ParsecSoundPlaybackDevices {
+function Get-ParsecSoundPlaybackDevice {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary[]])]
+    [OutputType([System.Object[]])]
     param()
 
     $adapter = Get-ParsecSoundDomainAdapter
@@ -57,6 +60,7 @@ function Get-ParsecSoundPlaybackDevices {
 
 function Get-ParsecSoundDefaultPlaybackDevice {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param()
 
     $adapter = Get-ParsecSoundDomainAdapter
@@ -64,7 +68,7 @@ function Get-ParsecSoundDefaultPlaybackDevice {
         return & $adapter.GetDefaultPlaybackDevice
     }
 
-    $devices = @(Get-ParsecSoundPlaybackDevices)
+    $devices = @(Get-ParsecSoundPlaybackDevice)
     $defaultDevice = @($devices | Where-Object { $_.is_default }) | Select-Object -First 1
     if ($null -ne $defaultDevice) {
         return $defaultDevice
@@ -79,7 +83,8 @@ function Get-ParsecSoundDefaultPlaybackDevice {
 }
 
 function Set-ParsecSoundDefaultPlaybackDevice {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $Arguments
@@ -95,6 +100,11 @@ function Set-ParsecSoundDefaultPlaybackDevice {
 
     if ([string]::IsNullOrWhiteSpace($deviceId) -and [string]::IsNullOrWhiteSpace($deviceName)) {
         return New-ParsecResult -Status 'Failed' -Message 'Either device_id or device_name is required to set the default playback device.' -Errors @('MissingArgument')
+    }
+
+    $targetDescription = if (-not [string]::IsNullOrWhiteSpace($deviceId)) { "device '$deviceId'" } else { "device '$deviceName'" }
+    if (-not $PSCmdlet.ShouldProcess($targetDescription, 'Set default playback device')) {
+        return New-ParsecResult -Status 'Skipped' -Message 'Operation skipped by ShouldProcess.'
     }
 
     # Try AudioDeviceCmdlets module
@@ -126,6 +136,7 @@ function Set-ParsecSoundDefaultPlaybackDevice {
 
 function Invoke-ParsecSoundDomain {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [string] $Method,
@@ -219,7 +230,7 @@ function Invoke-ParsecSoundDomain {
             }
         }
         'GetPlaybackDevices' {
-            $devices = @(Get-ParsecSoundPlaybackDevices)
+            $devices = @(Get-ParsecSoundPlaybackDevice)
             return New-ParsecResult -Status 'Succeeded' -Message "Found $($devices.Count) playback device(s)." -Observed @{
                 devices = $devices
                 count = $devices.Count

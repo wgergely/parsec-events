@@ -233,8 +233,8 @@ Describe 'Executor state entrypoints' {
             $stateRoot = Join-Path $TestDrive 'event-scalar-identifiers'
             Start-ParsecExecutor -EventName SwitchToMobile -StateRoot $stateRoot -Confirm:$false | Out-Null
 
-            $events = @(Get-ParsecEventDocuments -StateRoot $stateRoot)
-            $candidate = Get-ParsecRecoveryCandidateFromEvents -StateRoot $stateRoot
+            $events = @(Get-ParsecEventDocument -StateRoot $stateRoot)
+            $candidate = Get-ParsecRecoveryCandidateFromEvent -StateRoot $stateRoot
 
             $events.Count | Should -BeGreaterThan 0
             $events[0].payload.run_id | Should -BeOfType ([string])

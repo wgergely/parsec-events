@@ -1,5 +1,6 @@
 function Initialize-ParsecDisplayInterop {
     [CmdletBinding()]
+    [OutputType([void])]
     param()
 
     if ('ParsecEventExecutor.DisplayNative' -as [type]) {
@@ -1182,6 +1183,7 @@ namespace ParsecEventExecutor {
 
 function Get-ParsecTextScalePercent {
     [CmdletBinding()]
+    [OutputType([int])]
     param()
 
     try {
@@ -1199,6 +1201,7 @@ function Get-ParsecTextScalePercent {
 
 function Get-ParsecUiScalePercent {
     [CmdletBinding()]
+    [OutputType([int])]
     param(
         [Parameter()]
         [string] $DeviceName
@@ -1220,7 +1223,9 @@ function Get-ParsecUiScalePercent {
 }
 
 function ConvertTo-ParsecLogPixels {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '')]
     [CmdletBinding()]
+    [OutputType([int])]
     param(
         [Parameter(Mandatory)]
         [int] $ScalePercent
@@ -1231,6 +1236,7 @@ function ConvertTo-ParsecLogPixels {
 
 function ConvertTo-ParsecOrientationName {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [int] $Orientation
@@ -1247,6 +1253,7 @@ function ConvertTo-ParsecOrientationName {
 
 function Get-ParsecScalePercent {
     [CmdletBinding()]
+    [OutputType([int])]
     param(
         [Parameter()]
         [uint32] $EffectiveDpiX = 0
@@ -1261,6 +1268,7 @@ function Get-ParsecScalePercent {
 
 function ConvertTo-ParsecDisplayConfigRotationName {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [int] $Rotation
@@ -1277,6 +1285,7 @@ function ConvertTo-ParsecDisplayConfigRotationName {
 
 function ConvertFrom-ParsecOrientationName {
     [CmdletBinding()]
+    [OutputType([int])]
     param(
         [Parameter(Mandatory)]
         [string] $Orientation
@@ -1293,6 +1302,7 @@ function ConvertFrom-ParsecOrientationName {
 
 function Get-ParsecDisplayChangeStatusName {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [int] $Code
@@ -1312,7 +1322,9 @@ function Get-ParsecDisplayChangeStatusName {
 }
 
 function New-ParsecDisplayChangeFailureResult {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter(Mandatory)]
         [string] $Action,
@@ -1336,6 +1348,7 @@ function New-ParsecDisplayChangeFailureResult {
 
 function Get-ParsecNativeDeviceMode {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [string] $DeviceName
@@ -1352,6 +1365,7 @@ function Get-ParsecNativeDeviceMode {
 
 function Invoke-ParsecApplyDisplayMode {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter(Mandatory)]
         [string] $DeviceName,
@@ -1395,13 +1409,18 @@ function Invoke-ParsecApplyDisplayMode {
 }
 
 function Set-ParsecDisplayResolutionInternal {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([hashtable])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $Arguments
     )
 
     $deviceName = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments
+    if (-not $PSCmdlet.ShouldProcess("Display '$deviceName'", "Set resolution to $($Arguments.width)x$($Arguments.height)")) {
+        return New-ParsecResult -Status 'Skipped' -Message 'Operation skipped by ShouldProcess.'
+    }
+
     $mode = Get-ParsecNativeDeviceMode -DeviceName $deviceName
     $mode.dmPelsWidth = [int] $Arguments.width
     $mode.dmPelsHeight = [int] $Arguments.height
@@ -1416,13 +1435,18 @@ function Set-ParsecDisplayResolutionInternal {
 }
 
 function Set-ParsecDisplayOrientationInternal {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([hashtable])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $Arguments
     )
 
     $deviceName = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments
+    if (-not $PSCmdlet.ShouldProcess("Display '$deviceName'", "Set orientation to '$($Arguments.orientation)'")) {
+        return New-ParsecResult -Status 'Skipped' -Message 'Operation skipped by ShouldProcess.'
+    }
+
     $mode = Get-ParsecNativeDeviceMode -DeviceName $deviceName
     $currentOrientation = [int] $mode.dmDisplayOrientation
     $targetOrientation = ConvertFrom-ParsecOrientationName -Orientation ([string] $Arguments.orientation)
@@ -1448,15 +1472,21 @@ function Set-ParsecDisplayOrientationInternal {
 }
 
 function Set-ParsecDisplayEnabledInternal {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([hashtable])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $Arguments
     )
 
     $deviceName = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments
-    $mode = Get-ParsecNativeDeviceMode -DeviceName $deviceName
     $enable = [bool] $Arguments.enabled
+    $stateName = if ($enable) { 'Enable' } else { 'Disable' }
+    if (-not $PSCmdlet.ShouldProcess("Display '$deviceName'", $stateName)) {
+        return New-ParsecResult -Status 'Skipped' -Message 'Operation skipped by ShouldProcess.'
+    }
+
+    $mode = Get-ParsecNativeDeviceMode -DeviceName $deviceName
 
     if ($enable) {
         $bounds = if ($Arguments.ContainsKey('bounds') -and $Arguments.bounds -is [System.Collections.IDictionary]) {
@@ -1489,21 +1519,26 @@ function Set-ParsecDisplayEnabledInternal {
 
     $result = Invoke-ParsecApplyDisplayMode -DeviceName $deviceName -Mode $mode -Action 'SetEnabled' -Requested $Arguments
     if ($result.Status -eq 'Succeeded') {
-        $stateName = if ($enable) { 'enabled' } else { 'disabled' }
-        $result.Message = "Monitor '$deviceName' $stateName."
+        $stateLabel = if ($enable) { 'enabled' } else { 'disabled' }
+        $result.Message = "Monitor '$deviceName' $stateLabel."
     }
 
     return $result
 }
 
 function Set-ParsecDisplayPrimaryInternal {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([hashtable])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $Arguments
     )
 
     $deviceName = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments
+    if (-not $PSCmdlet.ShouldProcess("Display '$deviceName'", 'Set as primary')) {
+        return New-ParsecResult -Status 'Skipped' -Message 'Operation skipped by ShouldProcess.'
+    }
+
     $mode = Get-ParsecNativeDeviceMode -DeviceName $deviceName
     $mode.dmPositionX = 0
     $mode.dmPositionY = 0
@@ -1520,6 +1555,7 @@ function Set-ParsecDisplayPrimaryInternal {
 
 function Get-ParsecDisplayIdentityKey {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [psobject] $DisplayPath
@@ -1538,6 +1574,7 @@ function Get-ParsecDisplayIdentityKey {
 
 function Get-ParsecDisplayCaptureState {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param()
 
     try {
@@ -1821,6 +1858,7 @@ function Get-ParsecDisplayCaptureState {
 
 function Compare-ParsecActiveDisplaySelectionState {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $TargetState,
@@ -1869,6 +1907,7 @@ function Compare-ParsecActiveDisplaySelectionState {
 
 function Resolve-ParsecActiveDisplayTargetState {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $ObservedState,
@@ -2008,6 +2047,7 @@ function Resolve-ParsecActiveDisplayTargetState {
 
 function Resolve-ParsecActiveDisplayTargetStateForOperation {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         $ExecutionResult,
@@ -2035,6 +2075,7 @@ function Resolve-ParsecActiveDisplayTargetStateForOperation {
 
 function Initialize-ParsecDisplayAdapter {
     [CmdletBinding()]
+    [OutputType([void])]
     param()
 
     if ($null -ne (Get-ParsecModuleVariableValue -Name 'ParsecDisplayAdapter')) {
@@ -2082,6 +2123,7 @@ function Initialize-ParsecDisplayAdapter {
 
 function Invoke-ParsecDisplayAdapter {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter(Mandatory)]
         [string] $Method,

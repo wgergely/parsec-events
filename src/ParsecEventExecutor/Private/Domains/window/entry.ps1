@@ -302,6 +302,10 @@ return @{
                 [System.Collections.IDictionary] $RunState = @{}
             )
 
+            # StateRoot, RunState required by domain Invoke contract
+            $null = $StateRoot
+            $null = $RunState
+
             switch ($Method) {
                 'CaptureState' { return & $captureState }
                 'CycleActivation' { return & $cycleActivation $Arguments }

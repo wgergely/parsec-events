@@ -1,5 +1,7 @@
 function New-ParsecCoreDomainDefinition {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [string] $Name,
@@ -24,7 +26,9 @@ function New-ParsecCoreDomainDefinition {
 }
 
 function New-ParsecCoreIngredientDefinition {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [string] $Name,
@@ -93,7 +97,9 @@ function New-ParsecCoreIngredientDefinition {
 }
 
 function New-ParsecCoreIngredientDefinitionFromSchema {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Schema,
@@ -104,6 +110,9 @@ function New-ParsecCoreIngredientDefinitionFromSchema {
         [Parameter()]
         [string] $IngredientPath
     )
+
+    # IngredientPath is part of the package-loading contract; metadata is set by the caller
+    $null = $IngredientPath
 
     $operationSchemas = [ordered]@{}
     if ($Schema.Contains('operation_schemas')) {
@@ -144,6 +153,7 @@ function New-ParsecCoreIngredientDefinitionFromSchema {
 
 function Get-ParsecCoreRequiredIngredientDomain {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Schema,
@@ -168,6 +178,7 @@ function Get-ParsecCoreRequiredIngredientDomain {
 
 function Assert-ParsecCoreIngredientDomainNaming {
     [CmdletBinding()]
+    [OutputType([void])]
     param(
         [Parameter(Mandatory)]
         [string] $Name,

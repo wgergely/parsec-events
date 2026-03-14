@@ -55,11 +55,11 @@ return @{
                 'ApplyEnabled' { return Invoke-ParsecDisplayDomainApplyEnabled -Arguments $Arguments }
                 'VerifyEnabled' { return Invoke-ParsecDisplayDomainVerifyEnabled -Arguments $Arguments }
                 'ResetEnabled' { return Invoke-ParsecDisplayDomainResetEnabled -Arguments $Arguments -ExecutionResult $Prior }
-                'CaptureActiveDisplays' { return Invoke-ParsecDisplayDomainCaptureActiveDisplays }
-                'ApplyActiveDisplays' { return Invoke-ParsecDisplayDomainApplyActiveDisplays -Arguments $Arguments -StateRoot $StateRoot }
-                'WaitActiveDisplays' { return Invoke-ParsecDisplayDomainWaitActiveDisplays -Arguments $Arguments -ExecutionResult $Prior -StateRoot $StateRoot }
-                'VerifyActiveDisplays' { return Invoke-ParsecDisplayDomainVerifyActiveDisplays -Arguments $Arguments -ExecutionResult $Prior -StateRoot $StateRoot }
-                'ResetActiveDisplays' { return Invoke-ParsecDisplayDomainResetActiveDisplays -Arguments $Arguments -ExecutionResult $Prior }
+                'CaptureActiveDisplay' { return Invoke-ParsecDisplayDomainCaptureActiveDisplay }
+                'ApplyActiveDisplay' { return Invoke-ParsecDisplayDomainApplyActiveDisplay -Arguments $Arguments -StateRoot $StateRoot }
+                'WaitActiveDisplay' { return Invoke-ParsecDisplayDomainWaitActiveDisplay -Arguments $Arguments -ExecutionResult $Prior -StateRoot $StateRoot }
+                'VerifyActiveDisplay' { return Invoke-ParsecDisplayDomainVerifyActiveDisplay -Arguments $Arguments -ExecutionResult $Prior -StateRoot $StateRoot }
+                'ResetActiveDisplay' { return Invoke-ParsecDisplayDomainResetActiveDisplay -Arguments $Arguments -ExecutionResult $Prior }
                 'CaptureScaling' { return Invoke-ParsecDisplayDomainCaptureScaling -Arguments $Arguments }
                 'ApplyScaling' { return Invoke-ParsecDisplayDomainApplyScaling -Arguments $Arguments }
                 'VerifyScaling' { return Invoke-ParsecDisplayDomainVerifyScaling -Arguments $Arguments }

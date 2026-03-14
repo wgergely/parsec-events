@@ -1,5 +1,6 @@
 function Resolve-ParsecThemeExpectation {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{}
@@ -30,6 +31,7 @@ function Resolve-ParsecThemeExpectation {
 
 function Get-ParsecThemeCaptureResult {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param()
 
     $themeState = Invoke-ParsecPersonalizationAdapter -Method 'GetThemeState'
@@ -40,6 +42,7 @@ function Get-ParsecThemeCaptureResult {
 
 function Invoke-ParsecThemeApply {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{}
@@ -50,6 +53,7 @@ function Invoke-ParsecThemeApply {
 
 function Invoke-ParsecThemeVerify {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{}
@@ -71,6 +75,7 @@ function Invoke-ParsecThemeVerify {
 
 function Invoke-ParsecThemeReset {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -96,6 +101,7 @@ function Invoke-ParsecThemeReset {
 
 function Resolve-ParsecTextScaleExpectedValue {
     [CmdletBinding()]
+    [OutputType([int])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -122,6 +128,7 @@ function Resolve-ParsecTextScaleExpectedValue {
 
 function Get-ParsecTextScaleCaptureResult {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param()
 
     $observed = Get-ParsecDisplayDomainObservedState
@@ -143,6 +150,7 @@ function Get-ParsecTextScaleCaptureResult {
 
 function Invoke-ParsecTextScaleApply {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -166,6 +174,7 @@ function Invoke-ParsecTextScaleApply {
 
 function Invoke-ParsecTextScaleWait {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -197,6 +206,7 @@ function Invoke-ParsecTextScaleWait {
 
 function Invoke-ParsecTextScaleVerify {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -228,6 +238,7 @@ function Invoke-ParsecTextScaleVerify {
 
 function Invoke-ParsecTextScaleReset {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -248,6 +259,7 @@ function Invoke-ParsecTextScaleReset {
 
 function Resolve-ParsecUiScaleExpectedValue {
     [CmdletBinding()]
+    [OutputType([int])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -282,6 +294,7 @@ function Resolve-ParsecUiScaleExpectedValue {
 
 function Get-ParsecUiScaleCaptureResult {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -316,6 +329,7 @@ function Get-ParsecUiScaleCaptureResult {
 
 function Invoke-ParsecUiScaleApply {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -353,6 +367,7 @@ function Invoke-ParsecUiScaleApply {
 
 function Invoke-ParsecUiScaleWait {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -397,6 +412,7 @@ function Invoke-ParsecUiScaleWait {
 
 function Invoke-ParsecUiScaleVerify {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -441,6 +457,7 @@ function Invoke-ParsecUiScaleVerify {
 
 function Invoke-ParsecUiScaleReset {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},

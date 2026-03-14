@@ -1,5 +1,6 @@
 function Resolve-ParsecProcessDomainProcess {
     [CmdletBinding()]
+    [OutputType([System.Diagnostics.Process])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -54,7 +55,9 @@ function Resolve-ParsecProcessDomainProcess {
 }
 
 function Resolve-ParsecProcessDomainLaunchMetadata {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '')]
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter()]
         $Process
@@ -111,7 +114,8 @@ function Resolve-ParsecProcessDomainLaunchMetadata {
 }
 
 function Start-ParsecProcessDomainFromState {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -153,6 +157,10 @@ function Start-ParsecProcessDomainFromState {
         @()
     }
 
+    if (-not $PSCmdlet.ShouldProcess($filePath, 'Start process')) {
+        return New-ParsecResult -Status 'Skipped' -Message 'Operation skipped by ShouldProcess.'
+    }
+
     $process = Start-Process -FilePath $filePath -ArgumentList $argumentList -PassThru
     return New-ParsecResult -Status 'Succeeded' -Message "Started process '$filePath'." -Outputs @{
         process_id = [int] $process.Id
@@ -164,6 +172,7 @@ function Start-ParsecProcessDomainFromState {
 
 function Invoke-ParsecProcessDomain {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [string] $Method,

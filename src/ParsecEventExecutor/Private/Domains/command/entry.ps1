@@ -57,6 +57,11 @@ return @{
                 [System.Collections.IDictionary] $RunState = @{}
             )
 
+            # Prior, StateRoot, RunState required by domain Invoke contract
+            $null = $Prior
+            $null = $StateRoot
+            $null = $RunState
+
             & $loadSupportFiles $supportFiles
 
             switch ($Method) {

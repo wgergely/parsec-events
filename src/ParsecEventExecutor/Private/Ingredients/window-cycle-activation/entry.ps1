@@ -6,11 +6,19 @@ param(
     [string] $IngredientPath
 )
 
+# Schema, IngredientPath required by ingredient entry contract
+$null = $Schema
+$null = $IngredientPath
+
 return @{
     Domain = 'window'
     Operations = @{
         capture = {
             param($ctx, $operationArguments, $prior)
+
+            # operationArguments, prior required by ingredient operation contract
+            $null = $operationArguments
+            $null = $prior
 
             $capturedState = & $ctx.DomainApi.Invoke 'CaptureState' @{} $null $ctx.StateRoot $ctx.RunState
             & $ctx.Results.Succeed 'Captured window activation state.' @{

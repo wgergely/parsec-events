@@ -1,4 +1,6 @@
 function Set-ParsecIngredientObservedResolution {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
         [int] $Width,
@@ -20,6 +22,8 @@ function Set-ParsecIngredientObservedResolution {
 }
 
 function Set-ParsecIngredientObservedPosition {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
         [int] $X,
@@ -46,6 +50,10 @@ function Get-ParsecIngredientObservedMonitorByDeviceName {
 }
 
 function Enable-ParsecIngredientDualMonitorEnvironment {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    [CmdletBinding()]
+    param()
+
     $secondaryMonitor = [ordered]@{
         device_name = '\\.\DISPLAY2'
         source_name = '\\.\DISPLAY2'
@@ -123,6 +131,8 @@ function Enable-ParsecIngredientDualMonitorEnvironment {
 }
 
 function Add-ParsecIngredientSupportedMode {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
         [int] $Width,
@@ -440,7 +450,6 @@ function Initialize-ParsecIngredientTestEnvironment {
             New-ParsecResult -Status 'Succeeded' -Message 'text-scale' -Observed @{ text_scale_percent = $value } -Outputs @{ text_scale_percent = $value }
         }
     }
-    $global:ParsecPersonalizationAdapter = $script:ParsecPersonalizationAdapter
 
     $script:ParsecDisplayAdapter = @{
         GetObservedState = {
@@ -500,6 +509,9 @@ function Initialize-ParsecIngredientTestEnvironment {
         }
         GetSupportedModes = {
             param($Arguments)
+
+            # Arguments required by adapter interface contract
+            $null = $Arguments
 
             if ($null -ne $script:IngredientNvidiaPendingSupportedMode) {
                 if ($script:IngredientNvidiaSupportedModeLagRemaining -gt 0) {
@@ -661,7 +673,6 @@ function Initialize-ParsecIngredientTestEnvironment {
             New-ParsecResult -Status 'Succeeded' -Message 'scaling' -Requested $Arguments
         }
     }
-    $global:ParsecDisplayAdapter = $script:ParsecDisplayAdapter
 
     $script:ParsecWindowAdapter = @{
         GetForegroundWindowInfo = {
@@ -714,7 +725,6 @@ function Initialize-ParsecIngredientTestEnvironment {
             }
         }
     }
-    $global:ParsecWindowAdapter = $script:ParsecWindowAdapter
 
     $script:ParsecNvidiaAdapter = @{
         GetAvailability = {
@@ -816,7 +826,6 @@ function Initialize-ParsecIngredientTestEnvironment {
             }
         }
     }
-    $global:ParsecNvidiaAdapter = $script:ParsecNvidiaAdapter
 
     $script:IngredientSoundDevices = @(
         [ordered]@{
@@ -893,7 +902,6 @@ function Initialize-ParsecIngredientTestEnvironment {
             }
         }
     }
-    $global:ParsecSoundAdapter = $script:ParsecSoundAdapter
 
     $script:ParsecServiceAdapter = @{
         GetService = {
@@ -927,7 +935,6 @@ function Initialize-ParsecIngredientTestEnvironment {
             New-ParsecResult -Status 'Succeeded' -Message "Stopped service '$serviceName'."
         }
     }
-    $global:ParsecServiceAdapter = $script:ParsecServiceAdapter
 
     if (Get-Command -Name 'Set-ParsecModuleVariableValue' -ErrorAction SilentlyContinue) {
         Set-ParsecModuleVariableValue -Name 'ParsecPersonalizationAdapter' -Value $script:ParsecPersonalizationAdapter | Out-Null
@@ -939,7 +946,7 @@ function Initialize-ParsecIngredientTestEnvironment {
     }
 }
 
-function Clear-ParsecTestAdapters {
+function Clear-ParsecTestAdapter {
     foreach ($name in @(
             'ParsecPersonalizationAdapter',
             'ParsecDisplayAdapter',
@@ -948,7 +955,6 @@ function Clear-ParsecTestAdapters {
             'ParsecServiceAdapter',
             'ParsecSoundAdapter'
         )) {
-        Set-Variable -Scope Global -Name $name -Value $null -Force
         if (Get-Command -Name 'Set-ParsecModuleVariableValue' -ErrorAction SilentlyContinue) {
             Set-ParsecModuleVariableValue -Name $name -Value $null | Out-Null
         }

@@ -1,5 +1,6 @@
 function Get-ParsecDisplayDomainObservedState {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param()
 
     return Invoke-ParsecDisplayAdapter -Method 'GetObservedState'
@@ -7,6 +8,7 @@ function Get-ParsecDisplayDomainObservedState {
 
 function Get-ParsecDisplayDomainCatalogDocumentPath {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter()]
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)
@@ -18,6 +20,7 @@ function Get-ParsecDisplayDomainCatalogDocumentPath {
 
 function Get-ParsecDisplayDomainCatalogDocument {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter()]
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)
@@ -41,6 +44,7 @@ function Get-ParsecDisplayDomainCatalogDocument {
 
 function Save-ParsecDisplayDomainCatalogDocument {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $CatalogDocument,
@@ -57,6 +61,7 @@ function Save-ParsecDisplayDomainCatalogDocument {
 
 function Get-ParsecDisplayDomainIdentityRecord {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Monitor
@@ -82,6 +87,7 @@ function Get-ParsecDisplayDomainIdentityRecord {
 
 function Get-ParsecDisplayDomainIdentityKey {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Monitor
@@ -103,6 +109,7 @@ function Get-ParsecDisplayDomainIdentityKey {
 
 function Test-ParsecDisplayDomainCatalogValueEqual {
     [CmdletBinding()]
+    [OutputType([bool])]
     param(
         [Parameter()]
         $Left,
@@ -126,6 +133,7 @@ function Test-ParsecDisplayDomainCatalogValueEqual {
 
 function Find-ParsecDisplayDomainCatalogEntry {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IEnumerable] $Entries,
@@ -188,6 +196,7 @@ function Find-ParsecDisplayDomainCatalogEntry {
 
 function Sync-ParsecDisplayDomainCatalog {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $ObservedState,
@@ -271,6 +280,7 @@ function Sync-ParsecDisplayDomainCatalog {
 
 function Resolve-ParsecDisplayDomainMonitorByScreenId {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $ObservedState,
@@ -299,6 +309,7 @@ function Resolve-ParsecDisplayDomainMonitorByScreenId {
 
 function Get-ParsecDisplayDomainMonitorLabel {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Monitor
@@ -325,6 +336,7 @@ function Get-ParsecDisplayDomainMonitorLabel {
 
 function Resolve-ParsecDisplayDomainObservedMonitor {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $ObservedState,
@@ -430,6 +442,7 @@ function Resolve-ParsecDisplayDomainObservedMonitor {
 
 function Resolve-ParsecDisplayDomainTargetDeviceName {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $ObservedState,
@@ -467,6 +480,7 @@ function Resolve-ParsecDisplayDomainTargetDeviceName {
 
 function Invoke-ParsecDisplayDomainCaptureTarget {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -485,6 +499,7 @@ function Invoke-ParsecDisplayDomainCaptureTarget {
 
 function Invoke-ParsecDisplayDomainCaptureMonitorState {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter(Mandatory)]
         [string] $Domain,
@@ -506,6 +521,7 @@ function Invoke-ParsecDisplayDomainCaptureMonitorState {
 
 function Invoke-ParsecDisplayDomainApplyResolution {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -515,7 +531,7 @@ function Invoke-ParsecDisplayDomainApplyResolution {
     )
 
     $deviceName = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments -StateRoot $StateRoot
-    $supportedModes = @(Get-ParsecSupportedDisplayModes -DeviceName $deviceName)
+    $supportedModes = @(Get-ParsecSupportedDisplayMode -DeviceName $deviceName)
     $supportedModeCount = @($supportedModes).Count
     $requestedWidth = [int] $Arguments.width
     $requestedHeight = [int] $Arguments.height
@@ -558,6 +574,7 @@ function Invoke-ParsecDisplayDomainApplyResolution {
 
 function Invoke-ParsecDisplayDomainWaitResolution {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -596,6 +613,7 @@ function Invoke-ParsecDisplayDomainWaitResolution {
 
 function Invoke-ParsecDisplayDomainVerifyResolution {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -612,7 +630,7 @@ function Invoke-ParsecDisplayDomainVerifyResolution {
     }
 
     if ($monitor.bounds.width -ne [int] $Arguments.width -or $monitor.bounds.height -ne [int] $Arguments.height) {
-        $supportedModes = @(Get-ParsecSupportedDisplayModes -DeviceName $deviceName)
+        $supportedModes = @(Get-ParsecSupportedDisplayMode -DeviceName $deviceName)
         return New-ParsecResult -Status 'Failed' -Message "Monitor '$deviceName' resolution mismatch." -Observed $monitor -Outputs @{
             device_name = $deviceName
             width = [int] $Arguments.width
@@ -631,6 +649,7 @@ function Invoke-ParsecDisplayDomainVerifyResolution {
 
 function Invoke-ParsecDisplayDomainResetResolution {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -653,6 +672,7 @@ function Invoke-ParsecDisplayDomainResetResolution {
 
 function Invoke-ParsecDisplayDomainApplyEnsureResolution {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -667,8 +687,12 @@ function Invoke-ParsecDisplayDomainApplyEnsureResolution {
         [System.Collections.IDictionary] $RunState = @{}
     )
 
+    # ExecutionResult, RunState required by domain operation contract
+    $null = $ExecutionResult
+    $null = $RunState
+
     $deviceName = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments -StateRoot $StateRoot
-    $supportedModes = @(Get-ParsecSupportedDisplayModes -DeviceName $deviceName)
+    $supportedModes = @(Get-ParsecSupportedDisplayMode -DeviceName $deviceName)
     $requestedWidth = [int] $Arguments.width
     $requestedHeight = [int] $Arguments.height
     $requestedOrientation = if ($Arguments.Contains('orientation')) { [string] $Arguments.orientation } else { $null }
@@ -710,6 +734,7 @@ function Invoke-ParsecDisplayDomainApplyEnsureResolution {
 
 function Invoke-ParsecDisplayDomainVerifyEnsureResolution {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -738,6 +763,7 @@ function Invoke-ParsecDisplayDomainVerifyEnsureResolution {
 
 function Invoke-ParsecDisplayDomainResetEnsureResolution {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -756,6 +782,7 @@ function Invoke-ParsecDisplayDomainResetEnsureResolution {
 
 function Invoke-ParsecDisplayDomainApplyOrientation {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -782,6 +809,7 @@ function Invoke-ParsecDisplayDomainApplyOrientation {
 
 function Invoke-ParsecDisplayDomainWaitOrientation {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -814,6 +842,7 @@ function Invoke-ParsecDisplayDomainWaitOrientation {
 
 function Invoke-ParsecDisplayDomainVerifyOrientation {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -844,6 +873,7 @@ function Invoke-ParsecDisplayDomainVerifyOrientation {
 
 function Invoke-ParsecDisplayDomainResetOrientation {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -865,6 +895,7 @@ function Invoke-ParsecDisplayDomainResetOrientation {
 
 function Invoke-ParsecDisplayDomainCapturePrimary {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{}
@@ -881,6 +912,7 @@ function Invoke-ParsecDisplayDomainCapturePrimary {
 
 function Invoke-ParsecDisplayDomainApplyPrimary {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{}
@@ -891,6 +923,7 @@ function Invoke-ParsecDisplayDomainApplyPrimary {
 
 function Invoke-ParsecDisplayDomainVerifyPrimary {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{}
@@ -909,6 +942,7 @@ function Invoke-ParsecDisplayDomainVerifyPrimary {
 
 function Invoke-ParsecDisplayDomainResetPrimary {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -929,6 +963,7 @@ function Invoke-ParsecDisplayDomainResetPrimary {
 
 function Invoke-ParsecDisplayDomainCaptureEnabled {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{}
@@ -940,6 +975,7 @@ function Invoke-ParsecDisplayDomainCaptureEnabled {
 
 function Invoke-ParsecDisplayDomainApplyEnabled {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{}
@@ -950,6 +986,7 @@ function Invoke-ParsecDisplayDomainApplyEnabled {
 
 function Invoke-ParsecDisplayDomainVerifyEnabled {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{}
@@ -968,6 +1005,7 @@ function Invoke-ParsecDisplayDomainVerifyEnabled {
 
 function Invoke-ParsecDisplayDomainResetEnabled {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -988,8 +1026,9 @@ function Invoke-ParsecDisplayDomainResetEnabled {
     }
 }
 
-function Invoke-ParsecDisplayDomainCaptureActiveDisplays {
+function Invoke-ParsecDisplayDomainCaptureActiveDisplay {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param()
 
     $observed = Get-ParsecDisplayDomainObservedState
@@ -999,8 +1038,9 @@ function Invoke-ParsecDisplayDomainCaptureActiveDisplays {
     }
 }
 
-function Invoke-ParsecDisplayDomainApplyActiveDisplays {
+function Invoke-ParsecDisplayDomainApplyActiveDisplay {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -1039,8 +1079,9 @@ function Invoke-ParsecDisplayDomainApplyActiveDisplays {
     return $result
 }
 
-function Invoke-ParsecDisplayDomainWaitActiveDisplays {
+function Invoke-ParsecDisplayDomainWaitActiveDisplay {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -1071,8 +1112,9 @@ function Invoke-ParsecDisplayDomainWaitActiveDisplays {
     }
 }
 
-function Invoke-ParsecDisplayDomainVerifyActiveDisplays {
+function Invoke-ParsecDisplayDomainVerifyActiveDisplay {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -1103,8 +1145,9 @@ function Invoke-ParsecDisplayDomainVerifyActiveDisplays {
     }
 }
 
-function Invoke-ParsecDisplayDomainResetActiveDisplays {
+function Invoke-ParsecDisplayDomainResetActiveDisplay {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -1123,6 +1166,7 @@ function Invoke-ParsecDisplayDomainResetActiveDisplays {
 
 function Invoke-ParsecDisplayDomainCaptureScaling {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{}
@@ -1146,6 +1190,7 @@ function Invoke-ParsecDisplayDomainCaptureScaling {
 
 function Invoke-ParsecDisplayDomainApplyScaling {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{}
@@ -1156,6 +1201,7 @@ function Invoke-ParsecDisplayDomainApplyScaling {
 
 function Invoke-ParsecDisplayDomainVerifyScaling {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{}
@@ -1176,6 +1222,7 @@ function Invoke-ParsecDisplayDomainVerifyScaling {
 
 function Invoke-ParsecDisplayDomainResetScaling {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -1196,6 +1243,7 @@ function Invoke-ParsecDisplayDomainResetScaling {
 
 function Resolve-ParsecDisplayDomainUiScaleExpectedValue {
     [CmdletBinding()]
+    [OutputType([int])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -1215,6 +1263,7 @@ function Resolve-ParsecDisplayDomainUiScaleExpectedValue {
 
 function Invoke-ParsecDisplayDomainCaptureTextScale {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param()
 
     $observed = Get-ParsecDisplayDomainObservedState
@@ -1224,6 +1273,7 @@ function Invoke-ParsecDisplayDomainCaptureTextScale {
 
 function Invoke-ParsecDisplayDomainCaptureUiScale {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $Arguments = @{},
@@ -1243,6 +1293,8 @@ function Invoke-ParsecDisplayDomainCaptureUiScale {
 
 function Get-ParsecDisplayDomainInventory {
     [CmdletBinding()]
+    [OutputType([array])]
+    [OutputType([System.Object[]])]
     param(
         [Parameter()]
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)
@@ -1275,6 +1327,7 @@ function Get-ParsecDisplayDomainInventory {
 
 function Get-ParsecDisplayDomainAuditState {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter()]
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)
@@ -1295,6 +1348,7 @@ function Get-ParsecDisplayDomainAuditState {
 
 function Get-ParsecDisplayDomainTopologyCaptureState {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter()]
         [System.Collections.IDictionary] $ObservedState = $(Get-ParsecDisplayDomainObservedState)
@@ -1341,6 +1395,7 @@ function Get-ParsecDisplayDomainTopologyCaptureState {
 
 function Invoke-ParsecDisplayDomainTopologyReset {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $TopologyState,
@@ -1418,6 +1473,7 @@ function Invoke-ParsecDisplayDomainTopologyReset {
 
 function Compare-ParsecDisplayDomainTopologyState {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $TargetState,
@@ -1449,6 +1505,7 @@ function Compare-ParsecDisplayDomainTopologyState {
 
 function Compare-ParsecDisplayDomainState {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $TargetState,
@@ -1491,20 +1548,20 @@ function Compare-ParsecDisplayDomainState {
     return New-ParsecResult -Status 'Succeeded' -Message 'Observed state matches the target state.' -Observed $ObservedState -Outputs @{ target_state = $TargetState }
 }
 
-function Invoke-ParsecDisplayDomainApplyTextScale { [CmdletBinding()] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()] $ExecutionResult) $v = if ($Arguments.Contains('text_scale_percent')) { [int] $Arguments.text_scale_percent } elseif ($Arguments.Contains('value')) { [int] $Arguments.value } else { [int] (Get-ParsecCapturedStateFromResult -Arguments $Arguments -ExecutionResult $ExecutionResult).text_scale_percent }; $r = Invoke-ParsecPersonalizationAdapter -Method 'SetTextScale' -Arguments @{ text_scale_percent = $v }; $r.Requested = [ordered]@{ text_scale_percent = $v }; $r.Outputs = [ordered]@{ text_scale_percent = $v }; return $r }
-function Invoke-ParsecDisplayDomainWaitTextScale { [CmdletBinding()] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()] $ExecutionResult) $e = if ($Arguments.Contains('text_scale_percent')) { [int] $Arguments.text_scale_percent } elseif ($Arguments.Contains('value')) { [int] $Arguments.value } else { [int] (Get-ParsecCapturedStateFromResult -Arguments $Arguments -ExecutionResult $ExecutionResult).text_scale_percent }; $o = Get-ParsecDisplayDomainObservedState; $c = if ($o.Contains('font_scaling') -and $o.font_scaling.Contains('text_scale_percent')) { [int] $o.font_scaling.text_scale_percent } else { $null }; if ($c -ne $e) { return New-ParsecResult -Status 'Failed' -Message 'Text scale is still settling.' -Observed $o.font_scaling -Outputs @{ text_scale_percent = $e; observed_text_scale_percent = $c } -Errors @('ReadinessPending') }; return New-ParsecResult -Status 'Succeeded' -Message 'Text scale is ready.' -Observed $o.font_scaling -Outputs @{ text_scale_percent = $e } }
-function Invoke-ParsecDisplayDomainVerifyTextScale { [CmdletBinding()] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()] $ExecutionResult) $e = if ($Arguments.Contains('text_scale_percent')) { [int] $Arguments.text_scale_percent } elseif ($Arguments.Contains('value')) { [int] $Arguments.value } else { [int] (Get-ParsecCapturedStateFromResult -Arguments $Arguments -ExecutionResult $ExecutionResult).text_scale_percent }; $o = Get-ParsecDisplayDomainObservedState; $c = if ($o.Contains('font_scaling') -and $o.font_scaling.Contains('text_scale_percent')) { [int] $o.font_scaling.text_scale_percent } else { $null }; if ($c -ne $e) { return New-ParsecResult -Status 'Failed' -Message 'Text scale mismatch.' -Observed $o.font_scaling -Outputs @{ text_scale_percent = $e; observed_text_scale_percent = $c } -Errors @('TextScaleDrift') }; return New-ParsecResult -Status 'Succeeded' -Message 'Text scale matches.' -Observed $o.font_scaling -Outputs @{ text_scale_percent = $e } }
-function Invoke-ParsecDisplayDomainResetTextScale { [CmdletBinding()] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()] $ExecutionResult) $s = Get-ParsecCapturedStateFromResult -Arguments $Arguments -ExecutionResult $ExecutionResult; if ($null -eq $s -or -not $s.Contains('text_scale_percent')) { return New-ParsecResult -Status 'Failed' -Message 'Captured text scaling state does not include a resettable value.' -Errors @('MissingCapturedState') }; return Invoke-ParsecPersonalizationAdapter -Method 'SetTextScale' -Arguments @{ text_scale_percent = [int] $s.text_scale_percent } }
+function Invoke-ParsecDisplayDomainApplyTextScale { [CmdletBinding()] [OutputType([hashtable])] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()] $ExecutionResult) $v = if ($Arguments.Contains('text_scale_percent')) { [int] $Arguments.text_scale_percent } elseif ($Arguments.Contains('value')) { [int] $Arguments.value } else { [int] (Get-ParsecCapturedStateFromResult -Arguments $Arguments -ExecutionResult $ExecutionResult).text_scale_percent }; $r = Invoke-ParsecPersonalizationAdapter -Method 'SetTextScale' -Arguments @{ text_scale_percent = $v }; $r.Requested = [ordered]@{ text_scale_percent = $v }; $r.Outputs = [ordered]@{ text_scale_percent = $v }; return $r }
+function Invoke-ParsecDisplayDomainWaitTextScale { [CmdletBinding()] [OutputType([hashtable])] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()] $ExecutionResult) $e = if ($Arguments.Contains('text_scale_percent')) { [int] $Arguments.text_scale_percent } elseif ($Arguments.Contains('value')) { [int] $Arguments.value } else { [int] (Get-ParsecCapturedStateFromResult -Arguments $Arguments -ExecutionResult $ExecutionResult).text_scale_percent }; $o = Get-ParsecDisplayDomainObservedState; $c = if ($o.Contains('font_scaling') -and $o.font_scaling.Contains('text_scale_percent')) { [int] $o.font_scaling.text_scale_percent } else { $null }; if ($c -ne $e) { return New-ParsecResult -Status 'Failed' -Message 'Text scale is still settling.' -Observed $o.font_scaling -Outputs @{ text_scale_percent = $e; observed_text_scale_percent = $c } -Errors @('ReadinessPending') }; return New-ParsecResult -Status 'Succeeded' -Message 'Text scale is ready.' -Observed $o.font_scaling -Outputs @{ text_scale_percent = $e } }
+function Invoke-ParsecDisplayDomainVerifyTextScale { [CmdletBinding()] [OutputType([hashtable])] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()] $ExecutionResult) $e = if ($Arguments.Contains('text_scale_percent')) { [int] $Arguments.text_scale_percent } elseif ($Arguments.Contains('value')) { [int] $Arguments.value } else { [int] (Get-ParsecCapturedStateFromResult -Arguments $Arguments -ExecutionResult $ExecutionResult).text_scale_percent }; $o = Get-ParsecDisplayDomainObservedState; $c = if ($o.Contains('font_scaling') -and $o.font_scaling.Contains('text_scale_percent')) { [int] $o.font_scaling.text_scale_percent } else { $null }; if ($c -ne $e) { return New-ParsecResult -Status 'Failed' -Message 'Text scale mismatch.' -Observed $o.font_scaling -Outputs @{ text_scale_percent = $e; observed_text_scale_percent = $c } -Errors @('TextScaleDrift') }; return New-ParsecResult -Status 'Succeeded' -Message 'Text scale matches.' -Observed $o.font_scaling -Outputs @{ text_scale_percent = $e } }
+function Invoke-ParsecDisplayDomainResetTextScale { [CmdletBinding()] [OutputType([hashtable])] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()] $ExecutionResult) $s = Get-ParsecCapturedStateFromResult -Arguments $Arguments -ExecutionResult $ExecutionResult; if ($null -eq $s -or -not $s.Contains('text_scale_percent')) { return New-ParsecResult -Status 'Failed' -Message 'Captured text scaling state does not include a resettable value.' -Errors @('MissingCapturedState') }; return Invoke-ParsecPersonalizationAdapter -Method 'SetTextScale' -Arguments @{ text_scale_percent = [int] $s.text_scale_percent } }
 
-function Invoke-ParsecDisplayDomainApplyUiScale { [CmdletBinding()] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()] $ExecutionResult, [Parameter()][string] $StateRoot = (Get-ParsecDefaultStateRoot)) $u = Resolve-ParsecDisplayDomainUiScaleExpectedValue -Arguments $Arguments -ExecutionResult $ExecutionResult; $d = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments -StateRoot $StateRoot; $r = Invoke-ParsecPersonalizationAdapter -Method 'SetUiScale' -Arguments @{ device_name = $d; ui_scale_percent = $u }; $a = if ($r.Outputs -and $r.Outputs.Contains('ui_scale_percent')) { [int] $r.Outputs.ui_scale_percent } else { $u }; $r.Requested = [ordered]@{ device_name = $d; ui_scale_percent = $u }; $r.Outputs = [ordered]@{ device_name = $d; ui_scale_percent = $a; requires_signout = if ($r.Outputs -and $r.Outputs.Contains('requires_signout')) { [bool] $r.Outputs.requires_signout } else { $false } }; return $r }
-function Invoke-ParsecDisplayDomainWaitUiScale { [CmdletBinding()] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()] $ExecutionResult, [Parameter()][string] $StateRoot = (Get-ParsecDefaultStateRoot)) $e = Resolve-ParsecDisplayDomainUiScaleExpectedValue -Arguments $Arguments -ExecutionResult $ExecutionResult; $o = Get-ParsecDisplayDomainObservedState; $d = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments -StateRoot $StateRoot; $m = Get-ParsecObservedMonitor -ObservedState $o -DeviceName $d; if ($null -eq $m) { return New-ParsecResult -Status 'Failed' -Message \"Monitor '$d' not found during readiness probe.\" -Observed $o -Errors @('MonitorNotFound') }; $c = if ($m.display -is [System.Collections.IDictionary] -and $m.display.Contains('scale_percent')) { [int] $m.display.scale_percent } else { $null }; if ($c -ne $e) { return New-ParsecResult -Status 'Failed' -Message 'UI scale is still settling.' -Observed $m -Outputs @{ device_name = $d; ui_scale_percent = $e; observed_ui_scale_percent = $c; requires_signout = $false } -Errors @('ReadinessPending') }; return New-ParsecResult -Status 'Succeeded' -Message 'UI scale is ready.' -Observed $m -Outputs @{ device_name = $d; ui_scale_percent = $e; requires_signout = if ($ExecutionResult -and $ExecutionResult.Outputs -and $ExecutionResult.Outputs.Contains('requires_signout')) { [bool] $ExecutionResult.Outputs.requires_signout } else { $false } } }
-function Invoke-ParsecDisplayDomainVerifyUiScale { [CmdletBinding()] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()] $ExecutionResult, [Parameter()][string] $StateRoot = (Get-ParsecDefaultStateRoot)) $e = Resolve-ParsecDisplayDomainUiScaleExpectedValue -Arguments $Arguments -ExecutionResult $ExecutionResult; $o = Get-ParsecDisplayDomainObservedState; $d = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments -StateRoot $StateRoot; $m = Get-ParsecObservedMonitor -ObservedState $o -DeviceName $d; if ($null -eq $m) { return New-ParsecResult -Status 'Failed' -Message \"Monitor '$d' not found.\" -Observed $o -Errors @('MonitorNotFound') }; $c = if ($m.display -is [System.Collections.IDictionary] -and $m.display.Contains('scale_percent')) { [int] $m.display.scale_percent } else { $null }; if ($c -ne $e) { return New-ParsecResult -Status 'Failed' -Message 'UI scale mismatch.' -Observed $m -Outputs @{ device_name = $d; ui_scale_percent = $e; observed_ui_scale_percent = $c; requires_signout = $false } -Errors @('UiScaleDrift') }; return New-ParsecResult -Status 'Succeeded' -Message 'UI scale matches.' -Observed $m -Outputs @{ device_name = $d; ui_scale_percent = $e; requires_signout = if ($ExecutionResult -and $ExecutionResult.Outputs -and $ExecutionResult.Outputs.Contains('requires_signout')) { [bool] $ExecutionResult.Outputs.requires_signout } else { $false } } }
-function Invoke-ParsecDisplayDomainResetUiScale { [CmdletBinding()] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()] $ExecutionResult) $s = Get-ParsecCapturedStateFromResult -Arguments $Arguments -ExecutionResult $ExecutionResult; if ($null -eq $s -or -not $s.Contains('ui_scale_percent')) { return New-ParsecResult -Status 'Failed' -Message 'Captured UI scaling state does not include a resettable value.' -Errors @('MissingCapturedState') }; return Invoke-ParsecPersonalizationAdapter -Method 'SetUiScale' -Arguments @{ device_name = if ($s.Contains('device_name')) { [string] $s.device_name } else { $null }; ui_scale_percent = [int] $s.ui_scale_percent } }
+function Invoke-ParsecDisplayDomainApplyUiScale { [CmdletBinding()] [OutputType([hashtable])] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()] $ExecutionResult, [Parameter()][string] $StateRoot = (Get-ParsecDefaultStateRoot)) $u = Resolve-ParsecDisplayDomainUiScaleExpectedValue -Arguments $Arguments -ExecutionResult $ExecutionResult; $d = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments -StateRoot $StateRoot; $r = Invoke-ParsecPersonalizationAdapter -Method 'SetUiScale' -Arguments @{ device_name = $d; ui_scale_percent = $u }; $a = if ($r.Outputs -and $r.Outputs.Contains('ui_scale_percent')) { [int] $r.Outputs.ui_scale_percent } else { $u }; $r.Requested = [ordered]@{ device_name = $d; ui_scale_percent = $u }; $r.Outputs = [ordered]@{ device_name = $d; ui_scale_percent = $a; requires_signout = if ($r.Outputs -and $r.Outputs.Contains('requires_signout')) { [bool] $r.Outputs.requires_signout } else { $false } }; return $r }
+function Invoke-ParsecDisplayDomainWaitUiScale { [CmdletBinding()] [OutputType([hashtable])] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()] $ExecutionResult, [Parameter()][string] $StateRoot = (Get-ParsecDefaultStateRoot)) $e = Resolve-ParsecDisplayDomainUiScaleExpectedValue -Arguments $Arguments -ExecutionResult $ExecutionResult; $o = Get-ParsecDisplayDomainObservedState; $d = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments -StateRoot $StateRoot; $m = Get-ParsecObservedMonitor -ObservedState $o -DeviceName $d; if ($null -eq $m) { return New-ParsecResult -Status 'Failed' -Message \"Monitor '$d' not found during readiness probe.\" -Observed $o -Errors @('MonitorNotFound') }; $c = if ($m.display -is [System.Collections.IDictionary] -and $m.display.Contains('scale_percent')) { [int] $m.display.scale_percent } else { $null }; if ($c -ne $e) { return New-ParsecResult -Status 'Failed' -Message 'UI scale is still settling.' -Observed $m -Outputs @{ device_name = $d; ui_scale_percent = $e; observed_ui_scale_percent = $c; requires_signout = $false } -Errors @('ReadinessPending') }; return New-ParsecResult -Status 'Succeeded' -Message 'UI scale is ready.' -Observed $m -Outputs @{ device_name = $d; ui_scale_percent = $e; requires_signout = if ($ExecutionResult -and $ExecutionResult.Outputs -and $ExecutionResult.Outputs.Contains('requires_signout')) { [bool] $ExecutionResult.Outputs.requires_signout } else { $false } } }
+function Invoke-ParsecDisplayDomainVerifyUiScale { [CmdletBinding()] [OutputType([hashtable])] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()] $ExecutionResult, [Parameter()][string] $StateRoot = (Get-ParsecDefaultStateRoot)) $e = Resolve-ParsecDisplayDomainUiScaleExpectedValue -Arguments $Arguments -ExecutionResult $ExecutionResult; $o = Get-ParsecDisplayDomainObservedState; $d = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments -StateRoot $StateRoot; $m = Get-ParsecObservedMonitor -ObservedState $o -DeviceName $d; if ($null -eq $m) { return New-ParsecResult -Status 'Failed' -Message \"Monitor '$d' not found.\" -Observed $o -Errors @('MonitorNotFound') }; $c = if ($m.display -is [System.Collections.IDictionary] -and $m.display.Contains('scale_percent')) { [int] $m.display.scale_percent } else { $null }; if ($c -ne $e) { return New-ParsecResult -Status 'Failed' -Message 'UI scale mismatch.' -Observed $m -Outputs @{ device_name = $d; ui_scale_percent = $e; observed_ui_scale_percent = $c; requires_signout = $false } -Errors @('UiScaleDrift') }; return New-ParsecResult -Status 'Succeeded' -Message 'UI scale matches.' -Observed $m -Outputs @{ device_name = $d; ui_scale_percent = $e; requires_signout = if ($ExecutionResult -and $ExecutionResult.Outputs -and $ExecutionResult.Outputs.Contains('requires_signout')) { [bool] $ExecutionResult.Outputs.requires_signout } else { $false } } }
+function Invoke-ParsecDisplayDomainResetUiScale { [CmdletBinding()] [OutputType([hashtable])] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()] $ExecutionResult) $s = Get-ParsecCapturedStateFromResult -Arguments $Arguments -ExecutionResult $ExecutionResult; if ($null -eq $s -or -not $s.Contains('ui_scale_percent')) { return New-ParsecResult -Status 'Failed' -Message 'Captured UI scaling state does not include a resettable value.' -Errors @('MissingCapturedState') }; return Invoke-ParsecPersonalizationAdapter -Method 'SetUiScale' -Arguments @{ device_name = if ($s.Contains('device_name')) { [string] $s.device_name } else { $null }; ui_scale_percent = [int] $s.ui_scale_percent } }
 
-function Invoke-ParsecDisplayDomainCaptureSnapshot { [CmdletBinding()] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()][string] $StateRoot = (Get-ParsecDefaultStateRoot), [Parameter()][System.Collections.IDictionary] $RunState = @{}) return Invoke-ParsecSnapshotDomainCapture -Arguments $Arguments -StateRoot $StateRoot -RunState $RunState }
-function Invoke-ParsecDisplayDomainResetSnapshot { [CmdletBinding()] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()][string] $StateRoot = (Get-ParsecDefaultStateRoot), [Parameter()][System.Collections.IDictionary] $RunState = @{}) $t = Get-ParsecSnapshotDomainTarget -Arguments $Arguments -StateRoot $StateRoot -RunState $RunState; $RunState.active_snapshot = $t.snapshot_name; return Invoke-ParsecSnapshotDomainReset -SnapshotDocument $t.snapshot }
-function Invoke-ParsecDisplayDomainVerifySnapshot { [CmdletBinding()] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()][string] $StateRoot = (Get-ParsecDefaultStateRoot), [Parameter()][System.Collections.IDictionary] $RunState = @{}) $t = Get-ParsecSnapshotDomainTarget -Arguments $Arguments -StateRoot $StateRoot -RunState $RunState; $o = Get-ParsecDisplayDomainObservedState; $v = Compare-ParsecDisplayDomainState -TargetState $t.snapshot.display -ObservedState $o; $v.Outputs.snapshot_name = $t.snapshot_name; return $v }
+function Invoke-ParsecDisplayDomainCaptureSnapshot { [CmdletBinding()] [OutputType([hashtable])] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()][string] $StateRoot = (Get-ParsecDefaultStateRoot), [Parameter()][System.Collections.IDictionary] $RunState = @{}) return Invoke-ParsecSnapshotDomainCapture -Arguments $Arguments -StateRoot $StateRoot -RunState $RunState }
+function Invoke-ParsecDisplayDomainResetSnapshot { [CmdletBinding()] [OutputType([hashtable])] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()][string] $StateRoot = (Get-ParsecDefaultStateRoot), [Parameter()][System.Collections.IDictionary] $RunState = @{}) $t = Get-ParsecSnapshotDomainTarget -Arguments $Arguments -StateRoot $StateRoot -RunState $RunState; $RunState.active_snapshot = $t.snapshot_name; return Invoke-ParsecSnapshotDomainReset -SnapshotDocument $t.snapshot }
+function Invoke-ParsecDisplayDomainVerifySnapshot { [CmdletBinding()] [OutputType([hashtable])] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()][string] $StateRoot = (Get-ParsecDefaultStateRoot), [Parameter()][System.Collections.IDictionary] $RunState = @{}) $t = Get-ParsecSnapshotDomainTarget -Arguments $Arguments -StateRoot $StateRoot -RunState $RunState; $o = Get-ParsecDisplayDomainObservedState; $v = Compare-ParsecDisplayDomainState -TargetState $t.snapshot.display -ObservedState $o; $v.Outputs.snapshot_name = $t.snapshot_name; return $v }
 
-function Invoke-ParsecDisplayDomainCaptureTopologySnapshot { [CmdletBinding()] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()][string] $StateRoot = (Get-ParsecDefaultStateRoot), [Parameter()][System.Collections.IDictionary] $RunState = @{}) $n = Resolve-ParsecSnapshotDomainName -Arguments $Arguments -StateRoot $StateRoot -RunState $RunState -UseDefaultCaptureName; $o = Get-ParsecDisplayDomainObservedState; $t = Get-ParsecDisplayDomainTopologyCaptureState -ObservedState $o; $s = [ordered]@{ schema_version = 1; name = $n; source = 'capture'; captured_at = [DateTimeOffset]::UtcNow.ToString('o'); display = $t }; $p = Save-ParsecSnapshotDocument -Name $n -SnapshotDocument $s -StateRoot $StateRoot; $RunState.active_snapshot = $n; return New-ParsecResult -Status 'Succeeded' -Message \"Captured topology snapshot '$n'.\" -Observed $t -Outputs @{ snapshot_name = $n; snapshot = $s; captured_state = $t; path = $p } }
-function Invoke-ParsecDisplayDomainResetTopologySnapshot { [CmdletBinding()] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()][string] $StateRoot = (Get-ParsecDefaultStateRoot), [Parameter()][System.Collections.IDictionary] $RunState = @{}) $t = Get-ParsecSnapshotDomainTarget -Arguments $Arguments -StateRoot $StateRoot -RunState $RunState; $RunState.active_snapshot = $t.snapshot_name; return Invoke-ParsecDisplayDomainTopologyReset -TopologyState $t.snapshot.display -SnapshotName $t.snapshot_name }
-function Invoke-ParsecDisplayDomainVerifyTopologySnapshot { [CmdletBinding()] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()][string] $StateRoot = (Get-ParsecDefaultStateRoot), [Parameter()][System.Collections.IDictionary] $RunState = @{}) $t = Get-ParsecSnapshotDomainTarget -Arguments $Arguments -StateRoot $StateRoot -RunState $RunState; $o = Get-ParsecDisplayDomainObservedState; $v = Compare-ParsecDisplayDomainTopologyState -TargetState $t.snapshot.display -ObservedState $o; $v.Outputs.snapshot_name = $t.snapshot_name; return $v }
+function Invoke-ParsecDisplayDomainCaptureTopologySnapshot { [CmdletBinding()] [OutputType([hashtable])] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()][string] $StateRoot = (Get-ParsecDefaultStateRoot), [Parameter()][System.Collections.IDictionary] $RunState = @{}) $n = Resolve-ParsecSnapshotDomainName -Arguments $Arguments -StateRoot $StateRoot -RunState $RunState -UseDefaultCaptureName; $o = Get-ParsecDisplayDomainObservedState; $t = Get-ParsecDisplayDomainTopologyCaptureState -ObservedState $o; $s = [ordered]@{ schema_version = 1; name = $n; source = 'capture'; captured_at = [DateTimeOffset]::UtcNow.ToString('o'); display = $t }; $p = Save-ParsecSnapshotDocument -Name $n -SnapshotDocument $s -StateRoot $StateRoot; $RunState.active_snapshot = $n; return New-ParsecResult -Status 'Succeeded' -Message \"Captured topology snapshot '$n'.\" -Observed $t -Outputs @{ snapshot_name = $n; snapshot = $s; captured_state = $t; path = $p } }
+function Invoke-ParsecDisplayDomainResetTopologySnapshot { [CmdletBinding()] [OutputType([hashtable])] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()][string] $StateRoot = (Get-ParsecDefaultStateRoot), [Parameter()][System.Collections.IDictionary] $RunState = @{}) $t = Get-ParsecSnapshotDomainTarget -Arguments $Arguments -StateRoot $StateRoot -RunState $RunState; $RunState.active_snapshot = $t.snapshot_name; return Invoke-ParsecDisplayDomainTopologyReset -TopologyState $t.snapshot.display -SnapshotName $t.snapshot_name }
+function Invoke-ParsecDisplayDomainVerifyTopologySnapshot { [CmdletBinding()] [OutputType([hashtable])] param([Parameter()][System.Collections.IDictionary] $Arguments = @{}, [Parameter()][string] $StateRoot = (Get-ParsecDefaultStateRoot), [Parameter()][System.Collections.IDictionary] $RunState = @{}) $t = Get-ParsecSnapshotDomainTarget -Arguments $Arguments -StateRoot $StateRoot -RunState $RunState; $o = Get-ParsecDisplayDomainObservedState; $v = Compare-ParsecDisplayDomainTopologyState -TargetState $t.snapshot.display -ObservedState $o; $v.Outputs.snapshot_name = $t.snapshot_name; return $v }

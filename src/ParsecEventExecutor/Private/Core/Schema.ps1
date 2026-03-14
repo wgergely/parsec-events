@@ -1,5 +1,6 @@
 function Test-ParsecCoreArgumentType {
     [CmdletBinding()]
+    [OutputType([bool])]
     param(
         [Parameter(Mandatory)]
         $Value,
@@ -30,6 +31,7 @@ function Test-ParsecCoreArgumentType {
 
 function Get-ParsecCoreIngredientSchemaForOperation {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter(Mandatory)]
         $Definition,
@@ -49,8 +51,9 @@ function Get-ParsecCoreIngredientSchemaForOperation {
     return @{}
 }
 
-function Assert-ParsecCoreIngredientArguments {
+function Assert-ParsecCoreIngredientArgument {
     [CmdletBinding()]
+    [OutputType([void])]
     param(
         [Parameter(Mandatory)]
         $Definition,

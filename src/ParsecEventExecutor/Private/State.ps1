@@ -1,5 +1,7 @@
 function New-ParsecRunState {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $Recipe,
@@ -35,6 +37,7 @@ function New-ParsecRunState {
 
 function Save-ParsecRunState {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $RunState
@@ -47,6 +50,7 @@ function Save-ParsecRunState {
 
 function Get-ParsecExecutorStateDocument {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter()]
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)
@@ -78,6 +82,7 @@ function Get-ParsecExecutorStateDocument {
 
 function Save-ParsecExecutorStateDocument {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $StateDocument,
@@ -95,6 +100,7 @@ function Save-ParsecExecutorStateDocument {
 
 function Save-ParsecSnapshotDocument {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [string] $Name,
@@ -113,6 +119,7 @@ function Save-ParsecSnapshotDocument {
 
 function Read-ParsecSnapshotDocument {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [string] $Name,
@@ -136,6 +143,7 @@ function Read-ParsecSnapshotDocument {
 
 function Get-ParsecRunStateDocument {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [string] $RunId,
@@ -159,7 +167,9 @@ function Get-ParsecRunStateDocument {
 }
 
 function Get-ParsecRecoveryStatus {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '')]
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter()]
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)
@@ -195,7 +205,7 @@ function Get-ParsecRecoveryStatus {
         $issues.Add('Executor state and last run transition ids differ.')
     }
 
-    $recoveryCandidate = Get-ParsecRecoveryCandidateFromEvents -StateRoot $StateRoot
+    $recoveryCandidate = Get-ParsecRecoveryCandidateFromEvent -StateRoot $StateRoot
     $isRecoverable = $recoveryCandidate.recovered_from_journal -and $issues.Count -gt 0
 
     return [ordered]@{
@@ -212,8 +222,10 @@ function Get-ParsecRecoveryStatus {
     }
 }
 
-function Get-ParsecEventDocuments {
+function Get-ParsecEventDocument {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary[]])]
+    [OutputType([System.Object[]])]
     param(
         [Parameter()]
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)
@@ -250,8 +262,9 @@ function Get-ParsecEventDocuments {
     return @($documents)
 }
 
-function Get-ParsecRecoveryCandidateFromEvents {
+function Get-ParsecRecoveryCandidateFromEvent {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter()]
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)
@@ -270,7 +283,7 @@ function Get-ParsecRecoveryCandidateFromEvents {
         recovered_at = [DateTimeOffset]::UtcNow.ToString('o')
     }
 
-    foreach ($eventRecord in @(Get-ParsecEventDocuments -StateRoot $StateRoot)) {
+    foreach ($eventRecord in @(Get-ParsecEventDocument -StateRoot $StateRoot)) {
         $eventType = if ($eventRecord.envelope) { $eventRecord.envelope.document_type } else { $null }
         $payload = $eventRecord.payload
         switch ($eventType) {
@@ -318,12 +331,13 @@ function Get-ParsecRecoveryCandidateFromEvents {
 
 function Repair-ParsecExecutorStateDocumentInternal {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter()]
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)
     )
 
-    $candidate = Get-ParsecRecoveryCandidateFromEvents -StateRoot $StateRoot
+    $candidate = Get-ParsecRecoveryCandidateFromEvent -StateRoot $StateRoot
     if (-not $candidate.recovered_from_journal) {
         return [ordered]@{
             status = 'NoRecoveryData'
@@ -345,6 +359,7 @@ function Repair-ParsecExecutorStateDocumentInternal {
 
 function Save-ParsecProfileDocument {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [string] $Name,
@@ -361,6 +376,7 @@ function Save-ParsecProfileDocument {
 
 function Read-ParsecProfileDocument {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [string] $Name,

@@ -188,7 +188,7 @@ function Initialize-ParsecNvidiaDomain {
                     library_path = [string] $context.display_target.library_path
                 }
             )
-            $supportedModes = @(Get-ParsecSupportedDisplayModes -DeviceName $context.device_name)
+            $supportedModes = @(Get-ParsecSupportedDisplayMode -DeviceName $context.device_name)
             $matchingCustomModes = @(Invoke-ParsecNvidiaDomain -Method 'GetCustomResolutionMatches' -Arguments @{
                     modes = $customModes
                     width = $context.width

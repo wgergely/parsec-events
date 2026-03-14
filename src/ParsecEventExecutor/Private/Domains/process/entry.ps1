@@ -15,6 +15,10 @@ return @{
                 [System.Collections.IDictionary] $RunState = @{}
             )
 
+            # StateRoot, RunState required by domain Invoke contract
+            $null = $StateRoot
+            $null = $RunState
+
             foreach ($file in @($supportFiles)) {
                 . $file
             }
