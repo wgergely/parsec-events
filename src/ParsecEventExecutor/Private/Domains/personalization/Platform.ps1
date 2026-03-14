@@ -304,6 +304,21 @@ function Set-ParsecTextScaleStateInternal {
         New-Item -Path $path -Force | Out-Null
     }
 
+    # Windows bug workaround: setting text scale back to the same value (especially 100%)
+    # does not trigger a re-render. We must first set an intermediate value, broadcast,
+    # then set the target value and broadcast again to force the change to take effect.
+    $currentValue = (Get-ItemProperty -Path $path -Name 'TextScaleFactor' -ErrorAction SilentlyContinue).TextScaleFactor
+    if ($null -ne $currentValue -and [int] $currentValue -ne $textScalePercent) {
+        $intermediateValue = $textScalePercent + 1
+        $intermediateValue = [Math]::Max(100, [Math]::Min(225, $intermediateValue))
+        New-ItemProperty -Path $path -Name 'TextScaleFactor' -Value $intermediateValue -PropertyType DWord -Force | Out-Null
+        Initialize-ParsecPersonalizationInterop
+        [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('Accessibility')
+        [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('WindowMetrics')
+        [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('Control Panel\Desktop')
+        Start-Sleep -Milliseconds 500
+    }
+
     New-ItemProperty -Path $path -Name 'TextScaleFactor' -Value $textScalePercent -PropertyType DWord -Force | Out-Null
     Initialize-ParsecPersonalizationInterop
     [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('Accessibility')
