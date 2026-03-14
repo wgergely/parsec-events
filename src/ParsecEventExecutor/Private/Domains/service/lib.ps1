@@ -78,6 +78,19 @@ function Invoke-ParsecServiceDomain {
                 status = [string] $service.Status
             }
         }
+        'ResetStopped' {
+            $capturedState = Get-ParsecCapturedStateFromResult -Arguments $Arguments -ExecutionResult $null
+            if ($null -eq $capturedState -or -not $capturedState.Contains('status')) {
+                return New-ParsecResult -Status 'Failed' -Message 'Captured service state does not include a resettable status.' -Errors @('MissingCapturedState')
+            }
+
+            if ([string] $capturedState.status -ne 'Running') {
+                return New-ParsecResult -Status 'Succeeded' -Message "Service was already '$([string] $capturedState.status)' before stop."
+            }
+
+            $startArgs = @{ service_name = [string] $Arguments.service_name }
+            return Invoke-ParsecServiceDomain -Method 'Start' -Arguments $startArgs
+        }
         'VerifyStopped' {
             $service = Resolve-ParsecServiceDomainService -Arguments $Arguments
             if ($service.Status -eq 'Stopped') {

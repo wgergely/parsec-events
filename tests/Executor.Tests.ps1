@@ -15,11 +15,11 @@ Describe 'Invoke-ParsecRecipe' {
 
         It 'does not attempt compensation reset when the ingredient lacks reset support' {
             $step = @{
-                id = 'stop-service'
-                ingredient = 'service.stop'
+                id = 'run-command'
+                ingredient = 'command.invoke'
                 operation = 'apply'
                 depends_on = @()
-                arguments = @{ service_name = 'Spooler' }
+                arguments = @{ file_path = 'echo'; arguments = @('hello') }
                 verify = $true
                 compensation_policy = 'explicit'
                 retry_count = 0
@@ -34,29 +34,29 @@ Describe 'Invoke-ParsecRecipe' {
 
             Mock Invoke-ParsecIngredientCommandInternal {
                 [ordered]@{
-                    ingredient_name = 'service.stop'
+                    ingredient_name = 'command.invoke'
                     status = 'Failed'
-                    token_id = 'captured-token'
-                    token_path = 'Y:\fake-token.json'
-                    capture_result = @{ Status = 'Succeeded' }
-                    operation_result = @{ Status = 'Failed'; Message = 'Stop failed.' }
+                    token_id = $null
+                    token_path = $null
+                    capture_result = $null
+                    operation_result = @{ Status = 'Failed'; Message = 'Command failed.' }
                     readiness_result = $null
                     verify_result = $null
                     reset_result = $null
                     invocation_id = 'apply-invocation'
                     started_at = '2026-03-12T00:00:00.0000000+00:00'
                     completed_at = '2026-03-12T00:00:01.0000000+00:00'
-                    message = 'Stop failed.'
+                    message = 'Command failed.'
                 }
-            } -ParameterFilter { $Name -eq 'service.stop' -and $Operation -eq 'apply' }
+            } -ParameterFilter { $Name -eq 'command.invoke' -and $Operation -eq 'apply' }
 
             $result = Invoke-ParsecRecipeSequenceStep -Step $step -RunRecord $runRecord -StateRoot $TestDrive
 
             $result.status | Should -Be 'Failed'
-            $result.message | Should -Be 'Stop failed.'
+            $result.message | Should -Be 'Command failed.'
             $result.compensation_result | Should -BeNullOrEmpty
-            Should -Invoke Invoke-ParsecIngredientCommandInternal -Times 1 -Exactly -ParameterFilter { $Name -eq 'service.stop' -and $Operation -eq 'apply' }
-            Should -Invoke Invoke-ParsecIngredientCommandInternal -Times 0 -Exactly -ParameterFilter { $Name -eq 'service.stop' -and $Operation -eq 'reset' }
+            Should -Invoke Invoke-ParsecIngredientCommandInternal -Times 1 -Exactly -ParameterFilter { $Name -eq 'command.invoke' -and $Operation -eq 'apply' }
+            Should -Invoke Invoke-ParsecIngredientCommandInternal -Times 0 -Exactly -ParameterFilter { $Name -eq 'command.invoke' -and $Operation -eq 'reset' }
         }
     }
 

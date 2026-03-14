@@ -1,6 +1,7 @@
 @{
     IncludeDefaultRules = $true
     ExcludeRules = @(
+        'PSAvoidGlobalVars',
         'PSReviewUnusedParameter',
         'PSUseOutputTypeCorrectly',
         'PSUseShouldProcessForStateChangingFunctions',

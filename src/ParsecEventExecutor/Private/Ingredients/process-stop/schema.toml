@@ -2,7 +2,7 @@ name = "process.stop"
 domain = "process"
 kind = "process"
 description = "Stop a running process."
-capabilities = ["capture", "apply", "verify"]
+capabilities = ["capture", "apply", "verify", "reset"]
 required_backends = ["Process"]
 safety_class = "ExternalProcess"
 success_signals = []
@@ -27,3 +27,10 @@ required = []
 [operation_schemas.verify.types]
 process_id = "integer"
 process_name = "string"
+
+[operation_schemas.reset]
+required = []
+[operation_schemas.reset.types]
+process_id = "integer"
+process_name = "string"
+file_path = "string"

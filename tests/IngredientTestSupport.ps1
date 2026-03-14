@@ -818,6 +818,83 @@ function Initialize-ParsecIngredientTestEnvironment {
     }
     $global:ParsecNvidiaAdapter = $script:ParsecNvidiaAdapter
 
+    $script:IngredientSoundDevices = @(
+        [ordered]@{
+            id = 'speaker-001'
+            name = 'Speakers'
+            is_default = $true
+            type = 'Playback'
+            status = 'Active'
+        },
+        [ordered]@{
+            id = 'hdmi-002'
+            name = 'HDMI Audio'
+            is_default = $false
+            type = 'Playback'
+            status = 'Active'
+        }
+    )
+    $script:IngredientSoundDefaultDevice = [ordered]@{
+        id = 'speaker-001'
+        name = 'Speakers'
+        is_default = $true
+        type = 'Playback'
+        status = 'Active'
+    }
+
+    $script:ParsecSoundAdapter = @{
+        GetPlaybackDevices = {
+            return @($script:IngredientSoundDevices | ForEach-Object { ConvertTo-ParsecPlainObject -InputObject $_ })
+        }
+        GetDefaultPlaybackDevice = {
+            return ConvertTo-ParsecPlainObject -InputObject $script:IngredientSoundDefaultDevice
+        }
+        SetDefaultPlaybackDevice = {
+            param($Arguments)
+
+            $deviceId = if ($Arguments.ContainsKey('device_id')) { [string] $Arguments.device_id } else { $null }
+            $deviceName = if ($Arguments.ContainsKey('device_name')) { [string] $Arguments.device_name } else { $null }
+
+            if ([string]::IsNullOrWhiteSpace($deviceId) -and [string]::IsNullOrWhiteSpace($deviceName)) {
+                return New-ParsecResult -Status 'Failed' -Message 'Either device_id or device_name is required.' -Errors @('MissingArgument')
+            }
+
+            $targetDevice = $null
+            if (-not [string]::IsNullOrWhiteSpace($deviceId)) {
+                $targetDevice = @($script:IngredientSoundDevices | Where-Object { [string] $_.id -eq $deviceId }) | Select-Object -First 1
+            }
+            elseif (-not [string]::IsNullOrWhiteSpace($deviceName)) {
+                $targetDevice = @($script:IngredientSoundDevices | Where-Object { [string] $_.name -eq $deviceName }) | Select-Object -First 1
+            }
+
+            if ($null -eq $targetDevice) {
+                return New-ParsecResult -Status 'Failed' -Message "Playback device not found." -Errors @('DeviceNotFound')
+            }
+
+            foreach ($device in @($script:IngredientSoundDevices)) {
+                $device.is_default = $false
+            }
+
+            $targetDevice.is_default = $true
+            $script:IngredientSoundDefaultDevice = [ordered]@{
+                id = [string] $targetDevice.id
+                name = [string] $targetDevice.name
+                is_default = $true
+                type = 'Playback'
+                status = 'Active'
+            }
+
+            New-ParsecResult -Status 'Succeeded' -Message "Set default playback device to '$([string] $targetDevice.name)'." -Observed @{
+                device_id = [string] $targetDevice.id
+                device_name = [string] $targetDevice.name
+            } -Outputs @{
+                device_id = [string] $targetDevice.id
+                device_name = [string] $targetDevice.name
+            }
+        }
+    }
+    $global:ParsecSoundAdapter = $script:ParsecSoundAdapter
+
     $script:ParsecServiceAdapter = @{
         GetService = {
             param($Arguments)
@@ -858,6 +935,7 @@ function Initialize-ParsecIngredientTestEnvironment {
         Set-ParsecModuleVariableValue -Name 'ParsecWindowAdapter' -Value $script:ParsecWindowAdapter | Out-Null
         Set-ParsecModuleVariableValue -Name 'ParsecNvidiaAdapter' -Value $script:ParsecNvidiaAdapter | Out-Null
         Set-ParsecModuleVariableValue -Name 'ParsecServiceAdapter' -Value $script:ParsecServiceAdapter | Out-Null
+        Set-ParsecModuleVariableValue -Name 'ParsecSoundAdapter' -Value $script:ParsecSoundAdapter | Out-Null
     }
 }
 
@@ -867,7 +945,8 @@ function Clear-ParsecTestAdapters {
             'ParsecDisplayAdapter',
             'ParsecWindowAdapter',
             'ParsecNvidiaAdapter',
-            'ParsecServiceAdapter'
+            'ParsecServiceAdapter',
+            'ParsecSoundAdapter'
         )) {
         Set-Variable -Scope Global -Name $name -Value $null -Force
         if (Get-Command -Name 'Set-ParsecModuleVariableValue' -ErrorAction SilentlyContinue) {
