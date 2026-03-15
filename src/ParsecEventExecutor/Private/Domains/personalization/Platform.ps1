@@ -304,23 +304,30 @@ function Set-ParsecTextScaleStateInternal {
         New-Item -Path $path -Force | Out-Null
     }
 
-    # Windows bug workaround: setting text scale back to the same value (especially 100%)
-    # does not trigger a re-render. We must first set an intermediate value, broadcast,
-    # then set the target value and broadcast again to force the change to take effect.
+    # Windows bug workaround: text scale changes do not always trigger a UI re-render.
+    # Double-apply with an intermediate value forces Windows to process the change.
+    # When increasing: intermediate = n-1, then n (approach from below).
+    # When decreasing: intermediate = n+1, then n (approach from above).
+    # This always runs regardless of whether the current value matches the target.
     $currentValue = (Get-ItemProperty -Path $path -Name 'TextScaleFactor' -ErrorAction SilentlyContinue).TextScaleFactor
-    if ($null -ne $currentValue -and [int] $currentValue -ne $textScalePercent) {
-        $intermediateValue = $textScalePercent + 1
-        $intermediateValue = [Math]::Max(100, [Math]::Min(225, $intermediateValue))
-        New-ItemProperty -Path $path -Name 'TextScaleFactor' -Value $intermediateValue -PropertyType DWord -Force | Out-Null
-        Initialize-ParsecPersonalizationInterop
-        [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('Accessibility')
-        [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('WindowMetrics')
-        [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('Control Panel\Desktop')
-        Start-Sleep -Milliseconds 500
+    $currentInt = if ($null -ne $currentValue) { [int] $currentValue } else { 100 }
+
+    $intermediateValue = if ($textScalePercent -ge $currentInt) {
+        $textScalePercent - 1
     }
+    else {
+        $textScalePercent + 1
+    }
+    $intermediateValue = [Math]::Max(100, [Math]::Min(225, $intermediateValue))
+
+    Initialize-ParsecPersonalizationInterop
+    New-ItemProperty -Path $path -Name 'TextScaleFactor' -Value $intermediateValue -PropertyType DWord -Force | Out-Null
+    [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('Accessibility')
+    [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('WindowMetrics')
+    [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('Control Panel\Desktop')
+    Start-Sleep -Milliseconds 500
 
     New-ItemProperty -Path $path -Name 'TextScaleFactor' -Value $textScalePercent -PropertyType DWord -Force | Out-Null
-    Initialize-ParsecPersonalizationInterop
     [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('Accessibility')
     [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('WindowMetrics')
     [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('Control Panel\Desktop')

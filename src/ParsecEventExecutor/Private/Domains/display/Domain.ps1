@@ -903,7 +903,19 @@ function Invoke-ParsecDisplayDomainCapturePrimary {
 
     $observed = Get-ParsecDisplayDomainObservedState
     $primary = @($observed.monitors) | Where-Object { $_.is_primary } | Select-Object -First 1
-    $outputs = [ordered]@{ captured_state = [ordered]@{ primary_monitor = $primary } }
+    $monitorPositions = @(
+        @($observed.monitors) | Where-Object { $_.enabled } | ForEach-Object {
+            [ordered]@{
+                device_name = [string] $_.device_name
+                x = [int] $_.bounds.x
+                y = [int] $_.bounds.y
+                width = [int] $_.bounds.width
+                height = [int] $_.bounds.height
+                is_primary = [bool] $_.is_primary
+            }
+        }
+    )
+    $outputs = [ordered]@{ captured_state = [ordered]@{ primary_monitor = $primary; monitor_positions = $monitorPositions } }
     if ($Arguments.Contains('device_name')) {
         $outputs.captured_state.requested_monitor = Get-ParsecObservedMonitor -ObservedState $observed -DeviceName $Arguments.device_name
     }
@@ -956,9 +968,17 @@ function Invoke-ParsecDisplayDomainResetPrimary {
         return New-ParsecResult -Status 'Failed' -Message 'Captured primary-monitor state does not include a resettable value.' -Errors @('MissingCapturedState')
     }
 
-    return Invoke-ParsecDisplayAdapter -Method 'SetPrimary' -Arguments @{
+    $resetArgs = @{
         device_name = [string] $capturedMonitor.device_name
     }
+
+    # Pass captured monitor positions so the adapter can restore exact spatial arrangement
+    $capturedState = Get-ParsecCapturedStateFromResult -Arguments $Arguments -ExecutionResult $ExecutionResult
+    if ($null -ne $capturedState -and $capturedState.Contains('monitor_positions') -and @($capturedState.monitor_positions).Count -gt 0) {
+        $resetArgs.positions = @($capturedState.monitor_positions)
+    }
+
+    return Invoke-ParsecDisplayAdapter -Method 'SetPrimary' -Arguments $resetArgs
 }
 
 function Invoke-ParsecDisplayDomainCaptureEnabled {

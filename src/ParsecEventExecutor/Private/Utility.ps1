@@ -41,6 +41,21 @@ function Initialize-ParsecStateRoot {
     return $StateRoot
 }
 
+function ConvertTo-ParsecSnakeCaseKey {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory)]
+        [string] $Name
+    )
+
+    # Insert underscore before each uppercase letter that follows a lowercase letter or digit,
+    # or before a run of uppercase letters followed by a lowercase letter (e.g. XMLParser -> xml_parser).
+    $result = [regex]::Replace($Name, '(?<=\p{Ll}|\d)\p{Lu}', '_$0')
+    $result = [regex]::Replace($result, '(\p{Lu}+)(\p{Lu}\p{Ll})', '$1_$2')
+    return $result.ToLowerInvariant()
+}
+
 function ConvertTo-ParsecPlainObject {
     [CmdletBinding()]
     [OutputType([object])]
@@ -111,7 +126,8 @@ function ConvertTo-ParsecPlainObject {
                 continue
             }
 
-            $output[$property.Name] = ConvertTo-ParsecPlainObject -InputObject $property.Value
+            $key = ConvertTo-ParsecSnakeCaseKey -Name $property.Name
+            $output[$key] = ConvertTo-ParsecPlainObject -InputObject $property.Value
         }
 
         return $output

@@ -1190,6 +1190,30 @@ namespace ParsecEventExecutor {
 "@
 }
 
+function Sync-ParsecDisplayRegistryState {
+    [CmdletBinding()]
+    [OutputType([bool])]
+    param()
+
+    # Re-sync the display registry by staging ALL monitors with their current live
+    # positions, then committing. This fixes stale registry state left behind by
+    # prior failed CDS_UPDATEREGISTRY | CDS_NORESET operations.
+    Initialize-ParsecDisplayInterop
+    $observed = Get-ParsecDisplayDomainObservedState
+    $stageFlags = [ParsecEventExecutor.DisplayNative]::CDS_UPDATEREGISTRY -bor [ParsecEventExecutor.DisplayNative]::CDS_NORESET
+
+    foreach ($monitor in @($observed.monitors | Where-Object { $_.enabled })) {
+        $mode = [ParsecEventExecutor.DisplayNative]::GetDeviceMode($monitor.device_name, $false)
+        $result = [ParsecEventExecutor.DisplayNative]::ApplyDeviceMode($monitor.device_name, $mode, [uint32] $stageFlags)
+        if ($result -ne [ParsecEventExecutor.DisplayNative]::DISP_CHANGE_SUCCESSFUL) {
+            return $false
+        }
+    }
+
+    $commitResult = [ParsecEventExecutor.DisplayNative]::ApplyPendingDisplayChanges()
+    return $commitResult -eq [ParsecEventExecutor.DisplayNative]::DISP_CHANGE_SUCCESSFUL
+}
+
 function Get-ParsecTextScalePercent {
     [CmdletBinding()]
     [OutputType([int])]
@@ -1540,6 +1564,9 @@ function Set-ParsecDisplayPrimaryInternal {
     $deviceName = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments
     Initialize-ParsecDisplayInterop
 
+    # Re-sync display registry before staging to recover from any prior dirty state
+    Sync-ParsecDisplayRegistryState | Out-Null
+
     # Get current observed state to find the existing primary and compute position offsets
     $observed = Get-ParsecDisplayDomainObservedState
     $currentPrimary = @($observed.monitors | Where-Object { $_.is_primary }) | Select-Object -First 1
@@ -1549,15 +1576,17 @@ function Set-ParsecDisplayPrimaryInternal {
         return New-ParsecResult -Status 'Failed' -Message "Monitor '$deviceName' not found." -Requested $Arguments -Errors @('MonitorNotFound')
     }
 
-    if ($null -ne $currentPrimary -and $currentPrimary.device_name -eq $deviceName) {
+    if ($null -ne $currentPrimary -and $currentPrimary.device_name -eq $deviceName -and -not $Arguments.ContainsKey('positions')) {
         return New-ParsecResult -Status 'Succeeded' -Message "Monitor '$deviceName' is already primary." -Requested $Arguments
     }
 
     # Per Microsoft docs and Raymond Chen's guidance, setting primary requires:
-    # 1. Stage old primary with new position using CDS_UPDATEREGISTRY | CDS_NORESET
+    # 1. Stage each monitor with its new position using CDS_UPDATEREGISTRY | CDS_NORESET
     # 2. Stage new primary at (0,0) with CDS_SET_PRIMARY | CDS_UPDATEREGISTRY | CDS_NORESET
-    #    using a DEVMODE with ONLY DM_POSITION set (not the full display mode)
     # 3. Commit with ChangeDisplaySettingsEx(null, null, null, 0, null)
+    #
+    # When 'positions' is present (from a reset operation), restore exact captured positions.
+    # Otherwise, compute positions by translating all monitors so the target ends up at (0,0).
     #
     # Sources:
     # https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-changedisplaysettingsexw
@@ -1565,32 +1594,26 @@ function Set-ParsecDisplayPrimaryInternal {
 
     $stageFlags = [ParsecEventExecutor.DisplayNative]::CDS_UPDATEREGISTRY -bor [ParsecEventExecutor.DisplayNative]::CDS_NORESET
 
-    # Step 1: Move old primary to the right of new primary's width
-    # Per MS docs: stage with CDS_UPDATEREGISTRY | CDS_NORESET, then commit
-    foreach ($monitor in @($observed.monitors | Where-Object { $_.enabled -and $_.device_name -ne $deviceName })) {
-        $otherMode = Get-ParsecNativeDeviceMode -DeviceName $monitor.device_name
-        if ($null -eq $otherMode) { continue }
+    # Determine whether to use exact positions (reset) or compute offsets (apply)
+    $useExactPositions = $Arguments.ContainsKey('positions') -and @($Arguments.positions).Count -gt 0
 
-        # Place old primary to the right of the new primary
-        $newPrimaryWidth = if ($null -ne $targetMonitor.bounds -and $targetMonitor.bounds.Contains('width') -and $null -ne $targetMonitor.bounds.width) {
-            [int] $targetMonitor.bounds.width
-        } else {
-            [int] $targetMonitor.display.width
-        }
-        $otherMode.dmPositionX = $newPrimaryWidth
-        $otherMode.dmPositionY = 0
-        $otherMode.dmFields = $otherMode.dmFields -bor [ParsecEventExecutor.DisplayNative]::DM_POSITION
-
-        $otherResult = [ParsecEventExecutor.DisplayNative]::ApplyDeviceMode($monitor.device_name, $otherMode, [uint32] $stageFlags)
-        if ($otherResult -ne [ParsecEventExecutor.DisplayNative]::DISP_CHANGE_SUCCESSFUL) {
-            return New-ParsecDisplayChangeFailureResult -Action 'SetPrimary:reposition' -Code $otherResult -Requested $Arguments
-        }
-    }
-
-    # Step 2: Set new primary at (0,0) with full DEVMODE + CDS_SET_PRIMARY
+    # Step 1: Stage new primary at (0,0) with CDS_SET_PRIMARY FIRST.
+    # Windows rejects repositioning the current primary away from (0,0) until a new
+    # primary is designated, so the primary designation must be staged before repositioning.
     $mode = Get-ParsecNativeDeviceMode -DeviceName $deviceName
-    $mode.dmPositionX = 0
-    $mode.dmPositionY = 0
+    if ($useExactPositions) {
+        $positionIndex = @{}
+        foreach ($pos in @($Arguments.positions)) {
+            $positionIndex[[string] $pos.device_name] = $pos
+        }
+        $targetPos = $positionIndex[$deviceName]
+        $mode.dmPositionX = if ($null -ne $targetPos) { [int] $targetPos.x } else { 0 }
+        $mode.dmPositionY = if ($null -ne $targetPos) { [int] $targetPos.y } else { 0 }
+    }
+    else {
+        $mode.dmPositionX = 0
+        $mode.dmPositionY = 0
+    }
     $mode.dmFields = $mode.dmFields -bor [ParsecEventExecutor.DisplayNative]::DM_POSITION
     $primaryFlags = $stageFlags -bor [ParsecEventExecutor.DisplayNative]::CDS_SET_PRIMARY
     $stageResult = [ParsecEventExecutor.DisplayNative]::ApplyDeviceMode($deviceName, $mode, [uint32] $primaryFlags)
@@ -1598,7 +1621,49 @@ function Set-ParsecDisplayPrimaryInternal {
         return New-ParsecDisplayChangeFailureResult -Action 'SetPrimary:stage' -Code $stageResult -Requested $Arguments
     }
 
-    # Commit all pending changes
+    # Step 2: Reposition all other monitors
+    if ($useExactPositions) {
+        foreach ($monitor in @($observed.monitors | Where-Object { $_.enabled -and $_.device_name -ne $deviceName })) {
+            $otherMode = Get-ParsecNativeDeviceMode -DeviceName $monitor.device_name
+            if ($null -eq $otherMode) { continue }
+
+            $savedPos = $positionIndex[[string] $monitor.device_name]
+            if ($null -ne $savedPos) {
+                $otherMode.dmPositionX = [int] $savedPos.x
+                $otherMode.dmPositionY = [int] $savedPos.y
+            }
+            else {
+                $otherMode.dmPositionX = [int] $targetMonitor.bounds.width
+                $otherMode.dmPositionY = 0
+            }
+            $otherMode.dmFields = $otherMode.dmFields -bor [ParsecEventExecutor.DisplayNative]::DM_POSITION
+
+            $otherResult = [ParsecEventExecutor.DisplayNative]::ApplyDeviceMode($monitor.device_name, $otherMode, [uint32] $stageFlags)
+            if ($otherResult -ne [ParsecEventExecutor.DisplayNative]::DISP_CHANGE_SUCCESSFUL) {
+                return New-ParsecDisplayChangeFailureResult -Action 'SetPrimary:reposition' -Code $otherResult -Requested $Arguments
+            }
+        }
+    }
+    else {
+        $offsetX = [int] $targetMonitor.bounds.x
+        $offsetY = [int] $targetMonitor.bounds.y
+
+        foreach ($monitor in @($observed.monitors | Where-Object { $_.enabled -and $_.device_name -ne $deviceName })) {
+            $otherMode = Get-ParsecNativeDeviceMode -DeviceName $monitor.device_name
+            if ($null -eq $otherMode) { continue }
+
+            $otherMode.dmPositionX = [int] $monitor.bounds.x - $offsetX
+            $otherMode.dmPositionY = [int] $monitor.bounds.y - $offsetY
+            $otherMode.dmFields = $otherMode.dmFields -bor [ParsecEventExecutor.DisplayNative]::DM_POSITION
+
+            $otherResult = [ParsecEventExecutor.DisplayNative]::ApplyDeviceMode($monitor.device_name, $otherMode, [uint32] $stageFlags)
+            if ($otherResult -ne [ParsecEventExecutor.DisplayNative]::DISP_CHANGE_SUCCESSFUL) {
+                return New-ParsecDisplayChangeFailureResult -Action 'SetPrimary:reposition' -Code $otherResult -Requested $Arguments
+            }
+        }
+    }
+
+    # Step 3: Commit all pending changes
     $commitResult = [ParsecEventExecutor.DisplayNative]::ApplyPendingDisplayChanges()
     if ($commitResult -ne [ParsecEventExecutor.DisplayNative]::DISP_CHANGE_SUCCESSFUL) {
         return New-ParsecDisplayChangeFailureResult -Action 'SetPrimary:commit' -Code $commitResult -Requested $Arguments
