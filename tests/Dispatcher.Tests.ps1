@@ -65,6 +65,7 @@ snapshot_name = "dispatch-test-snapshot"
             $recipe = [ordered]@{
                 name = 'queued-recipe'
                 path = 'test.toml'
+                target_mode = 'MOBILE'
             }
 
             $result = Invoke-ParsecWatcherDispatch -Dispatcher $dispatcher -Recipe $recipe -Username 'test#1234' -EventType 'connect'
@@ -87,6 +88,7 @@ snapshot_name = "dispatch-test-snapshot"
             try {
                 $recipeContent = @'
 name = "drain-test"
+target_mode = "MOBILE"
 
 [[steps]]
 id = "noop-step"

@@ -34,6 +34,7 @@ function Invoke-ParsecWatcherDispatch {
     $dispatchItem = [ordered]@{
         recipe_name = $Recipe.name
         recipe_path = $Recipe.path
+        target_mode = $Recipe.target_mode
         username = $Username
         event_type = $EventType
         queued_at = [DateTimeOffset]::UtcNow.ToString('o')
@@ -91,6 +92,7 @@ function Invoke-ParsecWatcherDispatchInternal {
         return [ordered]@{
             status = 'Dispatched'
             terminal_status = $result.terminal_status
+            target_mode = $Item.target_mode
             message = "Recipe '$($Item.recipe_name)' $statusMsg"
             result = $result
         }

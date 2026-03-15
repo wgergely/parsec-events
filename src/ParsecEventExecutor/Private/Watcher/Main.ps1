@@ -144,6 +144,14 @@
                     }
                 }
                 elseif ($eventType -eq 'disconnect') {
+                    # Cancel any pending connect for this user that hasn't dispatched yet
+                    for ($pi = $pendingConnects.Count - 1; $pi -ge 0; $pi--) {
+                        if ($pendingConnects[$pi].username -eq $username) {
+                            $pendingConnects.RemoveAt($pi)
+                            Write-Information "Watcher: Cancelled pending connect for '$username' (disconnected before delay expired)"
+                        }
+                    }
+
                     $recipe = Find-ParsecMatchingRecipe -Username $username -CurrentMode $watcherState.current_mode -EventType 'disconnect' -Recipes $recipes
                     $gracePeriod = if ($recipe) {
                         Get-ParsecRecipeGracePeriod -Recipe $recipe -DefaultGracePeriodMs $Config.watcher.grace_period_ms
@@ -209,7 +217,7 @@
                 $drainResults = @(Invoke-ParsecWatcherDrainQueue -Dispatcher $dispatcher)
                 foreach ($dr in $drainResults) {
                     if ($dr.status -eq 'Dispatched' -and $dr.terminal_status -in @('Succeeded', 'SucceededWithDrift', 'Compensated')) {
-                        $watcherState.current_mode = $dr.result.target_mode
+                        $watcherState.current_mode = $dr.target_mode
                         $watcherState.recipes_dispatched++
                     }
                 }

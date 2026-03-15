@@ -72,14 +72,18 @@ function Test-ParsecRecipeMatchesEvent {
         return $false
     }
 
-    # For connect events, the recipe must have a target_mode (it transforms the system).
-    # For disconnect events, the recipe must also have a target_mode (it restores the system).
-    # This prevents a connect-only recipe from matching a disconnect event and vice versa.
-    if ($EventType -eq 'connect' -and -not [string]::IsNullOrEmpty($Recipe.target_mode)) {
-        # Connect recipe: target_mode should differ from current mode (otherwise it's a no-op)
-        if ($Recipe.target_mode -eq $CurrentMode) {
-            return $false
-        }
+    # The recipe must have a target_mode that differs from the current mode.
+    # This prevents no-op dispatches and ensures connect vs disconnect recipes
+    # don't match the wrong event type.
+    # - Connect from DESKTOP: enter-mobile (target=MOBILE != DESKTOP) matches
+    # - Disconnect from MOBILE: return-desktop (target=DESKTOP != MOBILE) matches
+    # - Connect from DESKTOP: return-desktop (target=DESKTOP == DESKTOP) does NOT match
+    if ([string]::IsNullOrEmpty($Recipe.target_mode)) {
+        return $false
+    }
+
+    if ($Recipe.target_mode -eq $CurrentMode) {
+        return $false
     }
 
     return $true
