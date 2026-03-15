@@ -1,4 +1,4 @@
-function Import-ParsecCorePackageSupportFiles {
+function Import-ParsecCorePackageSupportFile {
     [CmdletBinding()]
     param(
         [Parameter()]
@@ -46,7 +46,7 @@ function Invoke-ParsecCorePackageOperation {
     $operationScope = {
         param($Files, $OperationBody, $OperationArguments)
 
-        Import-ParsecCorePackageSupportFiles -SupportFiles $Files
+        Import-ParsecCorePackageSupportFile -SupportFiles $Files
 
         . $OperationBody @OperationArguments
     }

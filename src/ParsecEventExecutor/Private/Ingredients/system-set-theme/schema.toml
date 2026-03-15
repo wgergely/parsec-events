@@ -1,4 +1,5 @@
 name = "system.set-theme"
+domain = "personalization"
 kind = "system"
 description = "Set Windows application and system theme mode."
 capabilities = ["capture", "apply", "verify", "reset"]

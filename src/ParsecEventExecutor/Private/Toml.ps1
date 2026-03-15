@@ -1,5 +1,7 @@
 function Remove-ParsecTomlComment {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [AllowEmptyString()]
@@ -30,16 +32,19 @@ function Remove-ParsecTomlComment {
 
 function Split-ParsecTomlPath {
     [CmdletBinding()]
+    [OutputType([string[]])]
+    [OutputType([System.Object[]])]
     param(
         [Parameter(Mandatory)]
         [string] $Path
     )
 
-    return ,([string[]] ($Path.Split('.', [System.StringSplitOptions]::RemoveEmptyEntries)))
+    return , ([string[]] ($Path.Split('.', [System.StringSplitOptions]::RemoveEmptyEntries)))
 }
 
 function Get-ParsecTomlContext {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Document,
@@ -76,8 +81,10 @@ function Get-ParsecTomlContext {
     return $context
 }
 
-function Split-ParsecTomlArrayItems {
+function Split-ParsecTomlArrayItem {
     [CmdletBinding()]
+    [OutputType([string[]])]
+    [OutputType([System.Object[]])]
     param(
         [Parameter(Mandatory)]
         [string] $Text
@@ -123,6 +130,11 @@ function Split-ParsecTomlArrayItems {
 
 function ConvertFrom-ParsecTomlValue {
     [CmdletBinding()]
+    [OutputType([object])]
+    [OutputType([bool])]
+    [OutputType([int])]
+    [OutputType([string])]
+    [OutputType([System.Object[]])]
     param(
         [Parameter(Mandatory)]
         [string] $Value
@@ -147,7 +159,7 @@ function ConvertFrom-ParsecTomlValue {
             return @()
         }
 
-        $values = foreach ($item in (Split-ParsecTomlArrayItems -Text $inner)) {
+        $values = foreach ($item in (Split-ParsecTomlArrayItem -Text $inner)) {
             ConvertFrom-ParsecTomlValue -Value $item
         }
 
@@ -159,6 +171,7 @@ function ConvertFrom-ParsecTomlValue {
 
 function ConvertFrom-ParsecToml {
     [CmdletBinding(DefaultParameterSetName = 'Path')]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory, ParameterSetName = 'Path')]
         [string] $Path,

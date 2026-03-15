@@ -1,5 +1,6 @@
 name = "display.set-activedisplays"
 aliases = ["set-activedisplays"]
+domain = "display"
 kind = "display"
 description = "Keep only the requested displays active and preserve their relative topology."
 capabilities = ["capture", "apply", "wait", "verify", "reset"]

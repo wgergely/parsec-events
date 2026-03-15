@@ -1,16 +1,17 @@
 @{
-    RootModule        = 'ParsecEventExecutor.psm1'
-    ModuleVersion     = '0.1.0'
-    GUID              = '2eff4ae6-539f-47f6-bf7d-3d42d9d219ec'
-    Author            = 'OpenAI Codex'
-    CompanyName       = 'OpenAI'
-    Copyright         = '(c) OpenAI. All rights reserved.'
-    Description       = 'Mission-focused recipe executor for Parsec desktop/mobile transitions.'
+    RootModule = 'ParsecEventExecutor.psm1'
+    ModuleVersion = '0.1.0'
+    GUID = '2eff4ae6-539f-47f6-bf7d-3d42d9d219ec'
+    Author = 'OpenAI Codex'
+    CompanyName = 'OpenAI'
+    Copyright = '(c) OpenAI. All rights reserved.'
+    Description = 'Mission-focused recipe executor for Parsec desktop/mobile transitions.'
     PowerShellVersion = '7.0'
     FunctionsToExport = @(
         'Invoke-ParsecIngredient',
         'Invoke-ParsecRecipe',
         'Get-ParsecDisplay',
+        'Get-ParsecDisplayAudit',
         'Get-ParsecRecipe',
         'Get-ParsecIngredient',
         'Save-ParsecSnapshot',
@@ -21,12 +22,12 @@
         'Repair-ParsecExecutorState',
         'Start-ParsecExecutor'
     )
-    CmdletsToExport   = @()
+    CmdletsToExport = @()
     VariablesToExport = @()
-    AliasesToExport   = @('Capture-ParsecSnapshot', 'Capture-ParsecProfile')
-    PrivateData       = @{
+    AliasesToExport = @('Capture-ParsecSnapshot', 'Capture-ParsecProfile')
+    PrivateData = @{
         PSData = @{
-            Tags       = @('parsec', 'powershell', 'recipes', 'windows')
+            Tags = @('parsec', 'powershell', 'recipes', 'windows')
             ProjectUri = 'https://example.invalid/parsec-event-executor'
         }
     }

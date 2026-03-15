@@ -1,5 +1,6 @@
 function Initialize-ParsecNvidiaInterop {
     [CmdletBinding()]
+    [OutputType([void])]
     param()
 
     if ('ParsecEventExecutor.NvidiaApiNative' -as [type]) {
@@ -338,6 +339,7 @@ namespace ParsecEventExecutor {
 
 function Get-ParsecNvidiaApiLibraryPath {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter()]
         [string] $PreferredPath
@@ -368,6 +370,7 @@ function Get-ParsecNvidiaApiLibraryPath {
 
 function ConvertTo-ParsecNvidiaDisplayName {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [string] $DeviceName
@@ -386,6 +389,7 @@ function ConvertTo-ParsecNvidiaDisplayName {
 
 function Get-ParsecNvidiaBackendAvailability {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter()]
         [string] $LibraryPath
@@ -426,6 +430,7 @@ function Get-ParsecNvidiaBackendAvailability {
 
 function Get-ParsecNvidiaDisplayTargetInternal {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [string] $DeviceName,
@@ -450,8 +455,10 @@ function Get-ParsecNvidiaDisplayTargetInternal {
     }
 }
 
-function Get-ParsecNvidiaCustomResolutionsInternal {
+function Get-ParsecNvidiaCustomResolutionInternal {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary[]])]
+    [OutputType([System.Object[]])]
     param(
         [Parameter(Mandatory)]
         [uint32] $DisplayId,
@@ -482,7 +489,9 @@ function Get-ParsecNvidiaCustomResolutionsInternal {
 }
 
 function Add-ParsecNvidiaCustomResolutionInternal {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $Arguments

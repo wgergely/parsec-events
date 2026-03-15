@@ -114,6 +114,9 @@ Describe 'Snapshot workflow' {
                 SetOrientation = { param($Arguments) New-ParsecResult -Status 'Succeeded' -Message 'orientation' -Requested $Arguments }
                 SetScaling = { param($Arguments) New-ParsecResult -Status 'Succeeded' -Message 'scaling' -Requested $Arguments }
             }
+
+            Set-ParsecModuleVariableValue -Name 'ParsecPersonalizationAdapter' -Value $script:ParsecPersonalizationAdapter | Out-Null
+            Set-ParsecModuleVariableValue -Name 'ParsecDisplayAdapter' -Value $script:ParsecDisplayAdapter | Out-Null
         }
 
         It 'captures a transient snapshot and verifies it against the observed state' {
@@ -224,6 +227,8 @@ Describe 'Snapshot workflow' {
                 SetOrientation = { param($Arguments) New-ParsecResult -Status 'Succeeded' -Message 'orientation' -Requested $Arguments }
                 SetScaling = { param($Arguments) New-ParsecResult -Status 'Succeeded' -Message 'scaling' -Requested $Arguments }
             }
+
+            Set-ParsecModuleVariableValue -Name 'ParsecDisplayAdapter' -Value $script:ParsecDisplayAdapter | Out-Null
 
             $verification = Test-ParsecSnapshot -Name 'desktop-pre-parsec' -StateRoot $stateRoot
 

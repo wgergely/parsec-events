@@ -1,5 +1,6 @@
 function Get-ParsecCorePrivateRoot {
     [CmdletBinding()]
+    [OutputType([string])]
     param()
 
     return Split-Path -Path $PSScriptRoot -Parent
@@ -7,6 +8,7 @@ function Get-ParsecCorePrivateRoot {
 
 function Get-ParsecCoreDomainRoot {
     [CmdletBinding()]
+    [OutputType([string])]
     param()
 
     return Join-Path -Path (Get-ParsecCorePrivateRoot) -ChildPath 'Domains'
@@ -14,6 +16,7 @@ function Get-ParsecCoreDomainRoot {
 
 function Get-ParsecCoreIngredientRoot {
     [CmdletBinding()]
+    [OutputType([string])]
     param()
 
     return Join-Path -Path (Get-ParsecCorePrivateRoot) -ChildPath 'Ingredients'
@@ -21,6 +24,7 @@ function Get-ParsecCoreIngredientRoot {
 
 function ConvertTo-ParsecCorePackageMap {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         $InputObject
@@ -48,6 +52,7 @@ function ConvertTo-ParsecCorePackageMap {
 
 function Import-ParsecCoreDomainPackage {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [string] $DomainPath
@@ -82,6 +87,7 @@ function Import-ParsecCoreDomainPackage {
 
 function Import-ParsecCoreDomainPackageByName {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [string] $Name
@@ -101,6 +107,7 @@ function Import-ParsecCoreDomainPackageByName {
 
 function Import-ParsecCoreIngredientPackage {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [string] $IngredientPath
@@ -164,6 +171,7 @@ function Import-ParsecCoreIngredientPackage {
 
 function Import-ParsecCoreIngredientPackageByName {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [string] $Name
@@ -184,6 +192,7 @@ function Import-ParsecCoreIngredientPackageByName {
 
 function Get-ParsecCoreIngredientCatalogDefinition {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Schema,
@@ -207,12 +216,7 @@ function Get-ParsecCoreIngredientCatalogDefinition {
         }
     }
 
-    $domain = if ($Schema.Contains('domain')) {
-        [string] $Schema.domain
-    }
-    else {
-        Resolve-ParsecCoreIngredientDomain -Name ([string] $Schema.name)
-    }
+    $domain = Get-ParsecCoreRequiredIngredientDomain -Schema $Schema
 
     return New-ParsecCoreIngredientDefinition `
         -Name ([string] $Schema.name) `
@@ -234,6 +238,7 @@ function Get-ParsecCoreIngredientCatalogDefinition {
 
 function Resolve-ParsecCoreIngredientCatalogEntry {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [string] $Name
@@ -271,6 +276,7 @@ function Resolve-ParsecCoreIngredientCatalogEntry {
 
 function Import-ParsecCoreIngredientCatalog {
     [CmdletBinding()]
+    [OutputType([void])]
     param()
 
     Initialize-ParsecCoreRegistryState
@@ -288,6 +294,7 @@ function Import-ParsecCoreIngredientCatalog {
 
 function Initialize-ParsecCoreRuntime {
     [CmdletBinding()]
+    [OutputType([void])]
     param(
         [Parameter()]
         [switch] $Force

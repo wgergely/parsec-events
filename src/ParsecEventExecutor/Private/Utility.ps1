@@ -1,5 +1,6 @@
 function Get-ParsecModuleRoot {
     [CmdletBinding()]
+    [OutputType([string])]
     param()
 
     return $PSScriptRoot | Split-Path -Parent
@@ -7,6 +8,7 @@ function Get-ParsecModuleRoot {
 
 function Get-ParsecRepositoryRoot {
     [CmdletBinding()]
+    [OutputType([string])]
     param()
 
     return (Get-ParsecModuleRoot | Split-Path -Parent | Split-Path -Parent)
@@ -14,6 +16,7 @@ function Get-ParsecRepositoryRoot {
 
 function Get-ParsecDefaultStateRoot {
     [CmdletBinding()]
+    [OutputType([string])]
     param()
 
     $localAppData = [Environment]::GetFolderPath('LocalApplicationData')
@@ -22,6 +25,7 @@ function Get-ParsecDefaultStateRoot {
 
 function Initialize-ParsecStateRoot {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter()]
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)
@@ -37,8 +41,26 @@ function Initialize-ParsecStateRoot {
     return $StateRoot
 }
 
+function ConvertTo-ParsecSnakeCaseKey {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory)]
+        [string] $Name
+    )
+
+    # Insert underscore before each uppercase letter that follows a lowercase letter or digit,
+    # or before a run of uppercase letters followed by a lowercase letter (e.g. XMLParser -> xml_parser).
+    $result = [regex]::Replace($Name, '(?<=\p{Ll}|\d)\p{Lu}', '_$0')
+    $result = [regex]::Replace($result, '(\p{Lu}+)(\p{Lu}\p{Ll})', '$1_$2')
+    return $result.ToLowerInvariant()
+}
+
 function ConvertTo-ParsecPlainObject {
     [CmdletBinding()]
+    [OutputType([object])]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
+    [OutputType([System.Object[]])]
     param(
         [Parameter(Mandatory)]
         [AllowNull()]
@@ -104,7 +126,8 @@ function ConvertTo-ParsecPlainObject {
                 continue
             }
 
-            $output[$property.Name] = ConvertTo-ParsecPlainObject -InputObject $property.Value
+            $key = ConvertTo-ParsecSnakeCaseKey -Name $property.Name
+            $output[$key] = ConvertTo-ParsecPlainObject -InputObject $property.Value
         }
 
         return $output
@@ -115,15 +138,14 @@ function ConvertTo-ParsecPlainObject {
 
 function Get-ParsecModuleVariableValue {
     [CmdletBinding()]
+    [OutputType([object])]
     param(
         [Parameter(Mandatory)]
         [string] $Name
     )
 
-    $module = $ExecutionContext.SessionState.Module
-    if ($null -eq $module) {
-        $module = Get-Module -Name 'ParsecEventExecutor'
-    }
+    $rootModule = Get-Module -Name 'ParsecEventExecutor'
+    $module = if ($null -ne $rootModule) { $rootModule } else { $ExecutionContext.SessionState.Module }
     if ($null -ne $module) {
         $moduleValue = & $module {
             param($VariableName)
@@ -160,7 +182,8 @@ function Get-ParsecModuleVariableValue {
 }
 
 function Set-ParsecModuleVariableValue {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([object])]
     param(
         [Parameter(Mandatory)]
         [string] $Name,
@@ -169,10 +192,12 @@ function Set-ParsecModuleVariableValue {
         $Value
     )
 
-    $module = $ExecutionContext.SessionState.Module
-    if ($null -eq $module) {
-        $module = Get-Module -Name 'ParsecEventExecutor'
+    if (-not $PSCmdlet.ShouldProcess("Module variable '$Name'", 'Set value')) {
+        return $Value
     }
+
+    $rootModule = Get-Module -Name 'ParsecEventExecutor'
+    $module = if ($null -ne $rootModule) { $rootModule } else { $ExecutionContext.SessionState.Module }
     if ($null -ne $module) {
         & $module {
             param($VariableName, $VariableValue)
@@ -189,6 +214,7 @@ function Set-ParsecModuleVariableValue {
 
 function Read-ParsecJsonFile {
     [CmdletBinding()]
+    [OutputType([object])]
     param(
         [Parameter(Mandatory)]
         [string] $Path
@@ -203,6 +229,7 @@ function Read-ParsecJsonFile {
 
 function Write-ParsecJsonFile {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [string] $Path,
@@ -238,7 +265,9 @@ function Write-ParsecJsonFile {
 }
 
 function New-ParsecStateEnvelope {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [string] $DocumentType,
@@ -257,6 +286,7 @@ function New-ParsecStateEnvelope {
 
 function Test-ParsecStateEnvelope {
     [CmdletBinding()]
+    [OutputType([bool])]
     param(
         [Parameter()]
         $Document
@@ -267,6 +297,7 @@ function Test-ParsecStateEnvelope {
 
 function Read-ParsecStateDocument {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [string] $Path,
@@ -297,6 +328,7 @@ function Read-ParsecStateDocument {
 
 function Write-ParsecStateDocument {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [string] $Path,
@@ -315,6 +347,7 @@ function Write-ParsecStateDocument {
 
 function Write-ParsecEventRecord {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [string] $EventType,
@@ -339,7 +372,9 @@ function Write-ParsecEventRecord {
 }
 
 function New-ParsecResult {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [string] $Status,
@@ -381,7 +416,9 @@ function New-ParsecResult {
 }
 
 function Test-ParsecSuccessfulStatus {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '')]
     [CmdletBinding()]
+    [OutputType([bool])]
     param(
         [Parameter(Mandatory)]
         [string] $Status
@@ -396,7 +433,9 @@ function Test-ParsecSuccessfulStatus {
 }
 
 function New-ParsecRunIdentifier {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
+    [OutputType([string])]
     param()
 
     return [guid]::NewGuid().Guid
@@ -404,6 +443,7 @@ function New-ParsecRunIdentifier {
 
 function Resolve-ParsecRecipePath {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [string] $NameOrPath
@@ -424,6 +464,7 @@ function Resolve-ParsecRecipePath {
 
 function Get-ParsecSnapshotDocumentPath {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [string] $Name,
@@ -438,6 +479,7 @@ function Get-ParsecSnapshotDocumentPath {
 
 function Resolve-ParsecSnapshotPath {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [string] $Name,
@@ -456,6 +498,7 @@ function Resolve-ParsecSnapshotPath {
 
 function Get-ParsecProfileDocumentPath {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [string] $Name,
@@ -469,6 +512,7 @@ function Get-ParsecProfileDocumentPath {
 
 function Resolve-ParsecProfilePath {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [string] $Name,
