@@ -88,6 +88,14 @@ function Get-ScriptExitCode {
     return 0
 }
 
+$buildScript = Join-Path -Path $PSScriptRoot -ChildPath 'Build-NativeLibrary.ps1'
+if (Test-Path -LiteralPath $buildScript) {
+    & $buildScript
+    if ((Get-ScriptExitCode) -ne 0) {
+        exit (Get-ScriptExitCode)
+    }
+}
+
 $gitPath = Resolve-GitPath
 $stagedFiles = @(
     Invoke-GitCapture -GitExecutable $gitPath -ArgumentList @(
