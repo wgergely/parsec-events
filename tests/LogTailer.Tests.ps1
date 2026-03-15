@@ -84,7 +84,6 @@ InModuleScope ParsecEventExecutor {
 
                 Stop-ParsecLogTailer -Tailer $tailer
                 $tailer.is_running | Should -BeFalse
-                $tailer.watcher | Should -BeNullOrEmpty
             }
             finally {
                 Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue

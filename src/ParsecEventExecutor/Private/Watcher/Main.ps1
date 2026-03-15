@@ -12,7 +12,13 @@
     )
 
     # --- Instance guard: prevent duplicate watchers ---
-    $mutexName = 'Global\ParsecEventWatcher'
+    # Derive mutex name from StateRoot so tests with isolated state roots don't conflict
+    $stateHash = [System.BitConverter]::ToString(
+        [System.Security.Cryptography.SHA256]::HashData(
+            [System.Text.Encoding]::UTF8.GetBytes($StateRoot)
+        )
+    ).Replace('-', '').Substring(0, 16)
+    $mutexName = "Global\ParsecEventWatcher_$stateHash"
     $createdNew = $false
     $mutex = $null
 
@@ -83,21 +89,7 @@
     # Pending connect events waiting for apply_delay_ms to expire
     $pendingConnects = [System.Collections.Generic.List[hashtable]]::new()
 
-    # Incoming log line queue — event handler only enqueues, main loop processes
-    $incomingLines = [System.Collections.Concurrent.ConcurrentQueue[string]]::new()
-
-    # Set up script-scope state BEFORE registering any events (fixes race condition)
-    $script:ParsecWatcherIncomingLines = $incomingLines
-
     Start-ParsecLogTailer -Tailer $tailer -SkipExisting
-
-    # Lightweight handler: only enqueues raw lines, no processing
-    Register-EngineEvent -SourceIdentifier 'Parsec.LogLine' -Action {
-        $line = $Event.MessageData.Line
-        if ($line -and $script:ParsecWatcherIncomingLines) {
-            $script:ParsecWatcherIncomingLines.Enqueue($line)
-        }
-    } | Out-Null
 
     Write-Information 'Watcher: Log tailer started. Entering event loop.'
 
@@ -114,9 +106,9 @@
 
     try {
         while ($watcherState.is_running) {
-            # --- Phase 1: Drain incoming log lines and route events ---
-            $line = $null
-            while ($incomingLines.TryDequeue([ref]$line)) {
+            # --- Phase 1: Poll tailer for new log lines and route events ---
+            $newLines = @(Read-ParsecLogTailerNewLines -Tailer $tailer)
+            foreach ($line in $newLines) {
                 if ([string]::IsNullOrWhiteSpace($line)) { continue }
 
                 $parsedEvent = Invoke-ParsecEventRouter -Router $router -Line $line
@@ -233,17 +225,13 @@
                 }
             }
 
-            # Sleep briefly to avoid busy-waiting. Events accumulate in the
-            # ConcurrentQueue and are drained on the next iteration.
-            Start-Sleep -Milliseconds 250
+            # Poll interval — controls how frequently the tailer checks for new lines
+            Start-Sleep -Milliseconds $Config.watcher.poll_interval_ms
         }
     }
     finally {
         Write-Information 'Watcher: Shutting down...'
         Stop-ParsecLogTailer -Tailer $tailer
-        Unregister-Event -SourceIdentifier 'Parsec.LogLine' -ErrorAction SilentlyContinue
-        Remove-Job -Name 'Parsec.LogLine' -ErrorAction SilentlyContinue
-        $script:ParsecWatcherIncomingLines = $null
         $script:ParsecWatcherState = $null
 
         if ($mutex) {
