@@ -1,0 +1,34 @@
+name = "sound.set-playback-device"
+domain = "sound"
+kind = "sound"
+description = "Set the default audio playback device."
+capabilities = ["capture", "apply", "verify", "reset"]
+required_backends = ["AudioEndpoint"]
+safety_class = "ReversibleSystemChange"
+success_signals = []
+failure_signals = []
+wait_conditions = []
+
+[operation_schemas.capture]
+required = []
+[operation_schemas.capture.types]
+device_id = "string"
+device_name = "string"
+
+[operation_schemas.apply]
+required = []
+[operation_schemas.apply.types]
+device_id = "string"
+device_name = "string"
+
+[operation_schemas.verify]
+required = []
+[operation_schemas.verify.types]
+device_id = "string"
+device_name = "string"
+
+[operation_schemas.reset]
+required = []
+[operation_schemas.reset.types]
+device_id = "string"
+device_name = "string"

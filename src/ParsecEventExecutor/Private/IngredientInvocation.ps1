@@ -1,5 +1,6 @@
 function Get-ParsecIngredientInvocationDocumentPath {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [string] $InvocationId,
@@ -14,6 +15,7 @@ function Get-ParsecIngredientInvocationDocumentPath {
 
 function Save-ParsecIngredientInvocationDocument {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $InvocationDocument,
@@ -30,6 +32,7 @@ function Save-ParsecIngredientInvocationDocument {
 
 function Get-ParsecIngredientTokenDocumentPath {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [string] $TokenId,
@@ -44,6 +47,7 @@ function Get-ParsecIngredientTokenDocumentPath {
 
 function Save-ParsecIngredientTokenDocument {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $TokenDocument,
@@ -61,6 +65,9 @@ function Save-ParsecIngredientTokenDocument {
 
 function Compress-ParsecPersistenceValue {
     [CmdletBinding()]
+    [OutputType([object])]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
+    [OutputType([System.Object[]])]
     param(
         [Parameter()]
         $Value,
@@ -115,6 +122,7 @@ function Compress-ParsecPersistenceValue {
 
 function Compress-ParsecResultForPersistence {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter()]
         $Result
@@ -146,6 +154,7 @@ function Compress-ParsecResultForPersistence {
 
 function Compress-ParsecIngredientInvocationDocumentForPersistence {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $InvocationDocument
@@ -163,6 +172,7 @@ function Compress-ParsecIngredientInvocationDocumentForPersistence {
 
 function Compress-ParsecIngredientTokenDocumentForPersistence {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $TokenDocument
@@ -180,6 +190,7 @@ function Compress-ParsecIngredientTokenDocumentForPersistence {
 
 function Read-ParsecIngredientTokenDocument {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [string] $TokenId,
@@ -203,6 +214,7 @@ function Read-ParsecIngredientTokenDocument {
 
 function Get-ParsecDisplayCatalogDocumentPath {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter()]
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)
@@ -214,6 +226,7 @@ function Get-ParsecDisplayCatalogDocumentPath {
 
 function Get-ParsecDisplayCatalogDocument {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter()]
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)
@@ -237,6 +250,7 @@ function Get-ParsecDisplayCatalogDocument {
 
 function Save-ParsecDisplayCatalogDocument {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $CatalogDocument,
@@ -253,6 +267,7 @@ function Save-ParsecDisplayCatalogDocument {
 
 function Get-ParsecDisplayMonitorIdentityRecord {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Monitor
@@ -278,6 +293,7 @@ function Get-ParsecDisplayMonitorIdentityRecord {
 
 function Get-ParsecDisplayMonitorIdentityKey {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Monitor
@@ -299,6 +315,7 @@ function Get-ParsecDisplayMonitorIdentityKey {
 
 function Test-ParsecDisplayCatalogValueEqual {
     [CmdletBinding()]
+    [OutputType([bool])]
     param(
         [Parameter()]
         $Left,
@@ -322,6 +339,7 @@ function Test-ParsecDisplayCatalogValueEqual {
 
 function Find-ParsecDisplayCatalogEntry {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IEnumerable] $Entries,
@@ -384,6 +402,7 @@ function Find-ParsecDisplayCatalogEntry {
 
 function Sync-ParsecDisplayCatalog {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $ObservedState,
@@ -467,6 +486,7 @@ function Sync-ParsecDisplayCatalog {
 
 function Resolve-ParsecDisplayMonitorByScreenId {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $ObservedState,
@@ -495,6 +515,8 @@ function Resolve-ParsecDisplayMonitorByScreenId {
 
 function Get-ParsecDisplayInventory {
     [CmdletBinding()]
+    [OutputType([PSCustomObject[]])]
+    [OutputType([System.Object[]])]
     param(
         [Parameter()]
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)
@@ -504,7 +526,7 @@ function Get-ParsecDisplayInventory {
         Get-ParsecCoreDomainDefinition -Name 'display' | Out-Null
     }
 
-    $observed = Get-ParsecObservedState
+    $observed = Get-ParsecDisplayDomainObservedState
     $catalog = Sync-ParsecDisplayCatalog -ObservedState $observed -StateRoot $StateRoot
     return @(
         foreach ($monitor in @($observed.monitors)) {
@@ -531,6 +553,7 @@ function Get-ParsecDisplayInventory {
 
 function Get-ParsecInvocationResolvedTargetIdentity {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter()]
         $ExecutionResult
@@ -557,6 +580,7 @@ function Get-ParsecInvocationResolvedTargetIdentity {
 
 function Get-ParsecIngredientInvocationMessage {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter()]
         $OperationResult,
@@ -590,8 +614,55 @@ function Get-ParsecIngredientInvocationMessage {
     return $null
 }
 
+function Get-ParsecPersistedApplyOutputValue {
+    [CmdletBinding()]
+    [OutputType([object])]
+    param(
+        [Parameter()]
+        $ApplyResult,
+
+        [Parameter(Mandatory)]
+        [string] $Name
+    )
+
+    if ($null -eq $ApplyResult) {
+        return $null
+    }
+
+    $outputs = $null
+    if ($ApplyResult -is [System.Collections.IDictionary]) {
+        if ($ApplyResult.Contains('Outputs')) {
+            $outputs = $ApplyResult.Outputs
+        }
+        elseif ($ApplyResult.Contains('outputs')) {
+            $outputs = $ApplyResult.outputs
+        }
+    }
+    elseif ($ApplyResult.PSObject.Properties.Name -contains 'Outputs') {
+        $outputs = $ApplyResult.Outputs
+    }
+    elseif ($ApplyResult.PSObject.Properties.Name -contains 'outputs') {
+        $outputs = $ApplyResult.outputs
+    }
+
+    if ($outputs -is [System.Collections.IDictionary]) {
+        if ($outputs.Contains($Name)) {
+            return $outputs[$Name]
+        }
+    }
+    elseif ($null -ne $outputs) {
+        $properties = $outputs.PSObject.Properties
+        if ($null -ne $properties -and @($properties).Count -gt 0 -and $properties.Name -contains $Name) {
+            return $outputs.$Name
+        }
+    }
+
+    return $null
+}
+
 function Get-ParsecIngredientReadinessConfiguration {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         $Definition
@@ -611,6 +682,7 @@ function Get-ParsecIngredientReadinessConfiguration {
 
 function Wait-ParsecIngredientReadiness {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param(
         [Parameter(Mandatory)]
         [string] $Name,
@@ -635,6 +707,7 @@ function Wait-ParsecIngredientReadiness {
 
     $configuration = Get-ParsecIngredientReadinessConfiguration -Definition $definition
     $deadline = [DateTimeOffset]::UtcNow.AddMilliseconds([double] $configuration.timeout_ms)
+    $minimumAttempts = [Math]::Max(1, [int] $configuration.success_count + 2)
     $attempt = 0
     $successStreak = 0
     $maxSuccessStreak = 0
@@ -665,7 +738,7 @@ function Wait-ParsecIngredientReadiness {
             }
         }
 
-        if ([DateTimeOffset]::UtcNow -ge $deadline) {
+        if ([DateTimeOffset]::UtcNow -ge $deadline -and $attempt -ge $minimumAttempts) {
             break
         }
 
@@ -686,6 +759,7 @@ function Wait-ParsecIngredientReadiness {
 
 function Invoke-ParsecIngredientCommandInternal {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [string] $Name,
@@ -811,6 +885,14 @@ function Invoke-ParsecIngredientCommandInternal {
                 $null
             }
             $resetArguments = Merge-ParsecRecipeMap -Base ([ordered]@{ captured_state = $tokenDocument.captured_state }) -Override (Merge-ParsecRecipeMap -Base $tokenDocument.requested_arguments -Override $Arguments)
+            $persistedProcessId = Get-ParsecPersistedApplyOutputValue -ApplyResult $tokenDocument.apply_result -Name 'process_id'
+            if ($null -eq $persistedProcessId) {
+                $persistedProcessId = Get-ParsecPersistedApplyOutputValue -ApplyResult $resetExecutionResult -Name 'process_id'
+            }
+
+            if ($null -ne $persistedProcessId -and -not $resetArguments.Contains('process_id')) {
+                $resetArguments['process_id'] = [int] $persistedProcessId
+            }
             $operationResult = Invoke-ParsecCoreIngredientOperation -Name $definition.Name -Operation 'reset' -Arguments $resetArguments -Prior $resetExecutionResult -StateRoot $stateRoot -RunState @{}
             $resetResult = $operationResult
             $finalStatus = [string] $operationResult.Status

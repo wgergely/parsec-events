@@ -1,5 +1,6 @@
 name = "display.set-resolution"
 aliases = ["set-resolution"]
+domain = "display"
 kind = "display"
 description = "Set monitor resolution."
 capabilities = ["capture", "apply", "wait", "verify", "reset"]

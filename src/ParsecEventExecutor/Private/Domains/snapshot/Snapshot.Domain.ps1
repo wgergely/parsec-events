@@ -1,5 +1,6 @@
 function Resolve-ParsecSnapshotDomainName {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter()]
         [hashtable] $Arguments = @{},
@@ -36,6 +37,7 @@ function Resolve-ParsecSnapshotDomainName {
 
 function Invoke-ParsecSnapshotDomainResolveName {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter()]
         [hashtable] $Arguments = @{},
@@ -55,6 +57,7 @@ function Invoke-ParsecSnapshotDomainResolveName {
 
 function Get-ParsecSnapshotDomainTarget {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter()]
         [hashtable] $Arguments = @{},
@@ -76,6 +79,7 @@ function Get-ParsecSnapshotDomainTarget {
 
 function Invoke-ParsecSnapshotDomainCapture {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter()]
         [hashtable] $Arguments = @{},
@@ -88,7 +92,7 @@ function Invoke-ParsecSnapshotDomainCapture {
     )
 
     $snapshotName = Resolve-ParsecSnapshotDomainName -Arguments $Arguments -StateRoot $StateRoot -RunState $RunState -UseDefaultCaptureName
-    $observed = Get-ParsecObservedState
+    $observed = Get-ParsecDisplayDomainObservedState
     $snapshot = [ordered]@{
         schema_version = 1
         name = $snapshotName
@@ -107,6 +111,7 @@ function Invoke-ParsecSnapshotDomainCapture {
 
 function Invoke-ParsecSnapshotDomainReset {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $SnapshotDocument
@@ -153,6 +158,7 @@ function Invoke-ParsecSnapshotDomainReset {
 
 function Invoke-ParsecSnapshotDomainVerify {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter()]
         [hashtable] $Arguments = @{},
@@ -165,7 +171,7 @@ function Invoke-ParsecSnapshotDomainVerify {
     )
 
     $target = Get-ParsecSnapshotDomainTarget -Arguments $Arguments -StateRoot $StateRoot -RunState $RunState
-    $observed = Get-ParsecObservedState
+    $observed = Get-ParsecDisplayDomainObservedState
     $verification = Compare-ParsecDisplayDomainState -TargetState $target.snapshot.display -ObservedState $observed
     $verification.Outputs.snapshot_name = $target.snapshot_name
     return $verification

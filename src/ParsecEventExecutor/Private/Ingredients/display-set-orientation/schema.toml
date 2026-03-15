@@ -1,5 +1,6 @@
 name = "display.set-orientation"
 aliases = ["set-orientation"]
+domain = "display"
 kind = "display"
 description = "Set monitor orientation."
 capabilities = ["capture", "apply", "wait", "verify", "reset"]

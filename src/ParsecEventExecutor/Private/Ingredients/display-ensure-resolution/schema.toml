@@ -1,4 +1,5 @@
 name = "display.ensure-resolution"
+domain = "display"
 kind = "display"
 description = "Ensure a target resolution exists or can be applied for a display."
 capabilities = ["capture", "apply", "verify", "reset"]

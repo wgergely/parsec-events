@@ -11,6 +11,7 @@
         'Invoke-ParsecIngredient',
         'Invoke-ParsecRecipe',
         'Get-ParsecDisplay',
+        'Get-ParsecDisplayAudit',
         'Get-ParsecRecipe',
         'Get-ParsecIngredient',
         'Save-ParsecSnapshot',

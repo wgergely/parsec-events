@@ -1,5 +1,7 @@
 function Get-ParsecDisplay {
     [CmdletBinding()]
+    [OutputType([PSCustomObject[]])]
+    [OutputType([System.Object[]])]
     param(
         [Parameter()]
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)

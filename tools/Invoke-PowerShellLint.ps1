@@ -46,7 +46,7 @@ function Resolve-PowerShellFile {
     return $item.FullName
 }
 
-function Get-TargetFiles {
+function Get-TargetFile {
     param(
         [string[]]$CandidatePath
     )
@@ -75,7 +75,7 @@ function Get-TargetFiles {
 
 Import-Module PSScriptAnalyzer -ErrorAction Stop
 
-$targets = @(Get-TargetFiles -CandidatePath $Path)
+$targets = @(Get-TargetFile -CandidatePath $Path)
 if ($targets.Count -eq 0) {
     exit 0
 }

@@ -1,5 +1,6 @@
 function Test-ParsecCoreIngredientOperationSupported {
     [CmdletBinding()]
+    [OutputType([bool])]
     param(
         [Parameter(Mandatory)]
         $Definition,
@@ -25,6 +26,7 @@ function Test-ParsecCoreIngredientOperationSupported {
 
 function Invoke-ParsecCoreIngredientOperation {
     [CmdletBinding()]
+    [OutputType([object])]
     param(
         [Parameter(Mandatory)]
         [string] $Name,
@@ -53,7 +55,7 @@ function Invoke-ParsecCoreIngredientOperation {
         throw "Ingredient '$Name' does not support operation '$Operation'."
     }
 
-    Assert-ParsecCoreIngredientArguments -Definition $definition -Operation $Operation -Arguments $Arguments
+    Assert-ParsecCoreIngredientArgument -Definition $definition -Operation $Operation -Arguments $Arguments
     $domain = Get-ParsecCoreDomainDefinition -Name $definition.Domain
     $context = New-ParsecCoreExecutionContext -IngredientDefinition $definition -DomainDefinition $domain -Arguments $Arguments -Prior $Prior -StateRoot $StateRoot -RunState $RunState -Metadata $Metadata
     $handler = $definition.Operations[$Operation]
@@ -62,6 +64,7 @@ function Invoke-ParsecCoreIngredientOperation {
 
 function Invoke-ParsecCoreIngredientExecute {
     [CmdletBinding()]
+    [OutputType([object])]
     param(
         [Parameter(Mandatory)]
         [string] $Name,
@@ -84,6 +87,7 @@ function Invoke-ParsecCoreIngredientExecute {
 
 function Invoke-ParsecCoreIngredientVerify {
     [CmdletBinding()]
+    [OutputType([object])]
     param(
         [Parameter(Mandatory)]
         [string] $Name,
@@ -114,6 +118,7 @@ function Invoke-ParsecCoreIngredientVerify {
 
 function Invoke-ParsecCoreIngredientCompensate {
     [CmdletBinding()]
+    [OutputType([object])]
     param(
         [Parameter(Mandatory)]
         [string] $Name,

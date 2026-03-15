@@ -15,11 +15,11 @@ Describe 'Invoke-ParsecRecipe' {
 
         It 'does not attempt compensation reset when the ingredient lacks reset support' {
             $step = @{
-                id = 'stop-service'
-                ingredient = 'service.stop'
+                id = 'run-command'
+                ingredient = 'command.invoke'
                 operation = 'apply'
                 depends_on = @()
-                arguments = @{ service_name = 'Spooler' }
+                arguments = @{ file_path = 'echo'; arguments = @('hello') }
                 verify = $true
                 compensation_policy = 'explicit'
                 retry_count = 0
@@ -34,29 +34,29 @@ Describe 'Invoke-ParsecRecipe' {
 
             Mock Invoke-ParsecIngredientCommandInternal {
                 [ordered]@{
-                    ingredient_name = 'service.stop'
+                    ingredient_name = 'command.invoke'
                     status = 'Failed'
-                    token_id = 'captured-token'
-                    token_path = 'Y:\fake-token.json'
-                    capture_result = @{ Status = 'Succeeded' }
-                    operation_result = @{ Status = 'Failed'; Message = 'Stop failed.' }
+                    token_id = $null
+                    token_path = $null
+                    capture_result = $null
+                    operation_result = @{ Status = 'Failed'; Message = 'Command failed.' }
                     readiness_result = $null
                     verify_result = $null
                     reset_result = $null
                     invocation_id = 'apply-invocation'
                     started_at = '2026-03-12T00:00:00.0000000+00:00'
                     completed_at = '2026-03-12T00:00:01.0000000+00:00'
-                    message = 'Stop failed.'
+                    message = 'Command failed.'
                 }
-            } -ParameterFilter { $Name -eq 'service.stop' -and $Operation -eq 'apply' }
+            } -ParameterFilter { $Name -eq 'command.invoke' -and $Operation -eq 'apply' }
 
             $result = Invoke-ParsecRecipeSequenceStep -Step $step -RunRecord $runRecord -StateRoot $TestDrive
 
             $result.status | Should -Be 'Failed'
-            $result.message | Should -Be 'Stop failed.'
+            $result.message | Should -Be 'Command failed.'
             $result.compensation_result | Should -BeNullOrEmpty
-            Should -Invoke Invoke-ParsecIngredientCommandInternal -Times 1 -Exactly -ParameterFilter { $Name -eq 'service.stop' -and $Operation -eq 'apply' }
-            Should -Invoke Invoke-ParsecIngredientCommandInternal -Times 0 -Exactly -ParameterFilter { $Name -eq 'service.stop' -and $Operation -eq 'reset' }
+            Should -Invoke Invoke-ParsecIngredientCommandInternal -Times 1 -Exactly -ParameterFilter { $Name -eq 'command.invoke' -and $Operation -eq 'apply' }
+            Should -Invoke Invoke-ParsecIngredientCommandInternal -Times 0 -Exactly -ParameterFilter { $Name -eq 'command.invoke' -and $Operation -eq 'reset' }
         }
     }
 
@@ -116,6 +116,123 @@ height = 720
             $result.terminal_status | Should -Be 'Failed'
             $result.step_results[0].status | Should -Be 'Failed'
             $result.step_results[1].status | Should -Be 'Blocked'
+        }
+
+        It 'rejects recipe graphs with dependency cycles before execution starts' {
+            $stateRoot = Join-Path $TestDrive 'cycle-validation'
+            $recipePath = Join-Path $TestDrive 'cycle-validation.toml'
+            @"
+name = "cycle-validation"
+
+[[steps]]
+id = "alpha"
+ingredient = "set-resolution"
+depends_on = ["beta"]
+
+[steps.arguments]
+width = 1280
+height = 720
+
+[[steps]]
+id = "beta"
+ingredient = "set-resolution"
+depends_on = ["alpha"]
+
+[steps.arguments]
+width = 1920
+height = 1080
+"@ | Set-Content -LiteralPath $recipePath -Encoding UTF8
+
+            $result = Invoke-ParsecRecipe -NameOrPath $recipePath -StateRoot $stateRoot -Confirm:$false
+
+            $result.terminal_status | Should -Be 'Failed'
+            @($result.validation_errors).Count | Should -Be 1
+            $result.validation_errors[0] | Should -Match 'dependency cycle'
+            @($result.step_results).Count | Should -Be 0
+            $script:IngredientObservedState.monitors[0].bounds.width | Should -Be 1920
+        }
+
+        It 'schedules ready steps in deterministic topological order' {
+            $stateRoot = Join-Path $TestDrive 'topological-order'
+            $recipePath = Join-Path $TestDrive 'topological-order.toml'
+            @"
+name = "topological-order"
+
+[[steps]]
+id = "root-b"
+ingredient = "set-orientation"
+
+[steps.arguments]
+orientation = "Portrait"
+
+[[steps]]
+id = "root-a"
+ingredient = "set-textscale"
+
+[steps.arguments]
+text_scale_percent = 150
+
+[[steps]]
+id = "after-a"
+ingredient = "set-resolution"
+depends_on = ["root-a"]
+
+[steps.arguments]
+width = 1280
+height = 720
+
+[[steps]]
+id = "after-b"
+ingredient = "set-uiscale"
+depends_on = ["root-b"]
+
+[steps.arguments]
+ui_scale_percent = 125
+"@ | Set-Content -LiteralPath $recipePath -Encoding UTF8
+            $recipe = Get-ParsecRecipeDocument -NameOrPath $recipePath
+
+            $result = Invoke-ParsecRecipeSequence -Recipe $recipe -StateRoot $stateRoot
+
+            $result.terminal_status | Should -Be 'Succeeded'
+            @($result.step_results.step_id) | Should -Be @('root-b', 'root-a', 'after-b', 'after-a')
+        }
+
+        It 'rolls back earlier successful explicit-compensation steps in reverse order after a later failure' {
+            $stateRoot = Join-Path $TestDrive 'reverse-rollback'
+            $recipePath = Join-Path $TestDrive 'reverse-rollback.toml'
+            @"
+name = "reverse-rollback"
+
+[[steps]]
+id = "set-good-resolution"
+ingredient = "set-resolution"
+compensation_policy = "explicit"
+
+[steps.arguments]
+width = 1280
+height = 720
+
+[[steps]]
+id = "fail-command"
+ingredient = "command.invoke"
+depends_on = ["set-good-resolution"]
+compensation_policy = "explicit"
+
+[steps.arguments]
+file_path = "cmd.exe"
+arguments = ["/c", "exit", "7"]
+"@ | Set-Content -LiteralPath $recipePath -Encoding UTF8
+            $recipe = Get-ParsecRecipeDocument -NameOrPath $recipePath
+
+            $result = Invoke-ParsecRecipeSequence -Recipe $recipe -StateRoot $stateRoot
+
+            $result.terminal_status | Should -Be 'RolledBack'
+            $result.rollback_status | Should -Be 'Succeeded'
+            @($result.rollback_results).Count | Should -Be 1
+            $result.rollback_results[0].step_id | Should -Be 'set-good-resolution'
+            $script:IngredientObservedState.monitors[0].bounds.width | Should -Be 1920
+            $result.step_results[0].status | Should -Be 'Succeeded'
+            $result.step_results[1].status | Should -Be 'Failed'
         }
 
         It 'executes a no-mode resolution recipe through the standalone ingredient pipeline' {

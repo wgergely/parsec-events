@@ -25,23 +25,23 @@ function Start-ParsecExecutor {
         'VerifyOnly' {
             return [pscustomobject]@{
                 event_name = $EventName
-                state      = Get-ParsecExecutorStateDocument -StateRoot $StateRoot
-                timestamp  = [DateTimeOffset]::UtcNow.ToString('o')
+                state = Get-ParsecExecutorStateDocument -StateRoot $StateRoot
+                timestamp = [DateTimeOffset]::UtcNow.ToString('o')
             }
         }
         'Reconcile' {
             $state = Get-ParsecRecoveryStatus -StateRoot $StateRoot
             return [pscustomobject]@{
-                event_name      = $EventName
-                desired_mode    = $state.desired_mode
-                actual_mode     = $state.actual_mode
-                last_good_mode  = $state.last_good_mode
+                event_name = $EventName
+                desired_mode = $state.desired_mode
+                actual_mode = $state.actual_mode
+                last_good_mode = $state.last_good_mode
                 active_snapshot = $state.active_snapshot
-                issues          = @($state.issues)
-                recoverable     = [bool] $state.recoverable
+                issues = @($state.issues)
+                recoverable = [bool] $state.recoverable
                 recovery_candidate = $state.recovery_candidate
-                status          = $state.status
-                timestamp       = [DateTimeOffset]::UtcNow.ToString('o')
+                status = $state.status
+                timestamp = [DateTimeOffset]::UtcNow.ToString('o')
             }
         }
     }

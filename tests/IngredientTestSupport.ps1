@@ -1,4 +1,6 @@
 function Set-ParsecIngredientObservedResolution {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
         [int] $Width,
@@ -20,6 +22,8 @@ function Set-ParsecIngredientObservedResolution {
 }
 
 function Set-ParsecIngredientObservedPosition {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
         [int] $X,
@@ -46,6 +50,10 @@ function Get-ParsecIngredientObservedMonitorByDeviceName {
 }
 
 function Enable-ParsecIngredientDualMonitorEnvironment {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    [CmdletBinding()]
+    param()
+
     $secondaryMonitor = [ordered]@{
         device_name = '\\.\DISPLAY2'
         source_name = '\\.\DISPLAY2'
@@ -123,6 +131,8 @@ function Enable-ParsecIngredientDualMonitorEnvironment {
 }
 
 function Add-ParsecIngredientSupportedMode {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
         [int] $Width,
@@ -184,63 +194,9 @@ function Initialize-ParsecIngredientTestEnvironment {
     }
     $script:IngredientNvidiaSupportedModeLagRemaining = 0
     $script:IngredientNvidiaPendingSupportedMode = $null
-    $script:IngredientWindowActivationLog = @()
-    $script:IngredientWindowActivationDeniedHandles = @()
-    $script:IngredientWindowForegroundHandle = 101
-    $script:IngredientAltTabHandles = @([int64] 101, [int64] 102)
-    $script:IngredientWindows = @(
-        [ordered]@{
-            handle = [int64] 101
-            owner_handle = [int64] 0
-            process_id = 1001
-            process_name = 'Code'
-            title = 'Editor'
-            class_name = 'ApplicationFrameWindow'
-            is_visible = $true
-            is_minimized = $false
-            is_cloaked = $false
-            is_shell_window = $false
-            is_on_input_desktop = $true
-            is_on_current_virtual_desktop = $true
-            extended_style = 0
-            width = 1440
-            height = 900
-        },
-        [ordered]@{
-            handle = [int64] 102
-            owner_handle = [int64] 0
-            process_id = 1002
-            process_name = 'chrome'
-            title = 'Browser'
-            class_name = 'Chrome_WidgetWin_1'
-            is_visible = $true
-            is_minimized = $false
-            is_cloaked = $false
-            is_shell_window = $false
-            is_on_input_desktop = $true
-            is_on_current_virtual_desktop = $true
-            extended_style = 0
-            width = 1280
-            height = 720
-        },
-        [ordered]@{
-            handle = [int64] 103
-            owner_handle = [int64] 0
-            process_id = 1003
-            process_name = 'UtilityHost'
-            title = 'Hidden Utility'
-            class_name = 'ToolWindow'
-            is_visible = $false
-            is_minimized = $false
-            is_cloaked = $false
-            is_shell_window = $false
-            is_on_input_desktop = $true
-            is_on_current_virtual_desktop = $true
-            extended_style = 0
-            width = 320
-            height = 120
-        }
-    )
+    $script:IngredientServiceStates = @{
+        Spooler = 'Stopped'
+    }
     $script:IngredientSupportedModes = @(
         [ordered]@{ width = 1280; height = 720; bits_per_pel = 32; refresh_rate_hz = 60; orientation = 'Landscape' },
         [ordered]@{ width = 1920; height = 1080; bits_per_pel = 32; refresh_rate_hz = 60; orientation = 'Landscape' }
@@ -437,7 +393,6 @@ function Initialize-ParsecIngredientTestEnvironment {
             New-ParsecResult -Status 'Succeeded' -Message 'text-scale' -Observed @{ text_scale_percent = $value } -Outputs @{ text_scale_percent = $value }
         }
     }
-    $global:ParsecPersonalizationAdapter = $script:ParsecPersonalizationAdapter
 
     $script:ParsecDisplayAdapter = @{
         GetObservedState = {
@@ -456,7 +411,7 @@ function Initialize-ParsecIngredientTestEnvironment {
                     $script:IngredientOrientationObservationLagRemaining--
                 }
                 else {
-                    $monitor = Get-ParsecIngredientObservedMonitorByDeviceName -DeviceName ([string] $script:IngredientOrientationPendingOrientation.device_name)
+                    $monitor = @($script:IngredientObservedState.monitors) | Where-Object { [string] $_.device_name -eq [string] $script:IngredientOrientationPendingOrientation.device_name } | Select-Object -First 1
                     if ($null -ne $monitor) {
                         $monitor.orientation = [string] $script:IngredientOrientationPendingOrientation.orientation
                     }
@@ -498,6 +453,9 @@ function Initialize-ParsecIngredientTestEnvironment {
         GetSupportedModes = {
             param($Arguments)
 
+            # Arguments required by adapter interface contract
+            $null = $Arguments
+
             if ($null -ne $script:IngredientNvidiaPendingSupportedMode) {
                 if ($script:IngredientNvidiaSupportedModeLagRemaining -gt 0) {
                     $script:IngredientNvidiaSupportedModeLagRemaining--
@@ -516,7 +474,7 @@ function Initialize-ParsecIngredientTestEnvironment {
         }
         SetEnabled = {
             param($Arguments)
-            $monitor = Get-ParsecIngredientObservedMonitorByDeviceName -DeviceName ([string] $Arguments.device_name)
+            $monitor = @($script:IngredientObservedState.monitors) | Where-Object { [string] $_.device_name -eq [string] $Arguments.device_name } | Select-Object -First 1
             if ($null -eq $monitor) {
                 return New-ParsecResult -Status 'Failed' -Message "Monitor '$($Arguments.device_name)' not found." -Requested $Arguments -Errors @('MonitorNotFound')
             }
@@ -574,23 +532,49 @@ function Initialize-ParsecIngredientTestEnvironment {
         }
         SetPrimary = {
             param($Arguments)
-            foreach ($monitor in @($script:IngredientObservedState.monitors)) {
-                $monitor.is_primary = $false
+            foreach ($mon in @($script:IngredientObservedState.monitors)) {
+                $mon.is_primary = $false
             }
 
-            $monitor = Get-ParsecIngredientObservedMonitorByDeviceName -DeviceName ([string] $Arguments.device_name)
-            if ($null -eq $monitor) {
+            $targetMon = @($script:IngredientObservedState.monitors) | Where-Object { [string] $_.device_name -eq [string] $Arguments.device_name } | Select-Object -First 1
+            if ($null -eq $targetMon) {
                 return New-ParsecResult -Status 'Failed' -Message "Monitor '$($Arguments.device_name)' not found." -Requested $Arguments -Errors @('MonitorNotFound')
             }
 
-            $monitor.is_primary = $true
-            if ($monitor.bounds -is [System.Collections.IDictionary]) {
-                $monitor.bounds.x = 0
-                $monitor.bounds.y = 0
-                $monitor.working_area.x = 0
-                $monitor.working_area.y = 0
-                $monitor.topology.source_mode.position_x = 0
-                $monitor.topology.source_mode.position_y = 0
+            $targetMon.is_primary = $true
+
+            if ($Arguments.ContainsKey('positions') -and @($Arguments.positions).Count -gt 0) {
+                # Reset path: restore exact captured positions for all monitors
+                $posIndex = @{}
+                foreach ($pos in @($Arguments.positions)) {
+                    $posIndex[[string] $pos.device_name] = $pos
+                }
+                foreach ($mon in @($script:IngredientObservedState.monitors)) {
+                    $savedPos = $posIndex[[string] $mon.device_name]
+                    if ($null -ne $savedPos -and $mon.bounds -is [System.Collections.IDictionary]) {
+                        $mon.bounds.x = [int] $savedPos.x
+                        $mon.bounds.y = [int] $savedPos.y
+                        $mon.working_area.x = [int] $savedPos.x
+                        $mon.working_area.y = [int] $savedPos.y
+                        $mon.topology.source_mode.position_x = [int] $savedPos.x
+                        $mon.topology.source_mode.position_y = [int] $savedPos.y
+                    }
+                }
+            }
+            else {
+                # Apply path: shift all monitors so target becomes (0,0)
+                $offsetX = [int] $targetMon.bounds.x
+                $offsetY = [int] $targetMon.bounds.y
+                foreach ($mon in @($script:IngredientObservedState.monitors)) {
+                    if ($mon.bounds -is [System.Collections.IDictionary]) {
+                        $mon.bounds.x = [int] $mon.bounds.x - $offsetX
+                        $mon.bounds.y = [int] $mon.bounds.y - $offsetY
+                        $mon.working_area.x = [int] $mon.working_area.x - $offsetX
+                        $mon.working_area.y = [int] $mon.working_area.y - $offsetY
+                        $mon.topology.source_mode.position_x = [int] $mon.topology.source_mode.position_x - $offsetX
+                        $mon.topology.source_mode.position_y = [int] $mon.topology.source_mode.position_y - $offsetY
+                    }
+                }
             }
 
             New-ParsecResult -Status 'Succeeded' -Message 'primary' -Requested $Arguments
@@ -615,7 +599,7 @@ function Initialize-ParsecIngredientTestEnvironment {
         }
         SetOrientation = {
             param($Arguments)
-            $monitor = Get-ParsecIngredientObservedMonitorByDeviceName -DeviceName ([string] $Arguments.device_name)
+            $monitor = @($script:IngredientObservedState.monitors) | Where-Object { [string] $_.device_name -eq [string] $Arguments.device_name } | Select-Object -First 1
             if ($null -eq $monitor) {
                 return New-ParsecResult -Status 'Failed' -Message "Monitor '$($Arguments.device_name)' not found." -Requested $Arguments -Errors @('MonitorNotFound')
             }
@@ -658,60 +642,6 @@ function Initialize-ParsecIngredientTestEnvironment {
             New-ParsecResult -Status 'Succeeded' -Message 'scaling' -Requested $Arguments
         }
     }
-    $global:ParsecDisplayAdapter = $script:ParsecDisplayAdapter
-
-    $script:ParsecWindowAdapter = @{
-        GetForegroundWindowInfo = {
-            $window = @($script:IngredientWindows | Where-Object { [int64] $_.handle -eq [int64] $script:IngredientWindowForegroundHandle }) | Select-Object -First 1
-            if ($null -eq $window) {
-                return $null
-            }
-
-            return ConvertTo-ParsecPlainObject -InputObject $window
-        }
-        GetTopLevelWindows = {
-            return @($script:IngredientWindows | ForEach-Object { ConvertTo-ParsecPlainObject -InputObject $_ })
-        }
-        StepAltTab = {
-            $currentIndex = [Array]::IndexOf($script:IngredientAltTabHandles, [int64] $script:IngredientWindowForegroundHandle)
-            if ($currentIndex -lt 0 -or $script:IngredientAltTabHandles.Count -eq 0) {
-                return [ordered]@{
-                    succeeded = $false
-                    handle = $script:IngredientWindowForegroundHandle
-                }
-            }
-
-            $nextIndex = ($currentIndex + 1) % $script:IngredientAltTabHandles.Count
-            $nextHandle = [int64] $script:IngredientAltTabHandles[$nextIndex]
-            $script:IngredientWindowForegroundHandle = $nextHandle
-            $script:IngredientWindowActivationLog += $nextHandle
-            return [ordered]@{
-                succeeded = $true
-                handle = $nextHandle
-            }
-        }
-        ActivateWindow = {
-            param($Arguments)
-
-            $handle = [int64] $Arguments.handle
-            $script:IngredientWindowActivationLog += $handle
-            $window = @($script:IngredientWindows | Where-Object { [int64] $_.handle -eq $handle }) | Select-Object -First 1
-            $succeeded = ($null -ne $window) -and -not (@($script:IngredientWindowActivationDeniedHandles) -contains $handle)
-            if ($succeeded) {
-                $script:IngredientWindowForegroundHandle = $handle
-                if ($Arguments.restore_if_minimized -and $window.is_minimized) {
-                    $window.is_minimized = $false
-                }
-            }
-
-            return [ordered]@{
-                succeeded = $succeeded
-                handle = $handle
-                window = if ($null -ne $window) { ConvertTo-ParsecPlainObject -InputObject $window } else { $null }
-            }
-        }
-    }
-    $global:ParsecWindowAdapter = $script:ParsecWindowAdapter
 
     $script:ParsecNvidiaAdapter = @{
         GetAvailability = {
@@ -813,24 +743,133 @@ function Initialize-ParsecIngredientTestEnvironment {
             }
         }
     }
-    $global:ParsecNvidiaAdapter = $script:ParsecNvidiaAdapter
+
+    $script:IngredientSoundDevices = @(
+        [ordered]@{
+            id = 'speaker-001'
+            name = 'Speakers'
+            is_default = $true
+            type = 'Playback'
+            status = 'Active'
+        },
+        [ordered]@{
+            id = 'hdmi-002'
+            name = 'HDMI Audio'
+            is_default = $false
+            type = 'Playback'
+            status = 'Active'
+        }
+    )
+    $script:IngredientSoundDefaultDevice = [ordered]@{
+        id = 'speaker-001'
+        name = 'Speakers'
+        is_default = $true
+        type = 'Playback'
+        status = 'Active'
+    }
+
+    $script:ParsecSoundAdapter = @{
+        GetPlaybackDevices = {
+            return @($script:IngredientSoundDevices | ForEach-Object { ConvertTo-ParsecPlainObject -InputObject $_ })
+        }
+        GetDefaultPlaybackDevice = {
+            return ConvertTo-ParsecPlainObject -InputObject $script:IngredientSoundDefaultDevice
+        }
+        SetDefaultPlaybackDevice = {
+            param($Arguments)
+
+            $deviceId = if ($Arguments.ContainsKey('device_id')) { [string] $Arguments.device_id } else { $null }
+            $deviceName = if ($Arguments.ContainsKey('device_name')) { [string] $Arguments.device_name } else { $null }
+
+            if ([string]::IsNullOrWhiteSpace($deviceId) -and [string]::IsNullOrWhiteSpace($deviceName)) {
+                return New-ParsecResult -Status 'Failed' -Message 'Either device_id or device_name is required.' -Errors @('MissingArgument')
+            }
+
+            $targetDevice = $null
+            if (-not [string]::IsNullOrWhiteSpace($deviceId)) {
+                $targetDevice = @($script:IngredientSoundDevices | Where-Object { [string] $_.id -eq $deviceId }) | Select-Object -First 1
+            }
+            elseif (-not [string]::IsNullOrWhiteSpace($deviceName)) {
+                $targetDevice = @($script:IngredientSoundDevices | Where-Object { [string] $_.name -eq $deviceName }) | Select-Object -First 1
+            }
+
+            if ($null -eq $targetDevice) {
+                return New-ParsecResult -Status 'Failed' -Message "Playback device not found." -Errors @('DeviceNotFound')
+            }
+
+            foreach ($device in @($script:IngredientSoundDevices)) {
+                $device.is_default = $false
+            }
+
+            $targetDevice.is_default = $true
+            $script:IngredientSoundDefaultDevice = [ordered]@{
+                id = [string] $targetDevice.id
+                name = [string] $targetDevice.name
+                is_default = $true
+                type = 'Playback'
+                status = 'Active'
+            }
+
+            New-ParsecResult -Status 'Succeeded' -Message "Set default playback device to '$([string] $targetDevice.name)'." -Observed @{
+                device_id = [string] $targetDevice.id
+                device_name = [string] $targetDevice.name
+            } -Outputs @{
+                device_id = [string] $targetDevice.id
+                device_name = [string] $targetDevice.name
+            }
+        }
+    }
+
+    $script:ParsecServiceAdapter = @{
+        GetService = {
+            param($Arguments)
+
+            $serviceName = [string] $Arguments.service_name
+            $status = if ($script:IngredientServiceStates.ContainsKey($serviceName)) {
+                [string] $script:IngredientServiceStates[$serviceName]
+            }
+            else {
+                'Stopped'
+            }
+
+            [pscustomobject]@{
+                Name = $serviceName
+                Status = $status
+            }
+        }
+        StartService = {
+            param($Arguments)
+
+            $serviceName = [string] $Arguments.service_name
+            $script:IngredientServiceStates[$serviceName] = 'Running'
+            New-ParsecResult -Status 'Succeeded' -Message "Started service '$serviceName'."
+        }
+        StopService = {
+            param($Arguments)
+
+            $serviceName = [string] $Arguments.service_name
+            $script:IngredientServiceStates[$serviceName] = 'Stopped'
+            New-ParsecResult -Status 'Succeeded' -Message "Stopped service '$serviceName'."
+        }
+    }
 
     if (Get-Command -Name 'Set-ParsecModuleVariableValue' -ErrorAction SilentlyContinue) {
         Set-ParsecModuleVariableValue -Name 'ParsecPersonalizationAdapter' -Value $script:ParsecPersonalizationAdapter | Out-Null
         Set-ParsecModuleVariableValue -Name 'ParsecDisplayAdapter' -Value $script:ParsecDisplayAdapter | Out-Null
-        Set-ParsecModuleVariableValue -Name 'ParsecWindowAdapter' -Value $script:ParsecWindowAdapter | Out-Null
         Set-ParsecModuleVariableValue -Name 'ParsecNvidiaAdapter' -Value $script:ParsecNvidiaAdapter | Out-Null
+        Set-ParsecModuleVariableValue -Name 'ParsecServiceAdapter' -Value $script:ParsecServiceAdapter | Out-Null
+        Set-ParsecModuleVariableValue -Name 'ParsecSoundAdapter' -Value $script:ParsecSoundAdapter | Out-Null
     }
 }
 
-function Clear-ParsecTestAdapters {
+function Clear-ParsecTestAdapter {
     foreach ($name in @(
             'ParsecPersonalizationAdapter',
             'ParsecDisplayAdapter',
-            'ParsecWindowAdapter',
-            'ParsecNvidiaAdapter'
+            'ParsecNvidiaAdapter',
+            'ParsecServiceAdapter',
+            'ParsecSoundAdapter'
         )) {
-        Set-Variable -Scope Global -Name $name -Value $null -Force
         if (Get-Command -Name 'Set-ParsecModuleVariableValue' -ErrorAction SilentlyContinue) {
             Set-ParsecModuleVariableValue -Name $name -Value $null | Out-Null
         }

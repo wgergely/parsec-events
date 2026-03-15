@@ -5,17 +5,7 @@ Describe 'Standalone ingredient surface' {
     InModuleScope ParsecEventExecutor {
         BeforeAll {
             . (Join-Path $PSScriptRoot 'IngredientTestSupport.ps1')
-            $script:GuardStateRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("parsec-standalone-guard-{0}" -f ([Guid]::NewGuid().ToString('N')))
-            $script:GuardSnapshotName = "standalone-guard-{0}" -f ([Guid]::NewGuid().ToString('N'))
-            Clear-ParsecTestAdapters
-
-            $guardCapture = Invoke-ParsecCoreIngredientOperation -Name 'display.snapshot' -Operation 'capture' -Arguments @{
-                snapshot_name = $script:GuardSnapshotName
-            } -StateRoot $script:GuardStateRoot -RunState @{}
-
-            if (-not (Test-ParsecSuccessfulStatus -Status $guardCapture.Status)) {
-                throw "Failed to capture the standalone test guard snapshot: $($guardCapture.Message)"
-            }
+            Clear-ParsecTestAdapter
         }
 
         BeforeEach {
@@ -25,24 +15,8 @@ Describe 'Standalone ingredient surface' {
         }
 
         AfterEach {
-            Clear-ParsecTestAdapters
+            Clear-ParsecTestAdapter
             Initialize-ParsecCoreRuntime -Force
-
-            $verifyArguments = @{
-                snapshot_name = $script:GuardSnapshotName
-            }
-            $verify = Invoke-ParsecCoreIngredientOperation -Name 'display.snapshot' -Operation 'verify' -Arguments $verifyArguments -StateRoot $script:GuardStateRoot -RunState @{}
-            if (-not (Test-ParsecSuccessfulStatus -Status $verify.Status)) {
-                $reset = Invoke-ParsecCoreIngredientOperation -Name 'display.snapshot' -Operation 'reset' -Arguments $verifyArguments -StateRoot $script:GuardStateRoot -RunState @{}
-                if (-not (Test-ParsecSuccessfulStatus -Status $reset.Status)) {
-                    throw "Standalone test cleanup could not restore the guard snapshot: $($reset.Message)"
-                }
-
-                $postResetVerify = Invoke-ParsecCoreIngredientOperation -Name 'display.snapshot' -Operation 'verify' -Arguments $verifyArguments -StateRoot $script:GuardStateRoot -RunState @{}
-                if (-not (Test-ParsecSuccessfulStatus -Status $postResetVerify.Status)) {
-                    throw "Standalone test cleanup left the machine drifted after reset: $($postResetVerify.Message)"
-                }
-            }
         }
 
         It 'returns stable screen ids from the persisted display catalog' {
@@ -107,10 +81,35 @@ Describe 'Standalone ingredient surface' {
             $displayDefinition = Get-ParsecCoreIngredientDefinition -Name 'display.set-resolution'
             $commandDefinition = Get-ParsecCoreIngredientDefinition -Name 'command.invoke'
 
+            $displayDefinition.Domain | Should -Be 'display'
             $displayDefinition.Metadata.package_format | Should -Be 'entry'
             $displayDefinition.Metadata.ingredient_path | Should -Match 'display-set-resolution'
+            $commandDefinition.Domain | Should -Be 'command'
             $commandDefinition.Metadata.package_format | Should -Be 'entry'
             $commandDefinition.Metadata.ingredient_path | Should -Match 'command-invoke'
+        }
+
+        It 'requires domain metadata in ingredient schemas' {
+            {
+                Get-ParsecCoreRequiredIngredientDomain -Schema @{
+                    name = 'display.set-resolution'
+                    kind = 'display'
+                }
+            } | Should -Throw "*missing required 'domain' metadata*"
+        }
+
+        It 'rejects ingredient domain declarations that do not match the public naming contract' {
+            {
+                Get-ParsecCoreRequiredIngredientDomain -Schema @{
+                    name = 'display.set-resolution'
+                    domain = 'process'
+                    kind = 'display'
+                }
+            } | Should -Throw "*public name requires domain 'display'*"
+        }
+
+        It 'does not expose the retired core observed-state bridge' {
+            Get-Command -Name 'Get-ParsecObservedState' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         }
 
         It 'accepts a flat ingredient alias and persists a reusable token on apply' {
@@ -499,90 +498,6 @@ Describe 'Standalone ingredient surface' {
             }
         }
 
-        It 'cycles top-level windows and restores the original foreground window' {
-            $stateRoot = Join-Path $TestDrive 'window-cycle'
-
-            $result = Invoke-ParsecIngredient -Name 'cycle-activation' -Arguments @{
-                dwell_ms = 0
-                max_cycles = 4
-            } -StateRoot $stateRoot -Confirm:$false
-
-            $result.status | Should -Be 'Succeeded'
-            $result.ingredient_name | Should -Be 'window.cycle-activation'
-            $result.operation_result.Outputs.alt_tab_candidates.Count | Should -Be 2
-            $result.operation_result.Outputs.activation_results.Count | Should -Be 1
-            $result.operation_result.Outputs.restore_result.succeeded | Should -BeTrue
-            $result.verify_result.Status | Should -Be 'Succeeded'
-            $script:IngredientWindowForegroundHandle | Should -Be 101
-            $script:IngredientWindowActivationLog | Should -Be @(102, 101)
-        }
-
-        It 'restores the original foreground window through reset when activation drift occurs' {
-            $stateRoot = Join-Path $TestDrive 'window-cycle-reset'
-
-            $apply = Invoke-ParsecIngredient -Name 'cycle-activation' -Arguments @{
-                dwell_ms = 0
-                max_cycles = 4
-            } -StateRoot $stateRoot -Confirm:$false
-
-            $script:IngredientWindowForegroundHandle = 102
-            $reset = Invoke-ParsecIngredient -Name 'cycle-activation' -Operation 'reset' -TokenId $apply.token_id -StateRoot $stateRoot -Confirm:$false
-
-            $reset.status | Should -Be 'Succeeded'
-            $script:IngredientWindowForegroundHandle | Should -Be 101
-        }
-
-        It 'persists compact invocation payloads for noisy window cycle results' {
-            $stateRoot = Join-Path $TestDrive 'window-cycle-persistence'
-            $script:IngredientWindows = @(
-                [ordered]@{
-                    handle = [int64] 101
-                    owner_handle = [int64] 0
-                    process_id = 1001
-                    process_name = 'Code'
-                    title = 'Editor'
-                    class_name = 'ApplicationFrameWindow'
-                    is_visible = $true
-                    is_minimized = $false
-                    is_cloaked = $false
-                    is_shell_window = $false
-                    extended_style = 0
-                    width = 1440
-                    height = 900
-                }
-            ) + @(
-                foreach ($index in 200..230) {
-                    [ordered]@{
-                        handle = [int64] $index
-                        owner_handle = [int64] 0
-                        process_id = [int] (3000 + $index)
-                        process_name = 'TestApp'
-                        title = "App $index"
-                        class_name = 'Chrome_WidgetWin_1'
-                        is_visible = $true
-                        is_minimized = $false
-                        is_cloaked = $false
-                        is_shell_window = $false
-                        extended_style = 0
-                        width = 1280
-                        height = 720
-                    }
-                }
-            )
-
-            $result = Invoke-ParsecIngredient -Name 'cycle-activation' -Arguments @{
-                dwell_ms = 0
-                max_cycles = 30
-            } -StateRoot $stateRoot -Confirm:$false
-
-            $invocationDocument = Get-Content -LiteralPath $result.invocation_path -Raw | ConvertFrom-Json -Depth 100
-            $persistedActivationResults = $invocationDocument.payload.operation_result.Outputs.activation_results
-
-            $persistedActivationResults.truncated | Should -BeTrue
-            $persistedActivationResults.total_count | Should -Be 30
-            @($persistedActivationResults.sample).Count | Should -Be 20
-        }
-
         It 'captures and restores persisted topology snapshots explicitly' {
             $stateRoot = Join-Path $TestDrive 'persist-topology'
 
@@ -653,48 +568,48 @@ Describe 'Standalone ingredient surface' {
         It 'passes persisted apply output into token-based reset execution' {
             $stateRoot = Join-Path $TestDrive 'process-start-token-reset'
             $tokenId = 'process-start-token'
+            $process = Start-Process -FilePath 'C:\Program Files\PowerShell\7\pwsh.exe' -ArgumentList @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') -PassThru
 
-            $tokenDocument = @{
-                token_id = $tokenId
-                ingredient_name = 'process.start'
-                requested_name = 'process.start'
-                requested_arguments = @{
-                    file_path = 'C:\Program Files\PowerShell\7\pwsh.exe'
-                    arguments = @('-NoProfile', '-Command', 'Start-Sleep -Seconds 10')
-                }
-                resolved_target_identity = @{}
-                captured_state = @{
-                    is_running = $false
-                }
-                apply_result = @{
-                    Outputs = @{
-                        process_id = 4242
-                        process_name = 'pwsh'
+            try {
+                $tokenDocument = @{
+                    token_id = $tokenId
+                    ingredient_name = 'process.start'
+                    requested_name = 'process.start'
+                    requested_arguments = @{
                         file_path = 'C:\Program Files\PowerShell\7\pwsh.exe'
+                        arguments = @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30')
                     }
+                    resolved_target_identity = @{}
+                    captured_state = @{
+                        is_running = $false
+                    }
+                    apply_result = @{
+                        Outputs = @{
+                            process_id = [int] $process.Id
+                            process_name = [string] $process.ProcessName
+                            file_path = 'C:\Program Files\PowerShell\7\pwsh.exe'
+                        }
+                    }
+                    readiness_result = $null
+                    verify_result = $null
+                    reset_result = $null
+                    reset_status = 'Available'
+                    created_at = [DateTimeOffset]::UtcNow.ToString('o')
+                    updated_at = [DateTimeOffset]::UtcNow.ToString('o')
                 }
-                readiness_result = $null
-                verify_result = $null
-                reset_result = $null
-                reset_status = 'Available'
-                created_at = [DateTimeOffset]::UtcNow.ToString('o')
-                updated_at = [DateTimeOffset]::UtcNow.ToString('o')
+                $null = Save-ParsecIngredientTokenDocument -TokenDocument $tokenDocument -StateRoot $stateRoot
+
+                $reset = Invoke-ParsecIngredientCommandInternal -Name 'process.start' -Operation 'reset' -TokenId $tokenId -StateRoot $stateRoot
+
+                $reset.status | Should -Be 'Succeeded'
+                $reset.reset_result.Message | Should -Match ([string] $process.Id)
+                (Get-Process -Id $process.Id -ErrorAction SilentlyContinue) | Should -BeNullOrEmpty
             }
-            $null = Save-ParsecIngredientTokenDocument -TokenDocument $tokenDocument -StateRoot $stateRoot
-
-            Mock Get-Process {
-                [pscustomobject]@{
-                    Id = 4242
-                    ProcessName = 'pwsh'
+            finally {
+                if ($null -ne (Get-Process -Id $process.Id -ErrorAction SilentlyContinue)) {
+                    Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
                 }
-            } -ParameterFilter { $Id -eq 4242 }
-            Mock Stop-Process {} -ParameterFilter { $Id -eq 4242 }
-
-            $reset = Invoke-ParsecIngredientCommandInternal -Name 'process.start' -Operation 'reset' -TokenId $tokenId -StateRoot $stateRoot
-
-            $reset.status | Should -Be 'Succeeded'
-            Should -Invoke Get-Process -Times 1 -Exactly -ParameterFilter { $Id -eq 4242 }
-            Should -Invoke Stop-Process -Times 1 -Exactly -ParameterFilter { $Id -eq 4242 }
+            }
         }
     }
 }

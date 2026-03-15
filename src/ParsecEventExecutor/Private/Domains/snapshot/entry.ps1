@@ -6,20 +6,6 @@ $supportFiles = @(
     (Join-Path -Path $PSScriptRoot -ChildPath 'Snapshot.Domain.ps1')
 )
 
-$loadSupportFiles = {
-    param($files)
-    $module = $ExecutionContext.SessionState.Module
-    if ($null -ne $module) {
-        & $module {
-            param($innerFiles)
-            foreach ($file in @($innerFiles)) { . $file }
-        } $files
-        return
-    }
-
-    foreach ($file in @($files)) { . $file }
-}.GetNewClosure()
-
 return @{
     Name = 'snapshot'
     Api = [pscustomobject]@{
@@ -32,7 +18,9 @@ return @{
                 [System.Collections.IDictionary] $RunState = @{}
             )
 
-            & $loadSupportFiles $supportFiles
+            foreach ($file in @($supportFiles)) {
+                . $file
+            }
 
             switch ($Method) {
                 'ResolveName' { return Invoke-ParsecSnapshotDomainResolveName -Arguments $(if ($Arguments.Contains('arguments')) { [hashtable] $Arguments.arguments } else { @{} }) -StateRoot $StateRoot -RunState $RunState -UseDefaultCaptureName $(if ($Arguments.Contains('use_default_capture_name')) { [bool] $Arguments.use_default_capture_name } else { $false }) }

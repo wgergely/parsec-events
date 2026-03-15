@@ -16,7 +16,7 @@ function Initialize-ParsecNvidiaAdapter {
         }
         GetCustomResolutions = {
             param([hashtable] $Arguments)
-            return @(Get-ParsecNvidiaCustomResolutionsInternal -DisplayId ([uint32] $Arguments.display_id) -LibraryPath $(if ($Arguments.ContainsKey('library_path')) { [string] $Arguments.library_path } else { $null }))
+            return @(Get-ParsecNvidiaCustomResolutionInternal -DisplayId ([uint32] $Arguments.display_id) -LibraryPath $(if ($Arguments.ContainsKey('library_path')) { [string] $Arguments.library_path } else { $null }))
         }
         AddCustomResolution = {
             param([hashtable] $Arguments)

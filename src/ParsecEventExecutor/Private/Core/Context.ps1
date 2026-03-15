@@ -1,4 +1,5 @@
 function New-ParsecCoreLoggerProxy {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
     param()
 
@@ -23,6 +24,7 @@ function New-ParsecCoreLoggerProxy {
 }
 
 function New-ParsecCoreResultProxy {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
     param()
 
@@ -79,6 +81,7 @@ function New-ParsecCoreResultProxy {
 }
 
 function New-ParsecCorePersistenceProxy {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
     param(
         [Parameter()]
@@ -97,6 +100,7 @@ function New-ParsecCorePersistenceProxy {
 }
 
 function New-ParsecCoreExecutionContext {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]

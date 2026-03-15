@@ -1,4 +1,5 @@
 name = "display.set-enabled"
+domain = "display"
 kind = "display"
 description = "Enable or disable a monitor."
 capabilities = ["capture", "apply", "verify", "reset"]
