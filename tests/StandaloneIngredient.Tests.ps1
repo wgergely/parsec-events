@@ -112,15 +112,6 @@ Describe 'Standalone ingredient surface' {
             Get-Command -Name 'Get-ParsecObservedState' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         }
 
-        It 'keeps the window ingredient as a thin domain consumer' {
-            $entryPath = Join-Path $PSScriptRoot '..\src\ParsecEventExecutor\Private\Ingredients\window-cycle-activation\entry.ps1'
-            $entry = Get-Content -LiteralPath $entryPath -Raw
-
-            $entry | Should -Match 'DomainApi\.Invoke'
-            $entry | Should -Not -Match 'GetForegroundWindowInfo'
-            $entry | Should -Not -Match 'ActivateWindow'
-        }
-
         It 'accepts a flat ingredient alias and persists a reusable token on apply' {
             $stateRoot = Join-Path $TestDrive 'alias-apply'
 
@@ -505,90 +496,6 @@ Describe 'Standalone ingredient surface' {
             finally {
                 $definition.Readiness = ConvertTo-ParsecPlainObject -InputObject $originalReadiness
             }
-        }
-
-        It 'cycles top-level windows and restores the original foreground window' {
-            $stateRoot = Join-Path $TestDrive 'window-cycle'
-
-            $result = Invoke-ParsecIngredient -Name 'cycle-activation' -Arguments @{
-                dwell_ms = 0
-                max_cycles = 4
-            } -StateRoot $stateRoot -Confirm:$false
-
-            $result.status | Should -Be 'Succeeded'
-            $result.ingredient_name | Should -Be 'window.cycle-activation'
-            $result.operation_result.Outputs.alt_tab_candidates.Count | Should -Be 2
-            $result.operation_result.Outputs.activation_results.Count | Should -Be 1
-            $result.operation_result.Outputs.restore_result.succeeded | Should -BeTrue
-            $result.verify_result.Status | Should -Be 'Succeeded'
-            $script:IngredientWindowForegroundHandle | Should -Be 101
-            $script:IngredientWindowActivationLog | Should -Be @(102, 101)
-        }
-
-        It 'restores the original foreground window through reset when activation drift occurs' {
-            $stateRoot = Join-Path $TestDrive 'window-cycle-reset'
-
-            $apply = Invoke-ParsecIngredient -Name 'cycle-activation' -Arguments @{
-                dwell_ms = 0
-                max_cycles = 4
-            } -StateRoot $stateRoot -Confirm:$false
-
-            $script:IngredientWindowForegroundHandle = 102
-            $reset = Invoke-ParsecIngredient -Name 'cycle-activation' -Operation 'reset' -TokenId $apply.token_id -StateRoot $stateRoot -Confirm:$false
-
-            $reset.status | Should -Be 'Succeeded'
-            $script:IngredientWindowForegroundHandle | Should -Be 101
-        }
-
-        It 'persists compact invocation payloads for noisy window cycle results' {
-            $stateRoot = Join-Path $TestDrive 'window-cycle-persistence'
-            $script:IngredientWindows = @(
-                [ordered]@{
-                    handle = [int64] 101
-                    owner_handle = [int64] 0
-                    process_id = 1001
-                    process_name = 'Code'
-                    title = 'Editor'
-                    class_name = 'ApplicationFrameWindow'
-                    is_visible = $true
-                    is_minimized = $false
-                    is_cloaked = $false
-                    is_shell_window = $false
-                    extended_style = 0
-                    width = 1440
-                    height = 900
-                }
-            ) + @(
-                foreach ($index in 200..230) {
-                    [ordered]@{
-                        handle = [int64] $index
-                        owner_handle = [int64] 0
-                        process_id = [int] (3000 + $index)
-                        process_name = 'TestApp'
-                        title = "App $index"
-                        class_name = 'Chrome_WidgetWin_1'
-                        is_visible = $true
-                        is_minimized = $false
-                        is_cloaked = $false
-                        is_shell_window = $false
-                        extended_style = 0
-                        width = 1280
-                        height = 720
-                    }
-                }
-            )
-
-            $result = Invoke-ParsecIngredient -Name 'cycle-activation' -Arguments @{
-                dwell_ms = 0
-                max_cycles = 30
-            } -StateRoot $stateRoot -Confirm:$false
-
-            $invocationDocument = Get-Content -LiteralPath $result.invocation_path -Raw | ConvertFrom-Json -Depth 100
-            $persistedActivationResults = $invocationDocument.payload.operation_result.Outputs.activation_results
-
-            $persistedActivationResults.truncated | Should -BeTrue
-            $persistedActivationResults.total_count | Should -Be 30
-            @($persistedActivationResults.sample).Count | Should -Be 20
         }
 
         It 'captures and restores persisted topology snapshots explicitly' {
