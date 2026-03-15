@@ -15,6 +15,8 @@ Each domain addresses an independent technical concern. Together they define the
 | 03 | [DPI and Scaling](./03-dpi-and-scaling/research.md) | How do we change UI scaling and text scaling? | Viable but complex — registry + explorer restart |
 | 04 | [Profile System](./04-profile-system/research.md) | How do we save and restore complete display states? | Viable — composite profiles |
 | 05 | [System Architecture](./05-system-architecture/research.md) | How does it all fit together as a running system? | Designed — phased implementation plan included |
+| 06 | [Modular Ingredient Architecture](./06-modular-ingredient-architecture/research.md) | How do we structure the runtime into layers? | Complete — rewrite executed |
+| 07 | [Parsec State Watcher](./07-parsec-state-watcher/research.md) | How do we tail logs, dispatch events, and bind per-device recipes? | Complete — implemented |
 
 ## Key Architecture Decisions Summary
 

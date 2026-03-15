@@ -191,9 +191,11 @@ while ($true) {
 
 ### 5. Per-Device Recipe Binding Design
 
-Since Parsec logs only expose `Username#1234`, the per-device mapping must live in configuration. The design space:
+> **Note**: The options below were evaluated during research. **ADR-8 decided on a different approach**: recipes declare an optional `username` field directly, with no separate mapping layer. See `docs/adr/2026-03-14-parsec-state-watcher.md`.
 
-#### Option 1: Username → Profile → Recipe (Recommended)
+Since Parsec logs only expose `Username#1234`, the per-device mapping must live in configuration. The design space explored:
+
+#### Option 1: Username → Profile → Recipe (Rejected — unnecessary indirection)
 
 ```toml
 [profiles.mobile]

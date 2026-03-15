@@ -148,8 +148,8 @@ log_level = "info"
 [patterns]
 # Regex patterns for Parsec log line matching.
 # Group 1 must capture the username (e.g., "User#1234").
-connect = '\\]\s+(.+#\\d+)\\s+connected\\.\\s*$'
-disconnect = '\\]\s+(.+#\\d+)\\s+disconnected\\.\\s*$'
+connect = '\]\s+(.+#\d+)\s+connected\.\s*$'
+disconnect = '\]\s+(.+#\d+)\s+disconnected\.\s*$'
 # Note: "trying to connect" was NOT observed in Parsec 150-102b service install.
 # Omitted from default patterns. Can be re-added if validated on other versions.
 ```
