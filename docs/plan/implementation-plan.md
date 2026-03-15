@@ -15,3 +15,8 @@ This file is no longer a feature plan. It exists as a stable pointer for plan di
 Any new implementation plan under `docs/plan` should follow the same naming rule:
 
 - `yyyy-mm-dd-feature-name.md`
+
+## Active Plans
+
+- [`2026-03-13-modular-ingredient-architecture.md`](2026-03-13-modular-ingredient-architecture.md) — Core/Domain/Ingredient rewrite (complete)
+- [`2026-03-14-parsec-state-watcher.md`](2026-03-14-parsec-state-watcher.md) — Log tailing, event dispatch, per-device recipe binding (planning)

@@ -35,7 +35,7 @@ function Split-ParsecTomlPath {
         [string] $Path
     )
 
-    return ,([string[]] ($Path.Split('.', [System.StringSplitOptions]::RemoveEmptyEntries)))
+    return , ([string[]] ($Path.Split('.', [System.StringSplitOptions]::RemoveEmptyEntries)))
 }
 
 function Get-ParsecTomlContext {
@@ -130,7 +130,14 @@ function ConvertFrom-ParsecTomlValue {
 
     $trimmed = $Value.Trim()
     if ($trimmed.StartsWith('"') -and $trimmed.EndsWith('"')) {
-        return $trimmed.Substring(1, $trimmed.Length - 2).Replace('\"', '"')
+        $inner = $trimmed.Substring(1, $trimmed.Length - 2)
+        $inner = $inner.Replace('\\', "`0BACKSLASH`0")
+        $inner = $inner.Replace('\"', '"')
+        $inner = $inner.Replace('\n', "`n")
+        $inner = $inner.Replace('\t', "`t")
+        $inner = $inner.Replace('\r', "`r")
+        $inner = $inner.Replace("`0BACKSLASH`0", '\')
+        return $inner
     }
 
     if ($trimmed -in @('true', 'false')) {

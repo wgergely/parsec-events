@@ -25,6 +25,8 @@ function ConvertTo-ParsecRecipe {
         description = if ($Document.Contains('description')) { [string] $Document.description } else { '' }
         initial_mode = if ($Document.Contains('initial_mode')) { [string] $Document.initial_mode } else { $null }
         target_mode = if ($Document.Contains('target_mode')) { [string] $Document.target_mode } else { $null }
+        username = if ($Document.Contains('username')) { [string] $Document.username } else { $null }
+        grace_period_ms = if ($Document.Contains('grace_period_ms')) { [int] $Document.grace_period_ms } else { $null }
         path = $Path
         ingredient_definitions = $definitions
         steps = @($steps)
