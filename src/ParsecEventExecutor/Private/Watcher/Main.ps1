@@ -14,10 +14,20 @@
     # --- Instance guard: prevent duplicate watchers ---
     $mutexName = 'Global\ParsecEventWatcher'
     $createdNew = $false
-    $mutex = [System.Threading.Mutex]::new($true, $mutexName, [ref]$createdNew)
+    $mutex = $null
+
+    try {
+        $mutex = [System.Threading.Mutex]::new($true, $mutexName, [ref]$createdNew)
+    }
+    catch [System.Threading.AbandonedMutexException] {
+        # Previous watcher crashed without releasing the mutex. We now own it.
+        $createdNew = $true
+        $mutex = $_.Exception.Mutex
+        Write-Warning 'Watcher: Acquired abandoned mutex from a previous crashed instance.'
+    }
 
     if (-not $createdNew) {
-        $mutex.Dispose()
+        if ($mutex) { $mutex.Dispose() }
         throw 'Another instance of the Parsec watcher is already running. Only one watcher is allowed at a time.'
     }
 

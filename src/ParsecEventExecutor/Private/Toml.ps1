@@ -6,19 +6,24 @@ function Remove-ParsecTomlComment {
         [string] $Line
     )
 
-    $inString = $false
+    $inDoubleQuote = $false
+    $inSingleQuote = $false
     $builder = New-Object System.Text.StringBuilder
 
     for ($index = 0; $index -lt $Line.Length; $index++) {
         $char = $Line[$index]
-        if ($char -eq '"') {
+
+        if (-not $inSingleQuote -and $char -eq '"') {
             $escaped = $index -gt 0 -and $Line[$index - 1] -eq '\'
             if (-not $escaped) {
-                $inString = -not $inString
+                $inDoubleQuote = -not $inDoubleQuote
             }
         }
+        elseif (-not $inDoubleQuote -and $char -eq "'") {
+            $inSingleQuote = -not $inSingleQuote
+        }
 
-        if (-not $inString -and $char -eq '#') {
+        if (-not $inDoubleQuote -and -not $inSingleQuote -and $char -eq '#') {
             break
         }
 
@@ -138,6 +143,11 @@ function ConvertFrom-ParsecTomlValue {
         $inner = $inner.Replace('\r', "`r")
         $inner = $inner.Replace("`0BACKSLASH`0", '\')
         return $inner
+    }
+
+    # TOML literal strings: single-quoted, no escape processing
+    if ($trimmed.StartsWith("'") -and $trimmed.EndsWith("'")) {
+        return $trimmed.Substring(1, $trimmed.Length - 2)
     }
 
     if ($trimmed -in @('true', 'false')) {

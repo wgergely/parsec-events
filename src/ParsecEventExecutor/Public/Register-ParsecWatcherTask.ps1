@@ -26,16 +26,20 @@ function Register-ParsecWatcherTask {
         $modulePath = Join-Path -Path (Get-ParsecModuleRoot) -ChildPath 'ParsecEventExecutor.psd1'
     }
 
+    $escapedModulePath = $modulePath.Replace("'", "''")
+    $escapedConfigPath = $ConfigPath.Replace("'", "''")
+
     $scriptBlock = @"
-Import-Module '$modulePath' -Force
-Start-ParsecWatcher -ConfigPath '$ConfigPath' -InformationAction Continue
+Import-Module '$escapedModulePath' -Force
+Start-ParsecWatcher -ConfigPath '$escapedConfigPath' -InformationAction Continue
 "@
 
     $pwshPath = (Get-Process -Id $PID).Path
+    $escapedScriptBlock = $scriptBlock.Replace('"', '\"')
 
     $action = New-ScheduledTaskAction `
         -Execute $pwshPath `
-        -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command `"$scriptBlock`""
+        -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command `"$escapedScriptBlock`""
 
     $trigger = New-ScheduledTaskTrigger -AtLogon
 

@@ -33,7 +33,7 @@ function Invoke-ParsecWatcherDispatch {
 
     $dispatchItem = [ordered]@{
         recipe_name = $Recipe.name
-        recipe_path = $Recipe.path
+        recipe = $Recipe
         target_mode = $Recipe.target_mode
         username = $Username
         event_type = $EventType
@@ -69,7 +69,7 @@ function Invoke-ParsecWatcherDispatchInternal {
     Write-Information "Watcher: Dispatching recipe '$($Item.recipe_name)' for $($Item.event_type) event (user: $($Item.username))"
 
     try {
-        $result = Invoke-ParsecRecipe -NameOrPath $Item.recipe_path -StateRoot $Dispatcher.state_root
+        $result = Invoke-ParsecRecipeInternal -Recipe $Item.recipe -StateRoot $Dispatcher.state_root
 
         $Dispatcher.last_result = [ordered]@{
             recipe_name = $Item.recipe_name

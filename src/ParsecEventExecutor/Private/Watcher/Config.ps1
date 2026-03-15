@@ -39,11 +39,6 @@ function Read-ParsecWatcherConfig {
         connect = '\]\s+(.+#\d+)\s+connected\.\s*$'
         disconnect = '\]\s+(.+#\d+)\s+disconnected\.\s*$'
     }
-    # Note: defaults above use literal backslashes. The TOML config file must use
-    # double-quoted strings with escaped backslashes because the custom TOML parser
-    # does not track single-quoted literal strings for comment stripping, and the
-    # '#' in regex patterns would be misinterpreted as a TOML comment.
-
     if ($raw.Contains('patterns')) {
         $section = $raw.patterns
         foreach ($key in @('connect', 'disconnect')) {
