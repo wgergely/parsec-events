@@ -7,6 +7,59 @@
 
 ---
 
+## Current State and Gaps
+
+### What we built
+
+PR #3 implements a **long-running PowerShell script** (`Start-ParsecWatcher`) that blocks in a poll loop monitoring Parsec's log file. It behaves like a daemon — it runs indefinitely, detects events, and dispatches recipes — but it is just a `while` loop inside a `pwsh.exe` process. There is no Windows Service, no Service Control Manager registration, and no `sc.exe` integration.
+
+Installation is via `Register-ParsecWatcherTask`, which creates a Task Scheduler entry triggered at user logon. The user must run `Import-Module ParsecEventExecutor; Register-ParsecWatcherTask` manually in PowerShell.
+
+### Daemon vs Service — they are not the same thing
+
+A **daemon** is any long-running background process. Our watcher is a daemon in this sense.
+
+A **Windows Service** is a specific Windows construct: it registers with the Service Control Manager (SCM), runs in Session 0 (isolated from the desktop), has start/stop/pause lifecycle semantics managed by `services.msc` and `sc.exe`, and survives user logoff. Our watcher is NOT a Windows Service.
+
+Our current approach is the same as auto-parsec: a PowerShell script launched by Task Scheduler at logon. This works but has limitations:
+
+- No `services.msc` visibility or control
+- Brief window flash on startup (PowerShell console)
+- Task Scheduler restart-on-failure is coarser than service recovery
+- No clean stop semantics without killing the process
+- Only runs while the user is logged in
+
+### What's missing for production
+
+| Gap | Impact |
+|---|---|
+| No CLI entry point | Users must know PowerShell to operate the system |
+| No installer or package | Manual setup only |
+| No service management UI | Cannot query status, start/stop, or configure without PS commands |
+| No way to view logs or manage recipes | Requires navigating `%LOCALAPPDATA%\ParsecEventExecutor\` manually |
+| No proper Windows Service | No SCM integration, no logoff survival, no `sc.exe` control |
+
+### Why C# for the CLI
+
+The PowerShell module runs on .NET. A C# CLI binary can:
+
+- Load and invoke the PowerShell module directly via `System.Management.Automation` — no shelling out to `pwsh.exe`
+- Share types and state with the PowerShell backend
+- Register as a proper Windows Service via `Microsoft.Extensions.Hosting.WindowsServices`
+- Package as a single-file `.exe` with `dotnet publish --self-contained`
+- Use `System.CommandLine` for the CLI argument parsing
+
+Alternatives considered:
+
+| Language | Verdict | Reason |
+|---|---|---|
+| C# (.NET) | **Chosen** | Native PS API access, single ecosystem, can host Windows Service, single-file publish |
+| Rust | Rejected | Cannot call PowerShell directly — must shell out to `pwsh.exe`, two-language codebase |
+| C++ | Rejected | Massive development overhead for a CLI, no benefit over Rust |
+| PowerShell script only | Rejected | No CLI UX, no service registration, requires PS knowledge |
+
+---
+
 ## Scope
 
 Build a C# CLI binary (`pe.exe`) that wraps the PowerShell module and registers the watcher as a proper Windows Service.
