@@ -319,6 +319,11 @@ function Set-ParsecTextScaleStateInternal {
         $textScalePercent + 1
     }
     $intermediateValue = [Math]::Max(100, [Math]::Min(225, $intermediateValue))
+    # If clamping collapsed the intermediate to the target (e.g. target=100, intermediate
+    # would be 99 but clamps to 100), flip direction so the double-apply is not a no-op.
+    if ($intermediateValue -eq $textScalePercent) {
+        $intermediateValue = [Math]::Max(100, [Math]::Min(225, $textScalePercent + 1))
+    }
 
     Initialize-ParsecPersonalizationInterop
     New-ItemProperty -Path $path -Name 'TextScaleFactor' -Value $intermediateValue -PropertyType DWord -Force | Out-Null

@@ -1206,11 +1206,15 @@ function Sync-ParsecDisplayRegistryState {
         $mode = [ParsecEventExecutor.DisplayNative]::GetDeviceMode($monitor.device_name, $false)
         $result = [ParsecEventExecutor.DisplayNative]::ApplyDeviceMode($monitor.device_name, $mode, [uint32] $stageFlags)
         if ($result -ne [ParsecEventExecutor.DisplayNative]::DISP_CHANGE_SUCCESSFUL) {
+            Write-Verbose "Sync-ParsecDisplayRegistryState: staging '$($monitor.device_name)' failed with code $result."
             return $false
         }
     }
 
     $commitResult = [ParsecEventExecutor.DisplayNative]::ApplyPendingDisplayChanges()
+    if ($commitResult -ne [ParsecEventExecutor.DisplayNative]::DISP_CHANGE_SUCCESSFUL) {
+        Write-Verbose "Sync-ParsecDisplayRegistryState: commit failed with code $commitResult."
+    }
     return $commitResult -eq [ParsecEventExecutor.DisplayNative]::DISP_CHANGE_SUCCESSFUL
 }
 
@@ -1628,14 +1632,11 @@ function Set-ParsecDisplayPrimaryInternal {
             if ($null -eq $otherMode) { continue }
 
             $savedPos = $positionIndex[[string] $monitor.device_name]
-            if ($null -ne $savedPos) {
-                $otherMode.dmPositionX = [int] $savedPos.x
-                $otherMode.dmPositionY = [int] $savedPos.y
+            if ($null -eq $savedPos) {
+                return New-ParsecResult -Status 'Failed' -Message "Captured positions missing entry for '$($monitor.device_name)'." -Requested $Arguments -Errors @('IncompleteCapturedPositions')
             }
-            else {
-                $otherMode.dmPositionX = [int] $targetMonitor.bounds.width
-                $otherMode.dmPositionY = 0
-            }
+            $otherMode.dmPositionX = [int] $savedPos.x
+            $otherMode.dmPositionY = [int] $savedPos.y
             $otherMode.dmFields = $otherMode.dmFields -bor [ParsecEventExecutor.DisplayNative]::DM_POSITION
 
             $otherResult = [ParsecEventExecutor.DisplayNative]::ApplyDeviceMode($monitor.device_name, $otherMode, [uint32] $stageFlags)

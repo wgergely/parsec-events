@@ -650,8 +650,11 @@ function Get-ParsecPersistedApplyOutputValue {
             return $outputs[$Name]
         }
     }
-    elseif ($null -ne $outputs -and $null -ne $outputs.PSObject -and $null -ne $outputs.PSObject.Properties -and @($outputs.PSObject.Properties).Count -gt 0 -and $outputs.PSObject.Properties.Name -contains $Name) {
-        return $outputs.$Name
+    elseif ($null -ne $outputs) {
+        $properties = $outputs.PSObject.Properties
+        if ($null -ne $properties -and @($properties).Count -gt 0 -and $properties.Name -contains $Name) {
+            return $outputs.$Name
+        }
     }
 
     return $null
