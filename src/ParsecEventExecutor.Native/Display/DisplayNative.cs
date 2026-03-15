@@ -347,6 +347,15 @@ public static class DisplayNative {
     private static extern bool BringWindowToTop(IntPtr hWnd);
 
     [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    [DllImport("user32.dll")]
+    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
+
+    [DllImport("user32.dll")]
     private static extern bool IsWindow(IntPtr hWnd);
 
     [DllImport("user32.dll")]
@@ -772,15 +781,79 @@ public static class DisplayNative {
         return windows.ToArray();
     }
 
-    public static bool StepAltTab() {
-        var inputs = new INPUT[] {
-            new INPUT { type = 1u, U = new INPUTUNION { ki = new KEYBDINPUT { wVk = 0x12 } } },
-            new INPUT { type = 1u, U = new INPUTUNION { ki = new KEYBDINPUT { wVk = 0x09 } } },
-            new INPUT { type = 1u, U = new INPUTUNION { ki = new KEYBDINPUT { wVk = 0x09, dwFlags = 0x0002u } } },
-            new INPUT { type = 1u, U = new INPUTUNION { ki = new KEYBDINPUT { wVk = 0x12, dwFlags = 0x0002u } } }
-        };
+    private const int SW_RESTORE = 9;
 
-        return SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(INPUT))) == inputs.Length;
+    private static bool ForceSetForegroundWindow(IntPtr hWnd) {
+        var foreground = GetForegroundWindow();
+        if (foreground == hWnd) {
+            return true;
+        }
+
+        uint currentThreadId = GetCurrentThreadId();
+        uint foregroundThreadId = 0;
+        if (foreground != IntPtr.Zero) {
+            foregroundThreadId = GetWindowThreadProcessId(foreground, out _);
+        }
+        uint targetThreadId = GetWindowThreadProcessId(hWnd, out _);
+
+        bool attached = false;
+        try {
+            if (foregroundThreadId != 0 && foregroundThreadId != currentThreadId) {
+                attached = AttachThreadInput(currentThreadId, foregroundThreadId, true);
+            }
+
+            BringWindowToTop(hWnd);
+            SetForegroundWindow(hWnd);
+        }
+        finally {
+            if (attached) {
+                AttachThreadInput(currentThreadId, foregroundThreadId, false);
+            }
+        }
+
+        return GetForegroundWindow() == hWnd;
+    }
+
+    public static bool StepAltTab() {
+        // Find the next eligible alt-tab window after the current foreground
+        var foreground = GetForegroundWindow();
+        if (foreground == IntPtr.Zero) {
+            return false;
+        }
+
+        var windows = GetTopLevelWindows();
+        IntPtr nextWindow = IntPtr.Zero;
+        bool passedForeground = false;
+
+        foreach (var w in windows) {
+            var wHandle = new IntPtr(w.Handle);
+            if (wHandle == foreground) {
+                passedForeground = true;
+                continue;
+            }
+
+            if (!passedForeground) {
+                continue;
+            }
+
+            // Alt-tab criteria: visible, not cloaked, not tool window, has title, no owner
+            if (w.IsVisible && !w.IsCloaked && !w.IsShellWindow &&
+                !string.IsNullOrEmpty(w.Title) && w.OwnerHandle == 0 &&
+                (w.ExtendedStyle & 0x00000080L) == 0) {
+                nextWindow = wHandle;
+                break;
+            }
+        }
+
+        if (nextWindow == IntPtr.Zero) {
+            return false;
+        }
+
+        if (IsIconic(nextWindow)) {
+            ShowWindow(nextWindow, SW_RESTORE);
+        }
+
+        return ForceSetForegroundWindow(nextWindow);
     }
 
     public static bool ActivateWindow(long handle, bool restoreIfMinimized) {
@@ -789,7 +862,11 @@ public static class DisplayNative {
             return false;
         }
 
-        return SetForegroundWindow(hWnd);
+        if (restoreIfMinimized && IsIconic(hWnd)) {
+            ShowWindow(hWnd, SW_RESTORE);
+        }
+
+        return ForceSetForegroundWindow(hWnd);
     }
 
     public static string GetDesktopWallpaperPath() {
