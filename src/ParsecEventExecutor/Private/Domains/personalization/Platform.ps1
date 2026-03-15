@@ -1,5 +1,6 @@
 function Get-ParsecThemeState {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param()
 
     $path = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize'
@@ -35,6 +36,7 @@ function Get-ParsecThemeState {
 
 function Get-ParsecWallpaperState {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param()
 
     $desktopPath = 'HKCU:\Control Panel\Desktop'
@@ -91,13 +93,46 @@ function Get-ParsecWallpaperState {
 
 function Initialize-ParsecPersonalizationInterop {
     [CmdletBinding()]
+    [OutputType([void])]
     param()
 
-    Initialize-ParsecDisplayInterop
+    if ('ParsecEventExecutor.PersonalizationNative' -as [type]) {
+        return
+    }
+
+    Add-Type -TypeDefinition @"
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+
+namespace ParsecEventExecutor {
+    public static class PersonalizationNative {
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        private static extern IntPtr SendMessageTimeout(
+            IntPtr hWnd, uint msg, IntPtr wParam, string lParam,
+            uint fuFlags, uint uTimeout, out IntPtr lpdwResult);
+
+        public static void BroadcastSettingChange(string area) {
+            IntPtr result;
+            var timeoutFlags = 0x0002u | 0x0008u;
+            var messageResult = SendMessageTimeout(
+                new IntPtr(0xffff), 0x001A, IntPtr.Zero, area,
+                timeoutFlags, 5000u, out result);
+            if (messageResult == IntPtr.Zero) {
+                throw new Win32Exception(
+                    Marshal.GetLastWin32Error(),
+                    "SendMessageTimeout(WM_SETTINGCHANGE) failed.");
+            }
+        }
+    }
+}
+"@ -ErrorAction Stop
 }
 
 function Set-ParsecThemeStateInternal {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $Arguments
@@ -136,6 +171,7 @@ function Set-ParsecThemeStateInternal {
 
     $appsUseLightTheme = if ($appMode -ieq 'Dark') { 0 } else { 1 }
     $systemUsesLightTheme = if ($systemMode -ieq 'Dark') { 0 } else { 1 }
+
     $path = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize'
     if (-not (Test-Path -LiteralPath $path)) {
         New-Item -Path $path -Force | Out-Null
@@ -144,8 +180,8 @@ function Set-ParsecThemeStateInternal {
     New-ItemProperty -Path $path -Name 'AppsUseLightTheme' -Value $appsUseLightTheme -PropertyType DWord -Force | Out-Null
     New-ItemProperty -Path $path -Name 'SystemUsesLightTheme' -Value $systemUsesLightTheme -PropertyType DWord -Force | Out-Null
     Initialize-ParsecPersonalizationInterop
-    [ParsecEventExecutor.DisplayNative]::BroadcastSettingChange('ImmersiveColorSet')
-    [ParsecEventExecutor.DisplayNative]::BroadcastSettingChange('WindowsThemeElement')
+    [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('ImmersiveColorSet')
+    [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('WindowsThemeElement')
 
     $state = Get-ParsecThemeState
     return New-ParsecResult -Status 'Succeeded' -Message ("Theme set to app={0}, system={1}." -f $state.app_mode, $state.system_mode) -Observed $state -Outputs @{
@@ -154,7 +190,9 @@ function Set-ParsecThemeStateInternal {
 }
 
 function Set-ParsecWallpaperStateInternal {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $Arguments
@@ -226,8 +264,8 @@ function Set-ParsecWallpaperStateInternal {
 
     Initialize-ParsecPersonalizationInterop
     [ParsecEventExecutor.DisplayNative]::SetDesktopWallpaper($wallpaperPath)
-    [ParsecEventExecutor.DisplayNative]::BroadcastSettingChange('Control Panel\Desktop')
-    [ParsecEventExecutor.DisplayNative]::BroadcastSettingChange('Environment')
+    [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('Control Panel\Desktop')
+    [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('Environment')
 
     $state = Get-ParsecWallpaperState
     return New-ParsecResult -Status 'Succeeded' -Message 'Wallpaper state restored.' -Observed $state -Outputs @{
@@ -236,7 +274,9 @@ function Set-ParsecWallpaperStateInternal {
 }
 
 function Set-ParsecTextScaleStateInternal {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $Arguments
@@ -264,11 +304,38 @@ function Set-ParsecTextScaleStateInternal {
         New-Item -Path $path -Force | Out-Null
     }
 
-    New-ItemProperty -Path $path -Name 'TextScaleFactor' -Value $textScalePercent -PropertyType DWord -Force | Out-Null
+    # Windows bug workaround: text scale changes do not always trigger a UI re-render.
+    # Double-apply with an intermediate value forces Windows to process the change.
+    # When increasing: intermediate = n-1, then n (approach from below).
+    # When decreasing: intermediate = n+1, then n (approach from above).
+    # This always runs regardless of whether the current value matches the target.
+    $currentValue = (Get-ItemProperty -Path $path -Name 'TextScaleFactor' -ErrorAction SilentlyContinue).TextScaleFactor
+    $currentInt = if ($null -ne $currentValue) { [int] $currentValue } else { 100 }
+
+    $intermediateValue = if ($textScalePercent -ge $currentInt) {
+        $textScalePercent - 1
+    }
+    else {
+        $textScalePercent + 1
+    }
+    $intermediateValue = [Math]::Max(100, [Math]::Min(225, $intermediateValue))
+    # If clamping collapsed the intermediate to the target (e.g. target=100, intermediate
+    # would be 99 but clamps to 100), flip direction so the double-apply is not a no-op.
+    if ($intermediateValue -eq $textScalePercent) {
+        $intermediateValue = [Math]::Max(100, [Math]::Min(225, $textScalePercent + 1))
+    }
+
     Initialize-ParsecPersonalizationInterop
-    [ParsecEventExecutor.DisplayNative]::BroadcastSettingChange('Accessibility')
-    [ParsecEventExecutor.DisplayNative]::BroadcastSettingChange('WindowMetrics')
-    [ParsecEventExecutor.DisplayNative]::BroadcastSettingChange('Control Panel\Desktop')
+    New-ItemProperty -Path $path -Name 'TextScaleFactor' -Value $intermediateValue -PropertyType DWord -Force | Out-Null
+    [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('Accessibility')
+    [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('WindowMetrics')
+    [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('Control Panel\Desktop')
+    Start-Sleep -Milliseconds 500
+
+    New-ItemProperty -Path $path -Name 'TextScaleFactor' -Value $textScalePercent -PropertyType DWord -Force | Out-Null
+    [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('Accessibility')
+    [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('WindowMetrics')
+    [ParsecEventExecutor.PersonalizationNative]::BroadcastSettingChange('Control Panel\Desktop')
 
     return New-ParsecResult -Status 'Succeeded' -Message "Text scaling set to $textScalePercent%." -Observed @{
         text_scale_percent = $textScalePercent
@@ -278,7 +345,9 @@ function Set-ParsecTextScaleStateInternal {
 }
 
 function Set-ParsecUiScaleStateInternal {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [hashtable] $Arguments
@@ -321,6 +390,7 @@ function Set-ParsecUiScaleStateInternal {
 
 function Initialize-ParsecPersonalizationAdapter {
     [CmdletBinding()]
+    [OutputType([void])]
     param()
 
     if ($null -ne (Get-ParsecModuleVariableValue -Name 'ParsecPersonalizationAdapter')) {
@@ -355,6 +425,7 @@ function Initialize-ParsecPersonalizationAdapter {
 
 function Invoke-ParsecPersonalizationAdapter {
     [CmdletBinding()]
+    [OutputType([object])]
     param(
         [Parameter(Mandatory)]
         [string] $Method,

@@ -1,4 +1,5 @@
 name = "display.snapshot"
+domain = "display"
 kind = "display"
 description = "Capture, restore, or verify transient display state snapshots."
 capabilities = ["capture", "reset", "verify"]

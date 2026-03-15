@@ -1,4 +1,5 @@
 name = "display.set-primary"
+domain = "display"
 kind = "display"
 description = "Set the primary monitor."
 capabilities = ["capture", "apply", "verify", "reset"]

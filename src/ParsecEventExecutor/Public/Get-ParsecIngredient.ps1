@@ -1,5 +1,7 @@
 function Get-ParsecIngredient {
     [CmdletBinding()]
+    [OutputType([PSCustomObject[]])]
+    [OutputType([System.Object[]])]
     param(
         [Parameter()]
         [string] $Name = '*'

@@ -1,5 +1,6 @@
 name = "display.set-textscale"
 aliases = ["set-textscale"]
+domain = "display"
 kind = "display"
 description = "Set text scaling."
 capabilities = ["capture", "apply", "wait", "verify", "reset"]

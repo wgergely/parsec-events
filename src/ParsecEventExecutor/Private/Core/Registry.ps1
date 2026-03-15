@@ -1,5 +1,6 @@
 function Initialize-ParsecCoreRegistryState {
     [CmdletBinding()]
+    [OutputType([void])]
     param()
 
     if (-not (Get-Variable -Name ParsecCoreDomainCatalog -Scope Script -ErrorAction SilentlyContinue)) {
@@ -29,6 +30,7 @@ function Initialize-ParsecCoreRegistryState {
 
 function Clear-ParsecCoreRegistryState {
     [CmdletBinding()]
+    [OutputType([void])]
     param()
 
     Initialize-ParsecCoreRegistryState
@@ -41,7 +43,8 @@ function Clear-ParsecCoreRegistryState {
 }
 
 function Register-ParsecCoreDomainCatalogEntry {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([void])]
     param(
         [Parameter(Mandatory)]
         [string] $Name,
@@ -51,15 +54,18 @@ function Register-ParsecCoreDomainCatalogEntry {
     )
 
     Initialize-ParsecCoreRegistryState
-    $script:ParsecCoreDomainCatalog[$Name] = [pscustomobject]@{
-        Name = $Name
-        DomainPath = $DomainPath
-        EntryPath = Join-Path -Path $DomainPath -ChildPath 'entry.ps1'
+    if ($PSCmdlet.ShouldProcess("Domain catalog entry '$Name'", 'Register')) {
+        $script:ParsecCoreDomainCatalog[$Name] = [pscustomobject]@{
+            Name = $Name
+            DomainPath = $DomainPath
+            EntryPath = Join-Path -Path $DomainPath -ChildPath 'entry.ps1'
+        }
     }
 }
 
 function Register-ParsecCoreDomain {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         $Definition
@@ -70,12 +76,15 @@ function Register-ParsecCoreDomain {
         throw "Domain '$($Definition.Name)' is already registered."
     }
 
-    $script:ParsecCoreDomainRegistry[$Definition.Name] = $Definition
+    if ($PSCmdlet.ShouldProcess("Domain '$($Definition.Name)'", 'Register')) {
+        $script:ParsecCoreDomainRegistry[$Definition.Name] = $Definition
+    }
     return $Definition
 }
 
 function Get-ParsecCoreDomainDefinition {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [string] $Name
@@ -95,6 +104,7 @@ function Get-ParsecCoreDomainDefinition {
 
 function Get-ParsecCoreDomainApi {
     [CmdletBinding()]
+    [OutputType([object])]
     param(
         [Parameter(Mandatory)]
         [string] $Name
@@ -104,7 +114,8 @@ function Get-ParsecCoreDomainApi {
 }
 
 function Register-ParsecCoreIngredient {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         $Definition
@@ -123,55 +134,61 @@ function Register-ParsecCoreIngredient {
         throw "Ingredient '$($Definition.Name)' is already registered."
     }
 
-    $script:ParsecCoreIngredientRegistry[$Definition.Name] = $Definition
-    foreach ($alias in @($Definition.Aliases)) {
-        if ([string]::IsNullOrWhiteSpace([string] $alias)) {
-            continue
-        }
-
-        if ($script:ParsecCoreIngredientAliasRegistry.ContainsKey([string] $alias)) {
-            if ([string] $script:ParsecCoreIngredientAliasRegistry[[string] $alias] -eq [string] $Definition.Name) {
+    if ($PSCmdlet.ShouldProcess("Ingredient '$($Definition.Name)'", 'Register')) {
+        $script:ParsecCoreIngredientRegistry[$Definition.Name] = $Definition
+        foreach ($alias in @($Definition.Aliases)) {
+            if ([string]::IsNullOrWhiteSpace([string] $alias)) {
                 continue
             }
 
-            throw "Ingredient alias '$alias' is already registered."
-        }
+            if ($script:ParsecCoreIngredientAliasRegistry.ContainsKey([string] $alias)) {
+                if ([string] $script:ParsecCoreIngredientAliasRegistry[[string] $alias] -eq [string] $Definition.Name) {
+                    continue
+                }
 
-        $script:ParsecCoreIngredientAliasRegistry[[string] $alias] = $Definition.Name
+                throw "Ingredient alias '$alias' is already registered."
+            }
+
+            $script:ParsecCoreIngredientAliasRegistry[[string] $alias] = $Definition.Name
+        }
     }
 
     return $Definition
 }
 
 function Register-ParsecCoreIngredientCatalogEntry {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         $Definition
     )
 
     Initialize-ParsecCoreRegistryState
-    $script:ParsecCoreIngredientCatalog[$Definition.Name] = $Definition
-    foreach ($alias in @($Definition.Aliases)) {
-        if ([string]::IsNullOrWhiteSpace([string] $alias)) {
-            continue
-        }
+    if ($PSCmdlet.ShouldProcess("Ingredient catalog entry '$($Definition.Name)'", 'Register')) {
+        $script:ParsecCoreIngredientCatalog[$Definition.Name] = $Definition
+        foreach ($alias in @($Definition.Aliases)) {
+            if ([string]::IsNullOrWhiteSpace([string] $alias)) {
+                continue
+            }
 
-        if (
-            $script:ParsecCoreIngredientAliasRegistry.ContainsKey([string] $alias) -and
-            [string] $script:ParsecCoreIngredientAliasRegistry[[string] $alias] -ne [string] $Definition.Name
-        ) {
-            throw "Ingredient alias '$alias' is already registered."
-        }
+            if (
+                $script:ParsecCoreIngredientAliasRegistry.ContainsKey([string] $alias) -and
+                [string] $script:ParsecCoreIngredientAliasRegistry[[string] $alias] -ne [string] $Definition.Name
+            ) {
+                throw "Ingredient alias '$alias' is already registered."
+            }
 
-        $script:ParsecCoreIngredientAliasRegistry[[string] $alias] = $Definition.Name
+            $script:ParsecCoreIngredientAliasRegistry[[string] $alias] = $Definition.Name
+        }
     }
 
     return $Definition
 }
 
 function Register-ParsecCoreIngredientPathCatalogEntry {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([void])]
     param(
         [Parameter(Mandatory)]
         [string] $FolderName,
@@ -181,14 +198,17 @@ function Register-ParsecCoreIngredientPathCatalogEntry {
     )
 
     Initialize-ParsecCoreRegistryState
-    $script:ParsecCoreIngredientPathCatalog[$FolderName] = [pscustomobject]@{
-        FolderName = $FolderName
-        IngredientPath = $IngredientPath
+    if ($PSCmdlet.ShouldProcess("Ingredient path catalog entry '$FolderName'", 'Register')) {
+        $script:ParsecCoreIngredientPathCatalog[$FolderName] = [pscustomobject]@{
+            FolderName = $FolderName
+            IngredientPath = $IngredientPath
+        }
     }
 }
 
 function Resolve-ParsecCoreIngredientName {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [string] $Name
@@ -222,6 +242,7 @@ function Resolve-ParsecCoreIngredientName {
 
 function Get-ParsecCoreIngredientDefinition {
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
         [string] $Name
@@ -235,7 +256,10 @@ function Get-ParsecCoreIngredientDefinition {
 }
 
 function Get-ParsecCoreIngredientDefinitions {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '')]
     [CmdletBinding()]
+    [OutputType([PSCustomObject[]])]
+    [OutputType([System.Object[]])]
     param()
 
     Initialize-ParsecCoreRegistryState

@@ -1,5 +1,6 @@
 name = "display.set-uiscale"
 aliases = ["set-uiscale"]
+domain = "display"
 kind = "display"
 description = "Set UI scaling."
 capabilities = ["capture", "apply", "wait", "verify", "reset"]

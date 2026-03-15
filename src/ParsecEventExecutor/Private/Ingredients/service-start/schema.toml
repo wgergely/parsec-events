@@ -1,4 +1,5 @@
 name = "service.start"
+domain = "service"
 kind = "service"
 description = "Start a Windows service."
 capabilities = ["capture", "apply", "verify", "reset"]
