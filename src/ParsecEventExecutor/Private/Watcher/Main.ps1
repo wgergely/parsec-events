@@ -1,5 +1,7 @@
 ﻿function Start-ParsecWatcherLoop {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Config,
@@ -20,91 +22,92 @@
     ).Replace('-', '').Substring(0, 16)
     $mutexName = "Global\ParsecEventWatcher_$stateHash"
     $createdNew = $false
-    $mutex = $null
+    $mutex = [System.Threading.Mutex]::new($false, $mutexName)
 
     try {
-        $mutex = [System.Threading.Mutex]::new($true, $mutexName, [ref]$createdNew)
+        $createdNew = $mutex.WaitOne(0)
     }
     catch [System.Threading.AbandonedMutexException] {
-        # Previous watcher crashed without releasing the mutex. We now own it.
+        # Previous watcher crashed without releasing. WaitOne acquired it for us.
         $createdNew = $true
-        $mutex = $_.Exception.Mutex
         Write-Warning 'Watcher: Acquired abandoned mutex from a previous crashed instance.'
     }
 
     if (-not $createdNew) {
-        if ($mutex) { $mutex.Dispose() }
+        $mutex.Dispose()
         throw 'Another instance of the Parsec watcher is already running. Only one watcher is allowed at a time.'
     }
 
-    # --- File logging ---
-    $logsDir = Join-Path -Path $StateRoot -ChildPath 'logs'
-    if (-not (Test-Path -LiteralPath $logsDir)) {
-        New-Item -ItemType Directory -Path $logsDir -Force | Out-Null
-    }
-
-    $logTimestamp = [DateTime]::Now.ToString('yyyy-MM-dd_HH-mm-ss')
-    $transcriptPath = Join-Path -Path $logsDir -ChildPath "watcher-$logTimestamp.log"
-
     try {
-        Start-Transcript -LiteralPath $transcriptPath -Append | Out-Null
-        Write-Information "Watcher: Transcript logging to '$transcriptPath'"
-    }
-    catch {
-        Write-Warning "Watcher: Could not start transcript logging: $_"
-    }
+        # outer try — guarantees mutex release on any failure
 
-    # Clean old log files (keep last 10)
-    $oldLogs = Get-ChildItem -Path $logsDir -Filter 'watcher-*.log' -File |
-        Sort-Object LastWriteTime -Descending |
-        Select-Object -Skip 10
-    foreach ($old in $oldLogs) {
-        Remove-Item -LiteralPath $old.FullName -Force -ErrorAction SilentlyContinue
-    }
+        # --- File logging ---
+        $logsDir = Join-Path -Path $StateRoot -ChildPath 'logs'
+        if (-not (Test-Path -LiteralPath $logsDir)) {
+            New-Item -ItemType Directory -Path $logsDir -Force | Out-Null
+        }
 
-    $logPath = Resolve-ParsecLogPath -ConfiguredPath $Config.watcher.parsec_log_path
-    Write-Information "Watcher: Parsec log path resolved to '$logPath'"
+        $logTimestamp = [DateTime]::Now.ToString('yyyy-MM-dd_HH-mm-ss')
+        $transcriptPath = Join-Path -Path $logsDir -ChildPath "watcher-$logTimestamp.log"
 
-    $recipes = @(Get-ParsecRecipe)
-    if ($recipes.Count -eq 0) {
-        throw 'No recipes found. Cannot start watcher without at least one recipe.'
-    }
+        try {
+            Start-Transcript -LiteralPath $transcriptPath -Append | Out-Null
+            Write-Information "Watcher: Transcript logging to '$transcriptPath'"
+        }
+        catch {
+            Write-Warning "Watcher: Could not start transcript logging: $_"
+        }
 
-    Write-Information "Watcher: Loaded $($recipes.Count) recipe(s): $($recipes.name -join ', ')"
+        # Clean old log files (keep last 10)
+        $oldLogs = Get-ChildItem -Path $logsDir -Filter 'watcher-*.log' -File |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -Skip 10
+        foreach ($old in $oldLogs) {
+            Remove-Item -LiteralPath $old.FullName -Force -ErrorAction SilentlyContinue
+        }
 
-    Initialize-ParsecStateRoot -StateRoot $StateRoot | Out-Null
+        $logPath = Resolve-ParsecLogPath -ConfiguredPath $Config.watcher.parsec_log_path
+        Write-Information "Watcher: Parsec log path resolved to '$logPath'"
 
-    $router = New-ParsecEventRouter -Patterns $Config.patterns
-    $tracker = New-ParsecSessionTracker -DefaultGracePeriodMs $Config.watcher.grace_period_ms
-    $dispatcher = New-ParsecWatcherDispatcher -StateRoot $StateRoot
-    $tailer = New-ParsecLogTailer -LogPath $logPath -PollIntervalMs $Config.watcher.poll_interval_ms
+        $recipes = @(Get-ParsecRecipe)
+        if ($recipes.Count -eq 0) {
+            throw 'No recipes found. Cannot start watcher without at least one recipe.'
+        }
 
-    $executorState = Get-ParsecExecutorStateDocument -StateRoot $StateRoot
-    $currentMode = if ($executorState.desired_mode) { $executorState.desired_mode } else { 'DESKTOP' }
-    Write-Information "Watcher: Initial mode is '$currentMode'"
+        Write-Information "Watcher: Loaded $($recipes.Count) recipe(s): $($recipes.name -join ', ')"
 
-    Invoke-ParsecWatcherReconcile -LogPath $logPath -Router $router -Tracker $tracker -TailCount 200
-    Write-Information "Watcher: Startup reconciliation complete. Active sessions: $($tracker.active_sessions.Count)"
+        Initialize-ParsecStateRoot -StateRoot $StateRoot | Out-Null
 
-    # Pending connect events waiting for apply_delay_ms to expire
-    $pendingConnects = [System.Collections.Generic.List[hashtable]]::new()
+        $router = New-ParsecEventRouter -Patterns $Config.patterns
+        $tracker = New-ParsecSessionTracker -DefaultGracePeriodMs $Config.watcher.grace_period_ms
+        $dispatcher = New-ParsecWatcherDispatcher -StateRoot $StateRoot
+        $tailer = New-ParsecLogTailer -LogPath $logPath -PollIntervalMs $Config.watcher.poll_interval_ms
 
-    Start-ParsecLogTailer -Tailer $tailer -SkipExisting
+        $executorState = Get-ParsecExecutorStateDocument -StateRoot $StateRoot
+        $currentMode = if ($executorState.desired_mode) { $executorState.desired_mode } else { 'DESKTOP' }
+        Write-Information "Watcher: Initial mode is '$currentMode'"
 
-    Write-Information 'Watcher: Log tailer started. Entering event loop.'
+        Invoke-ParsecWatcherReconcile -LogPath $logPath -Router $router -Tracker $tracker -TailCount 200
+        Write-Information "Watcher: Startup reconciliation complete. Active sessions: $($tracker.active_sessions.Count)"
 
-    $watcherState = [ordered]@{
-        current_mode = $currentMode
-        is_running = $true
-        started_at = [DateTimeOffset]::UtcNow.ToString('o')
-        events_processed = 0
-        recipes_dispatched = 0
-    }
+        # Pending connect events waiting for apply_delay_ms to expire
+        $pendingConnects = [System.Collections.Generic.List[hashtable]]::new()
 
-    # Expose for Stop-ParsecWatcherLoop
-    $script:ParsecWatcherState = $watcherState
+        Start-ParsecLogTailer -Tailer $tailer -SkipExisting
 
-    try {
+        Write-Information 'Watcher: Log tailer started. Entering event loop.'
+
+        $watcherState = [ordered]@{
+            current_mode = $currentMode
+            is_running = $true
+            started_at = [DateTimeOffset]::UtcNow.ToString('o')
+            events_processed = 0
+            recipes_dispatched = 0
+        }
+
+        # Expose for Stop-ParsecWatcherLoop
+        $script:ParsecWatcherState = $watcherState
+
         while ($watcherState.is_running) {
             # --- Phase 1: Poll tailer for new log lines and route events ---
             $newLines = @(Read-ParsecLogTailerNewLines -Tailer $tailer)
@@ -253,6 +256,7 @@
 }
 
 function Stop-ParsecWatcherLoop {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
     param()
 

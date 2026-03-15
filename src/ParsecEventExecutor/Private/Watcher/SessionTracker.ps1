@@ -1,5 +1,7 @@
 function New-ParsecSessionTracker {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter()]
         [int] $DefaultGracePeriodMs = 10000
@@ -14,6 +16,7 @@ function New-ParsecSessionTracker {
 
 function Register-ParsecSession {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Tracker,
@@ -70,6 +73,7 @@ function Register-ParsecSession {
 
 function Unregister-ParsecSession {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Tracker,
@@ -117,7 +121,9 @@ function Unregister-ParsecSession {
 }
 
 function Get-ParsecExpiredDisconnects {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '')]
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary[]])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Tracker
@@ -128,7 +134,7 @@ function Get-ParsecExpiredDisconnects {
 
     foreach ($username in @($Tracker.pending_disconnects.Keys)) {
         $pending = $Tracker.pending_disconnects[$username]
-        $expiresAt = [DateTimeOffset]::ParseExact($pending.grace_expires_at, 'o', [System.Globalization.CultureInfo]::InvariantCulture)
+        $expiresAt = [DateTimeOffset]::Parse($pending.grace_expires_at, [System.Globalization.CultureInfo]::InvariantCulture)
 
         if ($now -ge $expiresAt) {
             $expired += [ordered]@{
@@ -146,6 +152,7 @@ function Get-ParsecExpiredDisconnects {
 
 function Get-ParsecSessionState {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Tracker
