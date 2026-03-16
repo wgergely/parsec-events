@@ -1,4 +1,4 @@
-function Initialize-ParsecDisplayInterop {
+﻿function Initialize-ParsecDisplayInterop {
     [CmdletBinding()]
     [OutputType([void])]
     param()
@@ -281,7 +281,11 @@ function Set-ParsecDisplayResolutionInternal {
     $mode = Get-ParsecNativeDeviceMode -DeviceName $deviceName
     $mode.dmPelsWidth = [int] $Arguments.width
     $mode.dmPelsHeight = [int] $Arguments.height
-    $mode.dmFields = $mode.dmFields -bor [ParsecEventExecutor.DisplayNative]::DM_PELSWIDTH -bor [ParsecEventExecutor.DisplayNative]::DM_PELSHEIGHT
+    # Set only width+height fields; clear frequency so the driver picks the best
+    # matching refresh rate. Inheriting the current frequency causes BadMode when
+    # switching between resolutions with different supported refresh rates
+    # (e.g., 1920x1080@59Hz → 3000x2000 which only supports 60Hz).
+    $mode.dmFields = [ParsecEventExecutor.DisplayNative]::DM_PELSWIDTH -bor [ParsecEventExecutor.DisplayNative]::DM_PELSHEIGHT
 
     $result = Invoke-ParsecApplyDisplayMode -DeviceName $deviceName -Mode $mode -Action 'SetResolution' -Requested $Arguments
     if ($result.Status -eq 'Succeeded') {
