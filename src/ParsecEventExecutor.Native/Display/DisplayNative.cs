@@ -295,9 +295,6 @@ public static class DisplayNative {
     [DllImport("Shcore.dll")]
     private static extern int GetDpiForMonitor(IntPtr hmonitor, int dpiType, out uint dpiX, out uint dpiY);
 
-    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, IntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out IntPtr lpdwResult);
-
     [DllImport("user32.dll")]
     private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
 
@@ -709,15 +706,6 @@ public static class DisplayNative {
     private static void ThrowIfWin32Error(int errorCode, string apiName) {
         if (errorCode != 0) {
             throw new Win32Exception(errorCode, apiName + " failed.");
-        }
-    }
-
-    public static void BroadcastSettingChange(string area) {
-        IntPtr result;
-        var timeoutFlags = 0x0002u | 0x0008u;
-        var messageResult = SendMessageTimeout(new IntPtr(0xffff), 0x001A, IntPtr.Zero, area, timeoutFlags, 5000u, out result);
-        if (messageResult == IntPtr.Zero) {
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "SendMessageTimeout(WM_SETTINGCHANGE) failed.");
         }
     }
 
