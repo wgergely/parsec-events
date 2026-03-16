@@ -1,7 +1,6 @@
-name = "test-watcher-noop"
-description = "Safe test recipe for watcher live validation. Captures a snapshot only — no display changes."
-initial_mode = "DESKTOP"
-target_mode = "MOBILE"
+name = "dev-connect-noop"
+description = "Dev test recipe for watcher validation. Captures a snapshot only — no display changes."
+event_type = "connect"
 
 [[steps]]
 id = "capture-test-snapshot"

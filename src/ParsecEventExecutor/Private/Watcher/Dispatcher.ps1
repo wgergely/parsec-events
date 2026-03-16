@@ -1,5 +1,7 @@
 function New-ParsecWatcherDispatcher {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter()]
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)
@@ -16,6 +18,7 @@ function New-ParsecWatcherDispatcher {
 
 function Invoke-ParsecWatcherDispatch {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Dispatcher,
@@ -34,7 +37,6 @@ function Invoke-ParsecWatcherDispatch {
     $dispatchItem = [ordered]@{
         recipe_name = $Recipe.name
         recipe = $Recipe
-        target_mode = $Recipe.target_mode
         username = $Username
         event_type = $EventType
         queued_at = [DateTimeOffset]::UtcNow.ToString('o')
@@ -55,6 +57,7 @@ function Invoke-ParsecWatcherDispatch {
 
 function Invoke-ParsecWatcherDispatchInternal {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Dispatcher,
@@ -92,7 +95,8 @@ function Invoke-ParsecWatcherDispatchInternal {
         return [ordered]@{
             status = 'Dispatched'
             terminal_status = $result.terminal_status
-            target_mode = $Item.target_mode
+            recipe_name = $Item.recipe_name
+            event_type = $Item.event_type
             message = "Recipe '$($Item.recipe_name)' $statusMsg"
             result = $result
         }

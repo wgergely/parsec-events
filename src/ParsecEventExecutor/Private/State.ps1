@@ -15,9 +15,7 @@ function New-ParsecRunState {
         run_id = $runId
         recipe_name = $Recipe.name
         recipe_file = $Recipe.path
-        desired_state = $Recipe.target_mode
-        actual_state = $null
-        last_good_state = $null
+        event_type = $Recipe.event_type
         active_snapshot = $null
         terminal_status = 'Running'
         transition_id = $runId
@@ -61,9 +59,9 @@ function Get-ParsecExecutorStateDocument {
     $document = Read-ParsecStateDocument -Path $path -ExpectedDocumentType 'executor-state'
     if ($null -eq $document) {
         return [ordered]@{
-            desired_mode = $null
-            actual_mode = $null
-            last_good_mode = $null
+            last_applied_recipe = $null
+            last_event_type = $null
+            default_profile = $null
             active_snapshot = $null
             transition_id = $null
             transition_phase = 'Idle'
@@ -209,9 +207,8 @@ function Get-ParsecRecoveryStatus {
     $isRecoverable = $recoveryCandidate.recovered_from_journal -and $issues.Count -gt 0
 
     return [ordered]@{
-        desired_mode = $state.desired_mode
-        actual_mode = $state.actual_mode
-        last_good_mode = $state.last_good_mode
+        last_applied_recipe = $state.last_applied_recipe
+        last_event_type = $state.last_event_type
         active_snapshot = $state.active_snapshot
         last_run_id = $state.last_run_id
         issues = @($issues)
@@ -270,10 +267,11 @@ function Get-ParsecRecoveryCandidateFromEvent {
         [string] $StateRoot = (Get-ParsecDefaultStateRoot)
     )
 
+    $existingState = Get-ParsecExecutorStateDocument -StateRoot $StateRoot
     $candidate = [ordered]@{
-        desired_mode = $null
-        actual_mode = $null
-        last_good_mode = $null
+        last_applied_recipe = $null
+        last_event_type = $null
+        default_profile = $existingState.default_profile
         active_snapshot = $null
         transition_id = $null
         transition_phase = 'Idle'
@@ -284,11 +282,12 @@ function Get-ParsecRecoveryCandidateFromEvent {
     }
 
     foreach ($eventRecord in @(Get-ParsecEventDocument -StateRoot $StateRoot)) {
-        $eventType = if ($eventRecord.envelope) { $eventRecord.envelope.document_type } else { $null }
+        $docType = if ($eventRecord.envelope) { $eventRecord.envelope.document_type } else { $null }
         $payload = $eventRecord.payload
-        switch ($eventType) {
+        switch ($docType) {
             'executor-run-started' {
-                $candidate.desired_mode = $payload.desired_state
+                $candidate.last_applied_recipe = $payload.recipe_name
+                $candidate.last_event_type = $payload.event_type
                 $candidate.transition_id = $payload.transition_id
                 $candidate.transition_phase = 'Running'
                 $candidate.last_run_id = $payload.run_id
@@ -313,8 +312,8 @@ function Get-ParsecRecoveryCandidateFromEvent {
                 $candidate.transition_id = $payload.transition_id
                 $candidate.transition_phase = 'Idle'
                 $candidate.last_run_id = $payload.run_id
-                $candidate.actual_mode = $payload.actual_state
-                $candidate.last_good_mode = $payload.last_good_state
+                $candidate.last_applied_recipe = $payload.recipe_name
+                $candidate.last_event_type = $payload.event_type
                 if ($payload.active_snapshot) {
                     $candidate.active_snapshot = $payload.active_snapshot
                 }

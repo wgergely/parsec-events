@@ -29,7 +29,7 @@ function Resolve-ParsecSnapshotDomainName {
     }
 
     if ($UseDefaultCaptureName.IsPresent) {
-        return 'desktop-pre-parsec'
+        return 'pre-connect'
     }
 
     throw 'No active snapshot is available.'

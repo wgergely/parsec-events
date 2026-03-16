@@ -123,25 +123,22 @@ InModuleScope ParsecEventExecutor {
     Describe 'Multi-account: different usernames trigger different recipes' {
         It 'matches a username-filtered recipe for a specific user and falls back for others' {
             $phoneRecipe = [ordered]@{
-                name = 'enter-mobile-phone'
-                initial_mode = 'DESKTOP'
-                target_mode = 'MOBILE'
+                name = 'dev-connect-phone'
+                event_type = 'connect'
                 username = 'phone#1111'
                 grace_period_ms = 5000
             }
 
             $laptopRecipe = [ordered]@{
                 name = 'enter-laptop'
-                initial_mode = 'DESKTOP'
-                target_mode = 'MOBILE'
+                event_type = 'connect'
                 username = 'laptop#2222'
                 grace_period_ms = 30000
             }
 
             $defaultRecipe = [ordered]@{
-                name = 'enter-mobile-default'
-                initial_mode = 'DESKTOP'
-                target_mode = 'MOBILE'
+                name = 'dev-connect-default'
+                event_type = 'connect'
                 username = $null
                 grace_period_ms = $null
             }
@@ -149,16 +146,16 @@ InModuleScope ParsecEventExecutor {
             $allRecipes = @($phoneRecipe, $laptopRecipe, $defaultRecipe)
 
             # Phone user gets phone recipe
-            $result = Find-ParsecMatchingRecipe -Username 'phone#1111' -CurrentMode 'DESKTOP' -EventType 'connect' -Recipes $allRecipes
-            $result.name | Should -Be 'enter-mobile-phone'
+            $result = Find-ParsecMatchingRecipe -Username 'phone#1111' -EventType 'connect' -Recipes $allRecipes
+            $result.name | Should -Be 'dev-connect-phone'
 
             # Laptop user gets laptop recipe
-            $result = Find-ParsecMatchingRecipe -Username 'laptop#2222' -CurrentMode 'DESKTOP' -EventType 'connect' -Recipes $allRecipes
+            $result = Find-ParsecMatchingRecipe -Username 'laptop#2222' -EventType 'connect' -Recipes $allRecipes
             $result.name | Should -Be 'enter-laptop'
 
             # Unknown user gets default recipe
-            $result = Find-ParsecMatchingRecipe -Username 'stranger#9999' -CurrentMode 'DESKTOP' -EventType 'connect' -Recipes $allRecipes
-            $result.name | Should -Be 'enter-mobile-default'
+            $result = Find-ParsecMatchingRecipe -Username 'stranger#9999' -EventType 'connect' -Recipes $allRecipes
+            $result.name | Should -Be 'dev-connect-default'
         }
 
         It 'routes connect and disconnect events to the correct recipes per user through the full pipeline' {
@@ -169,20 +166,18 @@ InModuleScope ParsecEventExecutor {
             $router = New-ParsecEventRouter -Patterns $patterns
 
             $phoneRecipe = [ordered]@{
-                name = 'enter-mobile-phone'
-                initial_mode = 'DESKTOP'
-                target_mode = 'MOBILE'
+                name = 'dev-connect-phone'
+                event_type = 'connect'
                 username = 'phone#1111'
                 grace_period_ms = $null
             }
-            $desktopRecipe = [ordered]@{
-                name = 'return-desktop'
-                initial_mode = 'MOBILE'
-                target_mode = 'DESKTOP'
+            $disconnectRecipe = [ordered]@{
+                name = 'dev-disconnect'
+                event_type = 'disconnect'
                 username = $null
                 grace_period_ms = $null
             }
-            $recipes = @($phoneRecipe, $desktopRecipe)
+            $recipes = @($phoneRecipe, $disconnectRecipe)
 
             $logLines = @(
                 '[I 2026-03-15 10:00:00] phone#1111 connected.',
@@ -191,7 +186,7 @@ InModuleScope ParsecEventExecutor {
             )
 
             $tracker = New-ParsecSessionTracker -DefaultGracePeriodMs 0
-            $currentMode = 'DESKTOP'
+            $lastRecipe = $null
             $dispatched = [System.Collections.Generic.List[string]]::new()
 
             foreach ($line in $logLines) {
@@ -201,10 +196,10 @@ InModuleScope ParsecEventExecutor {
                 if ($parsed.event_type -eq 'connect') {
                     $sessionResult = Register-ParsecSession -Tracker $tracker -Username $parsed.username
                     if ($sessionResult.action -eq 'dispatch_connect') {
-                        $recipe = Find-ParsecMatchingRecipe -Username $parsed.username -CurrentMode $currentMode -EventType 'connect' -Recipes $recipes
+                        $recipe = Find-ParsecMatchingRecipe -Username $parsed.username -EventType 'connect' -Recipes $recipes
                         if ($recipe) {
                             $dispatched.Add("connect:$($recipe.name)")
-                            $currentMode = $recipe.target_mode
+                            $lastRecipe = $recipe.name
                         }
                     }
                 }
@@ -213,10 +208,10 @@ InModuleScope ParsecEventExecutor {
                     if ($sessionResult.action -eq 'grace_period_started') {
                         $expired = @(Get-ParsecExpiredDisconnects -Tracker $tracker)
                         foreach ($exp in $expired) {
-                            $recipe = Find-ParsecMatchingRecipe -Username $exp.username -CurrentMode $currentMode -EventType 'disconnect' -Recipes $recipes
+                            $recipe = Find-ParsecMatchingRecipe -Username $exp.username -EventType 'disconnect' -Recipes $recipes
                             if ($recipe) {
                                 $dispatched.Add("disconnect:$($recipe.name)")
-                                $currentMode = $recipe.target_mode
+                                $lastRecipe = $recipe.name
                             }
                         }
                     }
@@ -224,9 +219,9 @@ InModuleScope ParsecEventExecutor {
             }
 
             $dispatched.Count | Should -Be 2
-            $dispatched[0] | Should -Be 'connect:enter-mobile-phone'
-            $dispatched[1] | Should -Be 'disconnect:return-desktop'
-            $currentMode | Should -Be 'DESKTOP'
+            $dispatched[0] | Should -Be 'connect:dev-connect-phone'
+            $dispatched[1] | Should -Be 'disconnect:dev-disconnect'
+            $lastRecipe | Should -Be 'dev-disconnect'
         }
 
         It 'ignores a second user connection when first user is already connected' {

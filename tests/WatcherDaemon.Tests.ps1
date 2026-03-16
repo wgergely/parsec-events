@@ -49,12 +49,23 @@ disconnect = '\]\s+(.+#\d+)\s+disconnected\.\s*`$'
 
         Start-Sleep -Milliseconds 500
         Remove-Item -LiteralPath $script:testDir -Recurse -Force -ErrorAction SilentlyContinue
+
+        # Clean up fixture recipes copied to the repo recipes dir
+        $repoRecipesDir = Join-Path $script:projectRoot 'recipes'
+        Remove-Item -LiteralPath (Join-Path $repoRecipesDir 'dev-connect-noop.toml') -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath (Join-Path $repoRecipesDir 'dev-disconnect-noop.toml') -Force -ErrorAction SilentlyContinue
     }
 
     It 'starts the watcher daemon as an isolated process' {
+        $fixtureRecipesDir = Join-Path $PSScriptRoot 'fixtures\recipes'
+        $repoRecipesDir = Join-Path $script:projectRoot 'recipes'
         $daemonScript = @"
 `$ErrorActionPreference = 'Stop'
 Import-Module '$($script:moduleFullPath)' -Force
+# Copy dev fixture recipes into the repo recipes dir so the watcher can discover them
+# Use noop recipes that only capture/restore snapshots — no real display changes
+Copy-Item -LiteralPath '$($fixtureRecipesDir)\dev-connect-noop.toml' -Destination '$repoRecipesDir' -Force
+Copy-Item -LiteralPath '$($fixtureRecipesDir)\dev-disconnect-noop.toml' -Destination '$repoRecipesDir' -Force
 Start-ParsecWatcher -ConfigPath '$($script:configPath)' -StateRoot '$($script:stateRoot)' -InformationAction Continue
 "@
         $daemonScriptPath = Join-Path $script:testDir 'daemon.ps1'
@@ -95,7 +106,8 @@ Start-ParsecWatcher -ConfigPath '$($script:configPath)' -StateRoot '$($script:st
             Get-ParsecExecutorStateDocument -StateRoot $stateRoot
         } $script:stateRoot
 
-        $executorState.desired_mode | Should -Be 'MOBILE' -Because 'the connect recipe should have set desired_mode to MOBILE'
+        $executorState.last_applied_recipe | Should -Be 'dev-connect-noop' -Because 'the connect recipe should have been recorded'
+        $executorState.last_event_type | Should -Be 'connect' -Because 'the connect event type should have been recorded'
         $executorState.transition_phase | Should -Not -Be 'Running' -Because 'the recipe should have completed'
     }
 
@@ -125,7 +137,8 @@ Start-ParsecWatcher -ConfigPath '$($script:configPath)' -StateRoot '$($script:st
             Get-ParsecExecutorStateDocument -StateRoot $stateRoot
         } $script:stateRoot
 
-        $executorState.desired_mode | Should -Be 'DESKTOP' -Because 'the disconnect recipe should have restored desired_mode to DESKTOP'
+        $executorState.last_applied_recipe | Should -Be 'dev-disconnect-noop' -Because 'the disconnect recipe should have been recorded'
+        $executorState.last_event_type | Should -Be 'disconnect' -Because 'the disconnect event type should have been recorded'
     }
 
     It 'recorded at least one recipe run and the executor state reflects both dispatches' {
@@ -134,14 +147,13 @@ Start-ParsecWatcher -ConfigPath '$($script:configPath)' -StateRoot '$($script:st
 
         $runFiles.Count | Should -BeGreaterOrEqual 1 -Because 'at least the connect recipe run should be recorded'
 
-        # The executor state should show DESKTOP as desired_mode (disconnect recipe sets this
-        # even if the recipe steps fail — the mode transition intent is recorded)
+        # The executor state should show dev-disconnect as last applied recipe
         $executorState = & (Get-Module ParsecEventExecutor) {
             param($stateRoot)
             Get-ParsecExecutorStateDocument -StateRoot $stateRoot
         } $script:stateRoot
 
-        $executorState.desired_mode | Should -Be 'DESKTOP' -Because 'the disconnect dispatch should have set desired_mode back to DESKTOP'
+        $executorState.last_applied_recipe | Should -Be 'dev-disconnect-noop' -Because 'the disconnect dispatch should have recorded dev-disconnect'
     }
 
     It 'created a transcript log file' {

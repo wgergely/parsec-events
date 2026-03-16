@@ -84,8 +84,7 @@
         $tailer = New-ParsecLogTailer -LogPath $logPath -PollIntervalMs $Config.watcher.poll_interval_ms
 
         $executorState = Get-ParsecExecutorStateDocument -StateRoot $StateRoot
-        $currentMode = if ($executorState.desired_mode) { $executorState.desired_mode } else { 'DESKTOP' }
-        Write-Information "Watcher: Initial mode is '$currentMode'"
+        Write-Information "Watcher: Last applied recipe: '$($executorState.last_applied_recipe)', Last event: '$($executorState.last_event_type)'"
 
         Invoke-ParsecWatcherReconcile -LogPath $logPath -Router $router -Tracker $tracker -TailCount 200
         Write-Information "Watcher: Startup reconciliation complete. Active sessions: $($tracker.active_sessions.Count)"
@@ -98,7 +97,7 @@
         Write-Information 'Watcher: Log tailer started. Entering event loop.'
 
         $watcherState = [ordered]@{
-            current_mode = $currentMode
+            last_dispatched_recipe = $executorState.last_applied_recipe
             is_running = $true
             started_at = [DateTimeOffset]::UtcNow.ToString('o')
             events_processed = 0
@@ -127,7 +126,7 @@
                     $sessionResult = Register-ParsecSession -Tracker $tracker -Username $username
 
                     if ($sessionResult.action -eq 'dispatch_connect') {
-                        $recipe = Find-ParsecMatchingRecipe -Username $username -CurrentMode $watcherState.current_mode -EventType 'connect' -Recipes $recipes
+                        $recipe = Find-ParsecMatchingRecipe -Username $username -EventType 'connect' -Recipes $recipes
 
                         if ($recipe) {
                             $delayMs = $Config.watcher.apply_delay_ms
@@ -141,7 +140,7 @@
                                 })
                         }
                         else {
-                            Write-Information "Watcher: No matching recipe for connect from '$username' in mode '$($watcherState.current_mode)'"
+                            Write-Information "Watcher: No matching connect recipe for '$username'"
                         }
                     }
                     else {
@@ -157,7 +156,7 @@
                         }
                     }
 
-                    $recipe = Find-ParsecMatchingRecipe -Username $username -CurrentMode $watcherState.current_mode -EventType 'disconnect' -Recipes $recipes
+                    $recipe = Find-ParsecMatchingRecipe -Username $username -EventType 'disconnect' -Recipes $recipes
                     $gracePeriod = if ($recipe) {
                         Get-ParsecRecipeGracePeriod -Recipe $recipe -DefaultGracePeriodMs $Config.watcher.grace_period_ms
                     }
@@ -186,7 +185,7 @@
                 else {
                     $dispatchResult = Invoke-ParsecWatcherDispatch -Dispatcher $dispatcher -Recipe $recipe -Username $username -EventType 'connect'
                     if ($dispatchResult.status -eq 'Dispatched' -and $dispatchResult.terminal_status -in @('Succeeded', 'SucceededWithDrift', 'Compensated')) {
-                        $watcherState.current_mode = $recipe.target_mode
+                        $watcherState.last_dispatched_recipe = $recipe.name
                         $watcherState.recipes_dispatched++
                     }
                 }
@@ -198,7 +197,7 @@
                 $username = $expiredEvent.username
                 Write-Information "Watcher: Grace period expired for '$username'. Looking for disconnect recipe."
 
-                $recipe = Find-ParsecMatchingRecipe -Username $username -CurrentMode $watcherState.current_mode -EventType 'disconnect' -Recipes $recipes
+                $recipe = Find-ParsecMatchingRecipe -Username $username -EventType 'disconnect' -Recipes $recipes
 
                 if ($recipe) {
                     if ($DryRun) {
@@ -207,13 +206,34 @@
                     else {
                         $dispatchResult = Invoke-ParsecWatcherDispatch -Dispatcher $dispatcher -Recipe $recipe -Username $username -EventType 'disconnect'
                         if ($dispatchResult.status -eq 'Dispatched' -and $dispatchResult.terminal_status -in @('Succeeded', 'SucceededWithDrift', 'Compensated')) {
-                            $watcherState.current_mode = $recipe.target_mode
+                            $watcherState.last_dispatched_recipe = $recipe.name
                             $watcherState.recipes_dispatched++
                         }
                     }
                 }
                 else {
-                    Write-Information "Watcher: No matching disconnect recipe for '$username' in mode '$($watcherState.current_mode)'"
+                    # No disconnect recipe — try restoring the default profile
+                    $executorState = Get-ParsecExecutorStateDocument -StateRoot $StateRoot
+                    if ($executorState.default_profile) {
+                        Write-Information "Watcher: No disconnect recipe for '$username'. Restoring default profile '$($executorState.default_profile)'."
+                        if ($DryRun) {
+                            Write-Information "Watcher: [DRY RUN] Would restore default profile '$($executorState.default_profile)'"
+                        }
+                        else {
+                            try {
+                                $resetResult = Invoke-ParsecIngredientCommandInternal -Name 'display.snapshot' -Operation 'reset' -Arguments @{ snapshot_name = $executorState.default_profile } -StateRoot $StateRoot
+                                Write-Information "Watcher: Default profile restored (status: $($resetResult.Status))"
+                                $watcherState.last_dispatched_recipe = "default-profile:$($executorState.default_profile)"
+                                $watcherState.recipes_dispatched++
+                            }
+                            catch {
+                                Write-Warning "Watcher: Failed to restore default profile: $_"
+                            }
+                        }
+                    }
+                    else {
+                        Write-Information "Watcher: No disconnect recipe and no default profile for '$username'"
+                    }
                 }
             }
 
@@ -222,7 +242,7 @@
                 $drainResults = @(Invoke-ParsecWatcherDrainQueue -Dispatcher $dispatcher)
                 foreach ($dr in $drainResults) {
                     if ($dr.status -eq 'Dispatched' -and $dr.terminal_status -in @('Succeeded', 'SucceededWithDrift', 'Compensated')) {
-                        $watcherState.current_mode = $dr.target_mode
+                        $watcherState.last_dispatched_recipe = $dr.recipe_name
                         $watcherState.recipes_dispatched++
                     }
                 }

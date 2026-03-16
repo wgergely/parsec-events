@@ -171,33 +171,37 @@ Describe 'Executor state entrypoints' {
             Set-ParsecModuleVariableValue -Name 'ParsecDisplayAdapter' -Value $script:ParsecDisplayAdapter | Out-Null
         }
 
-        It 'captures a transient snapshot when switching to mobile' {
-            $stateRoot = Join-Path $TestDrive 'switch-mobile'
-            $result = Start-ParsecExecutor -EventName SwitchToMobile -StateRoot $stateRoot -Confirm:$false
+        It 'captures a transient snapshot when running a connect recipe' {
+            $stateRoot = Join-Path $TestDrive 'test-connect'
+            $connectPath = Join-Path $PSScriptRoot 'fixtures\recipes\dev-connect.toml'
+            $result = Invoke-ParsecRecipe -NameOrPath $connectPath -StateRoot $stateRoot -Confirm:$false
             $state = Get-ParsecExecutorStateDocument -StateRoot $stateRoot
 
-            $result.recipe_name | Should -Be 'enter-mobile'
+            $result.recipe_name | Should -Be 'dev-connect'
             $result.terminal_status | Should -Be 'Succeeded'
             $result.step_results[0].ingredient | Should -Be 'display.snapshot'
             $result.step_results[0].operation | Should -Be 'capture'
-            $state.active_snapshot | Should -Be 'desktop-pre-parsec'
+            $state.active_snapshot | Should -Be 'pre-connect'
         }
 
-        It 'restores the active snapshot when switching back to desktop' {
-            $stateRoot = Join-Path $TestDrive 'switch-desktop'
-            Start-ParsecExecutor -EventName SwitchToMobile -StateRoot $stateRoot -Confirm:$false | Out-Null
+        It 'restores the active snapshot when running a disconnect recipe' {
+            $stateRoot = Join-Path $TestDrive 'test-disconnect'
+            $connectPath = Join-Path $PSScriptRoot 'fixtures\recipes\dev-connect.toml'
+            $disconnectPath = Join-Path $PSScriptRoot 'fixtures\recipes\dev-disconnect.toml'
+            Invoke-ParsecRecipe -NameOrPath $connectPath -StateRoot $stateRoot -Confirm:$false | Out-Null
 
-            $result = Start-ParsecExecutor -EventName SwitchToDesktop -StateRoot $stateRoot -Confirm:$false
+            $result = Invoke-ParsecRecipe -NameOrPath $disconnectPath -StateRoot $stateRoot -Confirm:$false
 
-            $result.recipe_name | Should -Be 'return-desktop'
+            $result.recipe_name | Should -Be 'dev-disconnect'
             $result.terminal_status | Should -Be 'Succeeded'
             $result.step_results[0].operation | Should -Be 'reset'
         }
 
         It 'reports persistence drift during reconciliation when the active snapshot is missing' {
             $stateRoot = Join-Path $TestDrive 'reconcile-missing-snapshot'
-            Start-ParsecExecutor -EventName SwitchToMobile -StateRoot $stateRoot -Confirm:$false | Out-Null
-            Remove-Item -LiteralPath (Join-Path $stateRoot 'snapshots\desktop-pre-parsec.json') -Force
+            $connectPath = Join-Path $PSScriptRoot 'fixtures\recipes\dev-connect.toml'
+            Invoke-ParsecRecipe -NameOrPath $connectPath -StateRoot $stateRoot -Confirm:$false | Out-Null
+            Remove-Item -LiteralPath (Join-Path $stateRoot 'snapshots\pre-connect.json') -Force
 
             $result = Start-ParsecExecutor -EventName Reconcile -StateRoot $stateRoot -Confirm:$false
 
@@ -210,7 +214,8 @@ Describe 'Executor state entrypoints' {
 
         It 'repairs executor state from the event journal' {
             $stateRoot = Join-Path $TestDrive 'repair-from-events'
-            Start-ParsecExecutor -EventName SwitchToMobile -StateRoot $stateRoot -Confirm:$false | Out-Null
+            $connectPath = Join-Path $PSScriptRoot 'fixtures\recipes\dev-connect.toml'
+            Invoke-ParsecRecipe -NameOrPath $connectPath -StateRoot $stateRoot -Confirm:$false | Out-Null
 
             $stateDocument = Get-Content -LiteralPath (Join-Path $stateRoot 'executor-state.json') -Raw | ConvertFrom-Json -Depth 100
             $stateDocument.payload.active_snapshot = $null
@@ -226,12 +231,13 @@ Describe 'Executor state entrypoints' {
             $repair.status | Should -Be 'Recovered'
             $repair.repaired | Should -BeTrue
             $after.status | Should -Be 'Converged'
-            $after.active_snapshot | Should -Be 'desktop-pre-parsec'
+            $after.active_snapshot | Should -Be 'pre-connect'
         }
 
         It 'preserves scalar identifiers when reading event documents' {
             $stateRoot = Join-Path $TestDrive 'event-scalar-identifiers'
-            Start-ParsecExecutor -EventName SwitchToMobile -StateRoot $stateRoot -Confirm:$false | Out-Null
+            $connectPath = Join-Path $PSScriptRoot 'fixtures\recipes\dev-connect.toml'
+            Invoke-ParsecRecipe -NameOrPath $connectPath -StateRoot $stateRoot -Confirm:$false | Out-Null
 
             $events = @(Get-ParsecEventDocument -StateRoot $stateRoot)
             $candidate = Get-ParsecRecoveryCandidateFromEvent -StateRoot $stateRoot

@@ -34,7 +34,7 @@ customizable.
 - recipe engine must be able to define constratins and dependencies - e.g. ingredient 1 dependends on ingredient 2 and 3
 - recipe engine must be rosubst, and implement error handling, error logging, expontntial retry mechanisms and failsave behaviour.
 - projects needs a robust "current state" persistance. This is crucial for identifying  current window layout and settings, window and modnitor placement, etc to restore to original state.
-- must define and refer to states as MOBILE and DESKTOP modes.
+- must support a default profile (baseline system state) and user-defined connect recipes.
 
 ## Best practices
 

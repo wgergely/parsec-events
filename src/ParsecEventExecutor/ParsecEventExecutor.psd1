@@ -5,7 +5,7 @@
     Author = 'OpenAI Codex'
     CompanyName = 'OpenAI'
     Copyright = '(c) OpenAI. All rights reserved.'
-    Description = 'Mission-focused recipe executor for Parsec desktop/mobile transitions.'
+    Description = 'Recipe executor for Parsec connection events with display configuration management.'
     PowerShellVersion = '7.0'
     FunctionsToExport = @(
         'Invoke-ParsecIngredient',
@@ -24,7 +24,10 @@
         'Start-ParsecWatcher',
         'Stop-ParsecWatcher',
         'Register-ParsecWatcherTask',
-        'Unregister-ParsecWatcherTask'
+        'Unregister-ParsecWatcherTask',
+        'Set-ParsecDefaultProfile',
+        'Get-ParsecDefaultProfile',
+        'New-ParsecRecipeFromCapture'
     )
     CmdletsToExport = @()
     VariablesToExport = @()

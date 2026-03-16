@@ -1,0 +1,77 @@
+name = "dev-connect"
+description = "Dev fixture connect recipe. Captures pre-connect snapshot then applies test settings."
+event_type = "connect"
+
+[ingredient_definitions.test-resolution]
+ingredient = "display.ensure-resolution"
+operation = "apply"
+verify = true
+compensation_policy = "explicit"
+retry_count = 1
+retry_delay_ms = 250
+
+[ingredient_definitions.test-resolution.arguments]
+width = 2000
+height = 3000
+orientation = "Portrait"
+
+[ingredient_definitions.test-ui-scaling]
+ingredient = "display.set-scaling"
+operation = "apply"
+verify = true
+compensation_policy = "explicit"
+
+[ingredient_definitions.test-ui-scaling.arguments]
+ui_scale_percent = 300
+
+[ingredient_definitions.test-text-scaling]
+ingredient = "display.set-scaling"
+operation = "apply"
+verify = true
+compensation_policy = "explicit"
+
+[ingredient_definitions.test-text-scaling.arguments]
+text_scale_percent = 125
+
+[ingredient_definitions.test-light-theme]
+ingredient = "system.set-theme"
+operation = "apply"
+verify = true
+compensation_policy = "explicit"
+
+[ingredient_definitions.test-light-theme.arguments]
+mode = "Light"
+
+[[steps]]
+id = "capture-pre-connect-snapshot"
+ingredient = "display.snapshot"
+operation = "capture"
+depends_on = []
+verify = true
+compensation_policy = "none"
+retry_count = 0
+retry_delay_ms = 0
+allow_diagnostics = false
+
+[steps.arguments]
+snapshot_name = "pre-connect"
+
+[[steps]]
+id = "ensure-test-resolution"
+definition = "test-resolution"
+depends_on = ["capture-pre-connect-snapshot"]
+
+[[steps]]
+id = "set-test-ui-scaling"
+definition = "test-ui-scaling"
+depends_on = ["ensure-test-resolution"]
+
+[[steps]]
+id = "set-test-text-scaling"
+definition = "test-text-scaling"
+depends_on = ["set-test-ui-scaling"]
+
+[[steps]]
+id = "set-test-light-theme"
+definition = "test-light-theme"
+depends_on = ["set-test-text-scaling"]

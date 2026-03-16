@@ -30,3 +30,12 @@ log/
 /*.log
 /*.txt
 /*.ini
+
+# .NET build artifacts
+bin/
+obj/
+publish/
+*.user
+*.suo
+*.DotSettings
+*.nupkg

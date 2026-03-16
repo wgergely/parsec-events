@@ -121,10 +121,10 @@ Describe 'Snapshot workflow' {
 
         It 'captures a transient snapshot and verifies it against the observed state' {
             $stateRoot = Join-Path $TestDrive 'snapshot-state'
-            $snapshot = Save-ParsecSnapshot -Name 'desktop-pre-parsec' -StateRoot $stateRoot -Confirm:$false
-            $verification = Test-ParsecSnapshot -Name 'desktop-pre-parsec' -StateRoot $stateRoot
+            $snapshot = Save-ParsecSnapshot -Name 'pre-connect' -StateRoot $stateRoot -Confirm:$false
+            $verification = Test-ParsecSnapshot -Name 'pre-connect' -StateRoot $stateRoot
 
-            $snapshot.name | Should -Be 'desktop-pre-parsec'
+            $snapshot.name | Should -Be 'pre-connect'
             $snapshot.display.topology.path_count | Should -Be 1
             $snapshot.display.monitors[0].Contains('identity') | Should -BeTrue
             $snapshot.display.monitors[0]['identity']['scheme'] | Should -Be 'adapter_id+target_id'
@@ -136,19 +136,19 @@ Describe 'Snapshot workflow' {
 
         It 'restores a captured snapshot through the display snapshot ingredient' {
             $stateRoot = Join-Path $TestDrive 'restore-state'
-            Save-ParsecSnapshot -Name 'desktop-pre-parsec' -StateRoot $stateRoot -Confirm:$false | Out-Null
+            Save-ParsecSnapshot -Name 'pre-connect' -StateRoot $stateRoot -Confirm:$false | Out-Null
 
             $result = Invoke-ParsecCoreIngredientOperation -Name 'display.snapshot' -Operation 'reset' -Arguments @{
-                snapshot_name = 'desktop-pre-parsec'
+                snapshot_name = 'pre-connect'
             } -StateRoot $stateRoot -RunState @{}
 
             $result.Status | Should -Be 'Succeeded'
-            $result.Outputs['snapshot_name'] | Should -Be 'desktop-pre-parsec'
+            $result.Outputs['snapshot_name'] | Should -Be 'pre-connect'
         }
 
         It 'fails snapshot verification when wallpaper state drifts' {
             $stateRoot = Join-Path $TestDrive 'wallpaper-drift'
-            Save-ParsecSnapshot -Name 'desktop-pre-parsec' -StateRoot $stateRoot -Confirm:$false | Out-Null
+            Save-ParsecSnapshot -Name 'pre-connect' -StateRoot $stateRoot -Confirm:$false | Out-Null
 
             $script:ParsecDisplayAdapter = @{
                 GetObservedState = {
@@ -230,7 +230,7 @@ Describe 'Snapshot workflow' {
 
             Set-ParsecModuleVariableValue -Name 'ParsecDisplayAdapter' -Value $script:ParsecDisplayAdapter | Out-Null
 
-            $verification = Test-ParsecSnapshot -Name 'desktop-pre-parsec' -StateRoot $stateRoot
+            $verification = Test-ParsecSnapshot -Name 'pre-connect' -StateRoot $stateRoot
 
             $verification.Status | Should -Be 'Failed'
             $verification.Message | Should -Match 'Wallpaper path mismatch.'

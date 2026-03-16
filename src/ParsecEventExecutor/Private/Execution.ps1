@@ -26,8 +26,7 @@ function ConvertTo-ParsecRecipe {
     return [ordered]@{
         name = [string] $Document.name
         description = if ($Document.Contains('description')) { [string] $Document.description } else { '' }
-        initial_mode = if ($Document.Contains('initial_mode')) { [string] $Document.initial_mode } else { $null }
-        target_mode = if ($Document.Contains('target_mode')) { [string] $Document.target_mode } else { $null }
+        event_type = if ($Document.Contains('event_type')) { [string] $Document.event_type } else { $null }
         username = if ($Document.Contains('username')) { [string] $Document.username } else { $null }
         grace_period_ms = if ($Document.Contains('grace_period_ms')) { [int] $Document.grace_period_ms } else { $null }
         path = $Path
@@ -191,8 +190,8 @@ function Test-ParsecStepCondition {
         return $true
     }
 
-    if ($Step.condition.Contains('mode_is')) {
-        return $RunState.actual_state -eq $Step.condition.mode_is -or $RunState.desired_state -eq $Step.condition.mode_is
+    if ($Step.condition.Contains('event_type_is')) {
+        return $RunState.event_type -eq $Step.condition.event_type_is
     }
 
     return $true
@@ -911,8 +910,7 @@ function Invoke-ParsecRecipeSequence {
         run_id = New-ParsecRunIdentifier
         recipe_name = $Recipe.name
         recipe_file = $Recipe.path
-        desired_state = $Recipe.target_mode
-        actual_state = $executorState.actual_mode
+        event_type = $Recipe.event_type
         active_snapshot = $executorState.active_snapshot
         terminal_status = 'Running'
         started_at = [DateTimeOffset]::UtcNow.ToString('o')
@@ -971,7 +969,8 @@ function Invoke-ParsecRecipeInternal {
     $stateRoot = Initialize-ParsecStateRoot -StateRoot $StateRoot
     $runState = New-ParsecRunState -Recipe $Recipe -StateRoot $stateRoot
     $executorState = Get-ParsecExecutorStateDocument -StateRoot $stateRoot
-    $executorState.desired_mode = $Recipe.target_mode
+    $executorState.last_applied_recipe = $Recipe.name
+    $executorState.last_event_type = $Recipe.event_type
     $executorState.transition_id = $runState.transition_id
     $executorState.transition_phase = 'Running'
     $executorState.last_run_id = $runState.run_id
@@ -981,7 +980,7 @@ function Invoke-ParsecRecipeInternal {
         run_id = $runState.run_id
         transition_id = $runState.transition_id
         recipe_name = $Recipe.name
-        desired_state = $Recipe.target_mode
+        event_type = $Recipe.event_type
         active_snapshot = $runState.active_snapshot
     } -StateRoot $stateRoot | Out-Null
 
@@ -991,8 +990,6 @@ function Invoke-ParsecRecipeInternal {
         $runState.errors += @($executionPlan.errors)
         $runState.terminal_status = 'Failed'
         $runState.transition_phase = 'Completed'
-        $runState.actual_state = $executorState.actual_mode
-        $runState.last_good_state = $executorState.last_good_mode
         $runState.completed_at = [DateTimeOffset]::UtcNow.ToString('o')
         Save-ParsecRunState -RunState $runState | Out-Null
         $executorState.transition_phase = 'Idle'
@@ -1053,15 +1050,8 @@ function Invoke-ParsecRecipeInternal {
 
     $runState.terminal_status = Resolve-ParsecRunTerminalStatus -RunState $runState
     $runState.transition_phase = 'Completed'
-    $runState.actual_state = if (Test-ParsecSuccessfulStatus -Status $runState.terminal_status) { $Recipe.target_mode } else { $executorState.actual_mode }
-    $runState.last_good_state = if (Test-ParsecSuccessfulStatus -Status $runState.terminal_status) { $Recipe.target_mode } else { $executorState.last_good_mode }
     $runState.completed_at = [DateTimeOffset]::UtcNow.ToString('o')
     Save-ParsecRunState -RunState $runState | Out-Null
-
-    $executorState.actual_mode = $runState.actual_state
-    if ($runState.last_good_state) {
-        $executorState.last_good_mode = $runState.last_good_state
-    }
 
     $executorState.active_snapshot = $runState.active_snapshot
     $executorState.transition_phase = 'Idle'
@@ -1072,8 +1062,7 @@ function Invoke-ParsecRecipeInternal {
         transition_id = $runState.transition_id
         recipe_name = $Recipe.name
         terminal_status = $runState.terminal_status
-        actual_state = $runState.actual_state
-        last_good_state = $runState.last_good_state
+        event_type = $Recipe.event_type
         active_snapshot = $runState.active_snapshot
         transition_phase = $runState.transition_phase
         error_count = @($runState.errors).Count

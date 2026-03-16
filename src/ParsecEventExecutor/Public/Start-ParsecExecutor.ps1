@@ -2,7 +2,7 @@ function Start-ParsecExecutor {
     [CmdletBinding(SupportsShouldProcess)]
     param(
         [Parameter()]
-        [ValidateSet('SwitchToMobile', 'SwitchToDesktop', 'VerifyOnly', 'Reconcile')]
+        [ValidateSet('VerifyOnly', 'Reconcile')]
         [string] $EventName = 'VerifyOnly',
 
         [Parameter()]
@@ -14,14 +14,6 @@ function Start-ParsecExecutor {
     }
 
     switch ($EventName) {
-        'SwitchToMobile' {
-            $recipe = Get-ParsecRecipeDocument -NameOrPath 'enter-mobile'
-            return Invoke-ParsecRecipeInternal -Recipe $recipe -StateRoot $StateRoot
-        }
-        'SwitchToDesktop' {
-            $recipe = Get-ParsecRecipeDocument -NameOrPath 'return-desktop'
-            return Invoke-ParsecRecipeInternal -Recipe $recipe -StateRoot $StateRoot
-        }
         'VerifyOnly' {
             return [pscustomobject]@{
                 event_name = $EventName
@@ -33,9 +25,8 @@ function Start-ParsecExecutor {
             $state = Get-ParsecRecoveryStatus -StateRoot $StateRoot
             return [pscustomobject]@{
                 event_name = $EventName
-                desired_mode = $state.desired_mode
-                actual_mode = $state.actual_mode
-                last_good_mode = $state.last_good_mode
+                last_applied_recipe = $state.last_applied_recipe
+                last_event_type = $state.last_event_type
                 active_snapshot = $state.active_snapshot
                 issues = @($state.issues)
                 recoverable = [bool] $state.recoverable

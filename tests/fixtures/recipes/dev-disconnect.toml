@@ -1,0 +1,17 @@
+name = "dev-disconnect"
+description = "Dev fixture disconnect recipe. Restores the pre-connect snapshot."
+event_type = "disconnect"
+
+[[steps]]
+id = "restore-pre-connect-snapshot"
+ingredient = "display.snapshot"
+operation = "reset"
+depends_on = []
+verify = true
+compensation_policy = "none"
+retry_count = 0
+retry_delay_ms = 0
+allow_diagnostics = false
+
+[steps.arguments]
+snapshot_name = "pre-connect"

@@ -34,16 +34,20 @@ try {
         New-ParsecSessionTracker -DefaultGracePeriodMs $gracePeriod
     } $config.watcher.grace_period_ms
 
-    $recipes = @(Get-ParsecRecipe)
+    $fixtureDir = Join-Path $PSScriptRoot 'fixtures\recipes'
+    $recipes = @(
+        (Get-ParsecRecipe -NameOrPath (Join-Path $fixtureDir 'dev-connect.toml')),
+        (Get-ParsecRecipe -NameOrPath (Join-Path $fixtureDir 'dev-disconnect.toml'))
+    )
     $dispatcher = & (Get-Module ParsecEventExecutor) {
         param($stateRoot)
         New-ParsecWatcherDispatcher -StateRoot $stateRoot
     } $stateRoot
 
-    $currentMode = 'DESKTOP'
+    $lastRecipe = $null
+    $lastEventType = $null
 
     Write-Information "Loaded $($recipes.Count) recipes: $($recipes.name -join ', ')"
-    Write-Information "Initial mode: $currentMode"
     Write-Information ''
 
     # --- Phase 1: Connect event ---
@@ -65,12 +69,12 @@ try {
 
     if ($sessionResult.action -eq 'dispatch_connect') {
         $recipe = & (Get-Module ParsecEventExecutor) {
-            param($username, $currentMode, $recipes)
-            Find-ParsecMatchingRecipe -Username $username -CurrentMode $currentMode -EventType 'connect' -Recipes $recipes
-        } $parsed.username $currentMode $recipes
+            param($username, $recipes)
+            Find-ParsecMatchingRecipe -Username $username -EventType 'connect' -Recipes $recipes
+        } $parsed.username $recipes
 
         if ($recipe) {
-            Write-Information "Matched recipe: $($recipe.name) (target: $($recipe.target_mode))"
+            Write-Information "Matched recipe: $($recipe.name) (event_type: $($recipe.event_type))"
 
             $dispatchResult = & (Get-Module ParsecEventExecutor) {
                 param($dispatcher, $recipe, $username)
@@ -80,8 +84,9 @@ try {
             Write-Information "Dispatch: status=$($dispatchResult.status), terminal=$($dispatchResult.terminal_status)"
 
             if ($dispatchResult.status -eq 'Dispatched' -and $dispatchResult.terminal_status -in @('Succeeded', 'SucceededWithDrift', 'Compensated')) {
-                $currentMode = $recipe.target_mode
-                Write-Information "Mode changed: $currentMode"
+                $lastRecipe = $recipe.name
+                $lastEventType = 'connect'
+                Write-Information "Applied recipe: $lastRecipe"
             }
             else {
                 Write-Information "Dispatch did not succeed: $($dispatchResult.message)"
@@ -102,9 +107,9 @@ try {
     Write-Information "Parsed: event=$($parsed.event_type), user=$($parsed.username)"
 
     $disconnectRecipe = & (Get-Module ParsecEventExecutor) {
-        param($username, $currentMode, $recipes)
-        Find-ParsecMatchingRecipe -Username $username -CurrentMode $currentMode -EventType 'disconnect' -Recipes $recipes
-    } $parsed.username $currentMode $recipes
+        param($username, $recipes)
+        Find-ParsecMatchingRecipe -Username $username -EventType 'disconnect' -Recipes $recipes
+    } $parsed.username $recipes
 
     $gracePeriod = if ($disconnectRecipe) {
         & (Get-Module ParsecEventExecutor) {
@@ -140,8 +145,9 @@ try {
         Write-Information "Dispatch: status=$($dispatchResult.status), terminal=$($dispatchResult.terminal_status)"
 
         if ($dispatchResult.status -eq 'Dispatched' -and $dispatchResult.terminal_status -in @('Succeeded', 'SucceededWithDrift', 'Compensated')) {
-            $currentMode = $disconnectRecipe.target_mode
-            Write-Information "Mode restored: $currentMode"
+            $lastRecipe = $disconnectRecipe.name
+            $lastEventType = 'disconnect'
+            Write-Information "Applied recipe: $lastRecipe"
         }
     }
 
@@ -154,9 +160,10 @@ try {
         Get-ParsecExecutorStateDocument -StateRoot $stateRoot
     } $stateRoot
 
-    Write-Information "desired_mode:     $($executorState.desired_mode)"
-    Write-Information "transition_phase: $($executorState.transition_phase)"
-    Write-Information "active_snapshot:  $($executorState.active_snapshot)"
+    Write-Information "last_applied_recipe: $($executorState.last_applied_recipe)"
+    Write-Information "last_event_type:    $($executorState.last_event_type)"
+    Write-Information "transition_phase:   $($executorState.transition_phase)"
+    Write-Information "active_snapshot:    $($executorState.active_snapshot)"
 
     $runFiles = @(Get-ChildItem -Path (Join-Path $stateRoot 'runs') -Filter '*.json' -ErrorAction SilentlyContinue)
     $eventFiles = @(Get-ChildItem -Path (Join-Path $stateRoot 'events') -Filter '*.json' -ErrorAction SilentlyContinue)
@@ -164,12 +171,12 @@ try {
     Write-Information "Events recorded:  $($eventFiles.Count)"
 
     Write-Information ''
-    if ($currentMode -eq 'DESKTOP' -and $runFiles.Count -ge 2) {
+    if ($lastEventType -eq 'disconnect' -and $runFiles.Count -ge 2) {
         Write-Information '=== FULL PIPELINE TEST PASSED ==='
-        Write-Information 'Connect dispatched, mode changed to MOBILE, disconnect dispatched, mode restored to DESKTOP.'
+        Write-Information 'Connect dispatched, disconnect dispatched, pipeline complete.'
     }
     else {
-        Write-Information "=== TEST INCOMPLETE: mode=$currentMode, runs=$($runFiles.Count) ==="
+        Write-Information "=== TEST INCOMPLETE: lastEventType=$lastEventType, runs=$($runFiles.Count) ==="
     }
 }
 finally {

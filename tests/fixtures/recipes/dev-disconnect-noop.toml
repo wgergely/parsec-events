@@ -1,0 +1,14 @@
+name = "dev-disconnect-noop"
+description = "Dev test recipe for disconnect validation. Restores the test snapshot."
+event_type = "disconnect"
+
+[[steps]]
+id = "restore-test-snapshot"
+ingredient = "display.snapshot"
+operation = "reset"
+depends_on = []
+verify = false
+compensation_policy = "none"
+
+[steps.arguments]
+snapshot_name = "watcher-live-test"

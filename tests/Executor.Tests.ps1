@@ -299,7 +299,7 @@ arguments = ["/c", "exit", "7"]
             $result.step_results[0].status | Should -Be 'Succeeded'
             $result.step_results[1].status | Should -Be 'Succeeded'
             $result.step_results[2].status | Should -Be 'Succeeded'
-            $result.step_results[2].operation_result.Outputs.snapshot_name | Should -Be 'desktop-pre-parsec'
+            $result.step_results[2].operation_result.Outputs.snapshot_name | Should -Be 'pre-connect'
             $script:IngredientObservedState.monitors[0].bounds.width | Should -Be 1920
             $script:IngredientObservedState.monitors[0].bounds.height | Should -Be 1080
         }

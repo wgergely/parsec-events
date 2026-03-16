@@ -1,9 +1,9 @@
 name = "condition-skips"
-description = "Thin recipe runner fixture that skips a step when the mode condition does not match."
-target_mode = "DESKTOP"
+description = "Thin recipe runner fixture that skips a step when the event_type condition does not match."
+event_type = "disconnect"
 
 [[steps]]
-id = "skip-mobile-only-step"
+id = "skip-on-event-type-mismatch"
 ingredient = "set-resolution"
 operation = "apply"
 depends_on = []
@@ -14,7 +14,7 @@ retry_delay_ms = 0
 allow_diagnostics = false
 
 [steps.condition]
-mode_is = "MOBILE"
+event_type_is = "connect"
 
 [steps.arguments]
 width = 1280

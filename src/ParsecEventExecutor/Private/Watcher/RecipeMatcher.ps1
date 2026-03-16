@@ -6,9 +6,7 @@ function Find-ParsecMatchingRecipe {
         [string] $Username,
 
         [Parameter(Mandatory)]
-        [string] $CurrentMode,
-
-        [Parameter(Mandatory)]
+        [ValidateSet('connect', 'disconnect')]
         [string] $EventType,
 
         [Parameter(Mandatory)]
@@ -17,7 +15,7 @@ function Find-ParsecMatchingRecipe {
 
     $candidates = @()
     foreach ($recipe in $Recipes) {
-        if (-not (Test-ParsecRecipeMatchesEvent -Recipe $recipe -Username $Username -CurrentMode $CurrentMode -EventType $EventType)) {
+        if (-not (Test-ParsecRecipeMatchesEvent -Recipe $recipe -Username $Username -EventType $EventType)) {
             continue
         }
 
@@ -42,7 +40,6 @@ function Find-ParsecMatchingRecipe {
 }
 
 function Test-ParsecRecipeMatchesEvent {
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', 'EventType')]
     [CmdletBinding()]
     [OutputType([bool])]
     param(
@@ -53,37 +50,23 @@ function Test-ParsecRecipeMatchesEvent {
         [string] $Username,
 
         [Parameter(Mandatory)]
-        [string] $CurrentMode,
-
-        [Parameter(Mandatory)]
         [ValidateSet('connect', 'disconnect')]
         [string] $EventType
     )
 
+    # Username filter: if recipe specifies a username, it must match
     if ($Recipe.Contains('username') -and $Recipe.username) {
         if ($Recipe.username -ne $Username) {
             return $false
         }
     }
 
-    # A recipe's initial_mode must match the current system state.
-    # On connect: enter-mobile (initial_mode=DESKTOP) matches when system is DESKTOP.
-    # On disconnect: return-desktop (initial_mode=MOBILE) matches when system is MOBILE.
-    if (-not [string]::IsNullOrEmpty($Recipe.initial_mode) -and $Recipe.initial_mode -ne $CurrentMode) {
+    # Event type matching: recipe must declare event_type and it must match
+    if (-not $Recipe.Contains('event_type') -or [string]::IsNullOrEmpty($Recipe.event_type)) {
         return $false
     }
 
-    # The recipe must have a target_mode that differs from the current mode.
-    # This prevents no-op dispatches and ensures connect vs disconnect recipes
-    # don't match the wrong event type.
-    # - Connect from DESKTOP: enter-mobile (target=MOBILE != DESKTOP) matches
-    # - Disconnect from MOBILE: return-desktop (target=DESKTOP != MOBILE) matches
-    # - Connect from DESKTOP: return-desktop (target=DESKTOP == DESKTOP) does NOT match
-    if ([string]::IsNullOrEmpty($Recipe.target_mode)) {
-        return $false
-    }
-
-    if ($Recipe.target_mode -eq $CurrentMode) {
+    if ($Recipe.event_type -ne $EventType) {
         return $false
     }
 

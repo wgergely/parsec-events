@@ -2,11 +2,16 @@ $modulePath = Join-Path $PSScriptRoot '..\src\ParsecEventExecutor\ParsecEventExe
 Import-Module $modulePath -Force
 
 Describe 'Get-ParsecRecipe' {
-    It 'loads the placeholder mission recipes' {
-        $recipes = Get-ParsecRecipe
+    It 'loads the dev fixture recipes' {
+        $connectPath = Join-Path $PSScriptRoot 'fixtures\recipes\dev-connect.toml'
+        $disconnectPath = Join-Path $PSScriptRoot 'fixtures\recipes\dev-disconnect.toml'
+        $recipes = @(
+            (Get-ParsecRecipe -NameOrPath $connectPath),
+            (Get-ParsecRecipe -NameOrPath $disconnectPath)
+        )
 
-        $recipes.name | Should -Contain 'enter-mobile'
-        $recipes.name | Should -Contain 'return-desktop'
+        $recipes.name | Should -Contain 'dev-connect'
+        $recipes.name | Should -Contain 'dev-disconnect'
     }
 
     It 'parses TOML arrays and step arguments from a fixture recipe' {
@@ -14,8 +19,7 @@ Describe 'Get-ParsecRecipe' {
         $recipe = Get-ParsecRecipe -NameOrPath $recipePath
 
         $recipe.name | Should -Be 'command-success'
-        $recipe.initial_mode | Should -BeNullOrEmpty
-        $recipe.target_mode | Should -BeNullOrEmpty
+        $recipe.event_type | Should -BeNullOrEmpty
         $recipe.steps.Count | Should -Be 1
         $recipe.steps[0].operation | Should -Be 'apply'
         $recipe.steps[0].arguments.arguments.Count | Should -Be 3
@@ -37,8 +41,7 @@ Describe 'Get-ParsecRecipe' {
         $recipePath = Join-Path $PSScriptRoot 'fixtures\recipes\resolution-sequence.toml'
         $recipe = Get-ParsecRecipe -NameOrPath $recipePath
 
-        $recipe.initial_mode | Should -BeNullOrEmpty
-        $recipe.target_mode | Should -BeNullOrEmpty
+        $recipe.event_type | Should -BeNullOrEmpty
         $recipe.steps.Count | Should -Be 1
         $recipe.steps[0].ingredient | Should -Be 'set-resolution'
         $recipe.steps[0].arguments.width | Should -Be 1280
@@ -82,19 +85,21 @@ Describe 'Get-ParsecRecipe' {
         $recipe.steps[0].arguments.ui_scale_percent | Should -Be 125
     }
 
-    It 'parses the mission recipes as mobile preset and snapshot reset flows' {
-        $mobile = Get-ParsecRecipe -NameOrPath 'enter-mobile'
-        $desktop = Get-ParsecRecipe -NameOrPath 'return-desktop'
+    It 'parses the dev fixture recipes as connect preset and snapshot reset flows' {
+        $connectPath = Join-Path $PSScriptRoot 'fixtures\recipes\dev-connect.toml'
+        $disconnectPath = Join-Path $PSScriptRoot 'fixtures\recipes\dev-disconnect.toml'
+        $connect = Get-ParsecRecipe -NameOrPath $connectPath
+        $disconnect = Get-ParsecRecipe -NameOrPath $disconnectPath
 
-        $mobile.steps[0].ingredient | Should -Be 'display.snapshot'
-        $mobile.steps[0].operation | Should -Be 'capture'
-        $mobile.steps[1].ingredient | Should -Be 'display.ensure-resolution'
-        $mobile.steps[1].arguments.width | Should -Be 2000
-        $mobile.steps[1].arguments.height | Should -Be 3000
-        $mobile.steps[2].arguments.ui_scale_percent | Should -Be 300
-        $mobile.steps[3].arguments.text_scale_percent | Should -Be 125
-        $mobile.steps[4].arguments.mode | Should -Be 'Light'
-        $desktop.steps[0].ingredient | Should -Be 'display.snapshot'
-        $desktop.steps[0].operation | Should -Be 'reset'
+        $connect.steps[0].ingredient | Should -Be 'display.snapshot'
+        $connect.steps[0].operation | Should -Be 'capture'
+        $connect.steps[1].ingredient | Should -Be 'display.ensure-resolution'
+        $connect.steps[1].arguments.width | Should -Be 2000
+        $connect.steps[1].arguments.height | Should -Be 3000
+        $connect.steps[2].arguments.ui_scale_percent | Should -Be 300
+        $connect.steps[3].arguments.text_scale_percent | Should -Be 125
+        $connect.steps[4].arguments.mode | Should -Be 'Light'
+        $disconnect.steps[0].ingredient | Should -Be 'display.snapshot'
+        $disconnect.steps[0].operation | Should -Be 'reset'
     }
 }

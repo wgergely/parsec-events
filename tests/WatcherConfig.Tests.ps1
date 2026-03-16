@@ -126,56 +126,52 @@ connect = '[\invalid'
 
     Describe 'Find-ParsecMatchingRecipe' {
         BeforeAll {
-            $script:mobileRecipe = [ordered]@{
-                name = 'enter-mobile'
-                initial_mode = 'DESKTOP'
-                target_mode = 'MOBILE'
+            $script:connectRecipe = [ordered]@{
+                name = 'dev-connect'
+                event_type = 'connect'
                 username = $null
                 grace_period_ms = $null
             }
 
-            $script:desktopRecipe = [ordered]@{
-                name = 'return-desktop'
-                initial_mode = 'MOBILE'
-                target_mode = 'DESKTOP'
+            $script:disconnectRecipe = [ordered]@{
+                name = 'dev-disconnect'
+                event_type = 'disconnect'
                 username = $null
                 grace_period_ms = $null
             }
 
             $script:phoneOnlyRecipe = [ordered]@{
-                name = 'enter-mobile-phone'
-                initial_mode = 'DESKTOP'
-                target_mode = 'MOBILE'
+                name = 'dev-connect-phone'
+                event_type = 'connect'
                 username = 'phone#1234'
                 grace_period_ms = 5000
             }
 
             $script:laptopRecipe = [ordered]@{
                 name = 'enter-laptop'
-                initial_mode = 'DESKTOP'
-                target_mode = 'MOBILE'
+                event_type = 'connect'
                 username = 'laptop#5678'
                 grace_period_ms = 30000
             }
         }
 
         Context 'with unfiltered recipes (no username)' {
-            It 'matches the connect recipe when in DESKTOP mode' {
-                $result = Find-ParsecMatchingRecipe -Username 'anyone#9999' -CurrentMode 'DESKTOP' -EventType 'connect' -Recipes @($mobileRecipe, $desktopRecipe)
+            It 'matches the connect recipe for a connect event' {
+                $result = Find-ParsecMatchingRecipe -Username 'anyone#9999' -EventType 'connect' -Recipes @($connectRecipe, $disconnectRecipe)
 
                 $result | Should -Not -BeNullOrEmpty
-                $result.name | Should -Be 'enter-mobile'
+                $result.name | Should -Be 'dev-connect'
             }
 
-            It 'matches the disconnect recipe when in MOBILE mode' {
-                $result = Find-ParsecMatchingRecipe -Username 'anyone#9999' -CurrentMode 'MOBILE' -EventType 'disconnect' -Recipes @($mobileRecipe, $desktopRecipe)
+            It 'matches the disconnect recipe for a disconnect event' {
+                $result = Find-ParsecMatchingRecipe -Username 'anyone#9999' -EventType 'disconnect' -Recipes @($connectRecipe, $disconnectRecipe)
 
                 $result | Should -Not -BeNullOrEmpty
-                $result.name | Should -Be 'return-desktop'
+                $result.name | Should -Be 'dev-disconnect'
             }
 
-            It 'returns null when no recipe matches the current mode' {
-                $result = Find-ParsecMatchingRecipe -Username 'anyone#9999' -CurrentMode 'MOBILE' -EventType 'connect' -Recipes @($mobileRecipe)
+            It 'returns null when no recipe matches the event type' {
+                $result = Find-ParsecMatchingRecipe -Username 'anyone#9999' -EventType 'disconnect' -Recipes @($connectRecipe)
 
                 $result | Should -BeNullOrEmpty
             }
@@ -183,21 +179,21 @@ connect = '[\invalid'
 
         Context 'with username-filtered recipes' {
             It 'matches the phone recipe for the phone user' {
-                $result = Find-ParsecMatchingRecipe -Username 'phone#1234' -CurrentMode 'DESKTOP' -EventType 'connect' -Recipes @($phoneOnlyRecipe, $laptopRecipe)
+                $result = Find-ParsecMatchingRecipe -Username 'phone#1234' -EventType 'connect' -Recipes @($phoneOnlyRecipe, $laptopRecipe)
 
                 $result | Should -Not -BeNullOrEmpty
-                $result.name | Should -Be 'enter-mobile-phone'
+                $result.name | Should -Be 'dev-connect-phone'
             }
 
             It 'matches the laptop recipe for the laptop user' {
-                $result = Find-ParsecMatchingRecipe -Username 'laptop#5678' -CurrentMode 'DESKTOP' -EventType 'connect' -Recipes @($phoneOnlyRecipe, $laptopRecipe)
+                $result = Find-ParsecMatchingRecipe -Username 'laptop#5678' -EventType 'connect' -Recipes @($phoneOnlyRecipe, $laptopRecipe)
 
                 $result | Should -Not -BeNullOrEmpty
                 $result.name | Should -Be 'enter-laptop'
             }
 
             It 'returns null for an unrecognized user when all recipes have username filters' {
-                $result = Find-ParsecMatchingRecipe -Username 'unknown#0000' -CurrentMode 'DESKTOP' -EventType 'connect' -Recipes @($phoneOnlyRecipe, $laptopRecipe)
+                $result = Find-ParsecMatchingRecipe -Username 'unknown#0000' -EventType 'connect' -Recipes @($phoneOnlyRecipe, $laptopRecipe)
 
                 $result | Should -BeNullOrEmpty
             }
@@ -205,30 +201,30 @@ connect = '[\invalid'
 
         Context 'with mixed filtered and unfiltered recipes' {
             It 'prefers a username-specific recipe over an unfiltered one' {
-                $result = Find-ParsecMatchingRecipe -Username 'phone#1234' -CurrentMode 'DESKTOP' -EventType 'connect' -Recipes @($mobileRecipe, $phoneOnlyRecipe)
+                $result = Find-ParsecMatchingRecipe -Username 'phone#1234' -EventType 'connect' -Recipes @($connectRecipe, $phoneOnlyRecipe)
 
                 $result | Should -Not -BeNullOrEmpty
-                $result.name | Should -Be 'enter-mobile-phone'
+                $result.name | Should -Be 'dev-connect-phone'
             }
 
             It 'falls back to unfiltered recipe for unknown users' {
-                $result = Find-ParsecMatchingRecipe -Username 'unknown#0000' -CurrentMode 'DESKTOP' -EventType 'connect' -Recipes @($mobileRecipe, $phoneOnlyRecipe)
+                $result = Find-ParsecMatchingRecipe -Username 'unknown#0000' -EventType 'connect' -Recipes @($connectRecipe, $phoneOnlyRecipe)
 
                 $result | Should -Not -BeNullOrEmpty
-                $result.name | Should -Be 'enter-mobile'
+                $result.name | Should -Be 'dev-connect'
             }
         }
 
         Context 'disconnect event matching' {
-            It 'matches disconnect recipe when current mode equals recipe initial_mode' {
-                $result = Find-ParsecMatchingRecipe -Username 'anyone#9999' -CurrentMode 'MOBILE' -EventType 'disconnect' -Recipes @($mobileRecipe, $desktopRecipe)
+            It 'matches disconnect recipe when event type is disconnect' {
+                $result = Find-ParsecMatchingRecipe -Username 'anyone#9999' -EventType 'disconnect' -Recipes @($connectRecipe, $disconnectRecipe)
 
                 $result | Should -Not -BeNullOrEmpty
-                $result.name | Should -Be 'return-desktop'
+                $result.name | Should -Be 'dev-disconnect'
             }
 
-            It 'returns null when no recipe initial_mode matches current mode for disconnect' {
-                $result = Find-ParsecMatchingRecipe -Username 'anyone#9999' -CurrentMode 'DESKTOP' -EventType 'disconnect' -Recipes @($desktopRecipe)
+            It 'returns null when no recipe matches disconnect event type' {
+                $result = Find-ParsecMatchingRecipe -Username 'anyone#9999' -EventType 'disconnect' -Recipes @($connectRecipe)
 
                 $result | Should -BeNullOrEmpty
             }
@@ -262,8 +258,7 @@ Describe 'Recipe schema extension' {
             $recipeContent = @'
 name = "test-username-recipe"
 description = "Recipe with username filter"
-initial_mode = "DESKTOP"
-target_mode = "MOBILE"
+event_type = "connect"
 username = "phone#1234"
 grace_period_ms = 5000
 
@@ -282,8 +277,7 @@ snapshot_name = "test"
 
             $recipe.username | Should -Be 'phone#1234'
             $recipe.grace_period_ms | Should -Be 5000
-            $recipe.initial_mode | Should -Be 'DESKTOP'
-            $recipe.target_mode | Should -Be 'MOBILE'
+            $recipe.event_type | Should -Be 'connect'
         }
         finally {
             Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -291,7 +285,8 @@ snapshot_name = "test"
     }
 
     It 'returns null for username and grace_period_ms when not specified in TOML' {
-        $recipe = Get-ParsecRecipe -NameOrPath 'enter-mobile'
+        $connectPath = Join-Path $PSScriptRoot 'fixtures\recipes\dev-connect.toml'
+        $recipe = Get-ParsecRecipe -NameOrPath $connectPath
 
         $recipe.username | Should -BeNullOrEmpty
         $recipe.grace_period_ms | Should -BeNullOrEmpty
