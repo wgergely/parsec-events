@@ -1,4 +1,4 @@
-function Get-ParsecDisplayDomainObservedState {
+﻿function Get-ParsecDisplayDomainObservedState {
     [CmdletBinding()]
     [OutputType([hashtable])]
     param()
@@ -1252,13 +1252,27 @@ function Invoke-ParsecDisplayDomainResetScaling {
     )
 
     $capturedState = if ($Arguments.Contains('captured_state') -and $Arguments.captured_state -is [System.Collections.IDictionary]) { ConvertTo-ParsecPlainObject -InputObject $Arguments.captured_state } elseif ($null -ne $ExecutionResult -and $ExecutionResult.Outputs.captured_state) { ConvertTo-ParsecPlainObject -InputObject $ExecutionResult.Outputs.captured_state } else { $null }
-    if ($null -ne $capturedState -and $capturedState.Contains('text_scale_percent')) {
-        return Invoke-ParsecDisplayAdapter -Method 'SetScaling' -Arguments @{ text_scale_percent = [int] $capturedState.text_scale_percent }
+    if ($null -eq $capturedState) {
+        return New-ParsecResult -Status 'Failed' -Message 'Captured scaling state is not available.' -Errors @('MissingCapturedState')
     }
-    if ($null -ne $capturedState -and $capturedState.Contains('ui_scale_percent')) {
-        return Invoke-ParsecDisplayAdapter -Method 'SetScaling' -Arguments @{ ui_scale_percent = [int] $capturedState.ui_scale_percent }
+
+    # Build reset arguments from captured state — include both text and UI scale
+    # so the adapter applies them sequentially when both are present
+    $resetArgs = @{}
+    if ($capturedState.Contains('text_scale_percent')) {
+        $resetArgs['text_scale_percent'] = [int] $capturedState.text_scale_percent
     }
-    return New-ParsecResult -Status 'Failed' -Message 'Captured scaling state does not include a resettable text scaling value.' -Errors @('CapabilityUnavailable')
+    if ($capturedState.Contains('ui_scale_percent')) {
+        $resetArgs['ui_scale_percent'] = [int] $capturedState.ui_scale_percent
+    }
+    if ($capturedState.Contains('device_name')) {
+        $resetArgs['device_name'] = [string] $capturedState.device_name
+    }
+    if ($resetArgs.Count -eq 0) {
+        return New-ParsecResult -Status 'Failed' -Message 'Captured scaling state does not include a resettable scaling value.' -Errors @('MissingCapturedState')
+    }
+
+    return Invoke-ParsecDisplayAdapter -Method 'SetScaling' -Arguments $resetArgs
 }
 
 function Resolve-ParsecDisplayDomainUiScaleExpectedValue {

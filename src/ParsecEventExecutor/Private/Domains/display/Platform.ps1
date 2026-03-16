@@ -1051,19 +1051,28 @@ function Initialize-ParsecDisplayAdapter {
         }
         SetScaling = {
             param([hashtable] $Arguments)
-            if ($Arguments.ContainsKey('text_scale_percent') -or ($Arguments.ContainsKey('value') -and -not $Arguments.ContainsKey('device_name'))) {
-                if ($Arguments.ContainsKey('text_scale_percent')) {
-                    return Invoke-ParsecPersonalizationAdapter -Method 'SetTextScale' -Arguments $Arguments
+            $hasTextScale = $Arguments.ContainsKey('text_scale_percent')
+            $hasUiScale = $Arguments.ContainsKey('ui_scale_percent') -or $Arguments.ContainsKey('scale_percent')
+
+            # Composite: apply both text scale and UI scale sequentially
+            if ($hasTextScale -and $hasUiScale) {
+                $textResult = Invoke-ParsecPersonalizationAdapter -Method 'SetTextScale' -Arguments $Arguments
+                if ($textResult.Status -ne 'Succeeded') {
+                    return $textResult
                 }
 
-                if ($Arguments.ContainsKey('ui_scale_percent') -or $Arguments.ContainsKey('scale_percent') -or ($Arguments.ContainsKey('value') -and -not $Arguments.ContainsKey('text_scale_percent'))) {
-                    return Set-ParsecUiScaleStateInternal -Arguments $Arguments
-                }
+                return Set-ParsecUiScaleStateInternal -Arguments $Arguments
+            }
 
+            if ($hasTextScale) {
                 return Invoke-ParsecPersonalizationAdapter -Method 'SetTextScale' -Arguments $Arguments
             }
 
-            return New-ParsecResult -Status 'Failed' -Message 'Per-monitor UI scaling changes require a concrete backend implementation.' -Requested $Arguments -Errors @('CapabilityUnavailable')
+            if ($hasUiScale -or ($Arguments.ContainsKey('value') -and -not $Arguments.ContainsKey('device_name'))) {
+                return Set-ParsecUiScaleStateInternal -Arguments $Arguments
+            }
+
+            return New-ParsecResult -Status 'Failed' -Message 'Scaling apply requires text_scale_percent or ui_scale_percent.' -Requested $Arguments -Errors @('MissingArgument')
         }
     } | Out-Null
 }
