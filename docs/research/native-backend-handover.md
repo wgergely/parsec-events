@@ -1,21 +1,92 @@
 # Native C# Backend — Handover Document
 
-## Problem Statement
+## Status: Phase 1 Complete (PR #4)
 
-The PowerShell ingredient framework contains ~1000 lines of inline C# embedded as string literals in `Add-Type -TypeDefinition` blocks. This code has no compile-time checking, no IDE support, and no independent tests. Additionally, the `display.set-textscale` ingredient cannot reliably trigger UI re-renders because the proper Windows API (`UISettingsController.SetTextScaleFactor`) requires a restricted capability only available to packaged (MSIX) apps.
+Phases 1, 3, and 5 from the original migration plan are **done**. All inline C# has been extracted into a compiled class library DLL. The remaining work is Phase 2 (UISettingsController text scale via MSIX) and integrating the existing window management methods into ingredients.
 
-## Research Findings
+## What Was Built
 
-### Text Scale API
+### Compiled Class Library: `src/ParsecEventExecutor.Native/`
 
-The official API for setting text scale is `Windows.UI.ViewManagement.Core.UISettingsController`:
-- **Class:** `UISettingsController` in `Windows.UI.ViewManagement.Core`
-- **Method:** `SetTextScaleFactor(double value)` where value is 1.0–2.25 (representing 100%–225%)
-- **Availability:** Windows 10 version 2004+ (10.0.19041.0), UniversalApiContract v10.0
-- **Obtain instance:** `UISettingsController.RequestDefaultAsync()`
-- **Restricted capability required:** `iot:systemManagement` in the app manifest
+A `net9.0-windows` class library replacing ~870 lines of inline `Add-Type -TypeDefinition` C# from three PowerShell files. The DLL is loaded via `RequiredAssemblies` in the module manifest — all 42+ PowerShell call sites are unchanged.
 
-The Windows Settings app (`SystemSettings.exe`) is a packaged UWP app that uses this API internally. It fires the full WinRT notification chain including `UISettings.TextScaleFactorChanged`, which is what UWP/WinUI apps listen for. Direct registry writes (`HKCU:\SOFTWARE\Microsoft\Accessibility\TextScaleFactor`) + `WM_SETTINGCHANGE` broadcast do NOT trigger the WinRT event.
+```
+src/ParsecEventExecutor.Native/
+├── ParsecEventExecutor.Native.csproj     # net9.0-windows, x64
+├── Display/
+│   ├── DisplayNative.cs                  # CCD, resolution, orientation, DPI, window management, wallpaper
+│   ├── MonitorCapture.cs                 # Monitor enumeration data class
+│   ├── DisplayPathCapture.cs             # CCD path data class
+│   ├── DisplayModeCapture.cs             # Display mode data class
+│   ├── WindowCapture.cs                  # Window enumeration data class
+│   └── IVirtualDesktopManager.cs         # COM interface for virtual desktop queries
+├── Personalization/
+│   └── PersonalizationNative.cs          # WM_SETTINGCHANGE broadcast via SendMessageTimeout
+└── Nvidia/
+    ├── NvidiaApiNative.cs                # NVAPI dynamic loading, custom resolution management
+    └── NvidiaCustomDisplayRecord.cs      # Custom resolution data class
+```
+
+### Build Tooling
+
+- `tools/Build-NativeLibrary.ps1` — builds the project and copies DLL to the module directory
+- Pre-commit hook (`tools/Invoke-PreCommitChecks.ps1`) — rebuilds DLL before every commit
+- `.gitignore` excludes built DLL and build artifacts — always build from source
+
+### PowerShell Changes
+
+The three `Initialize-*Interop` functions that contained `Add-Type -TypeDefinition` blocks are now guard-only functions that throw if the DLL type isn't loaded:
+
+- `display/Platform.ps1` — removed ~1180 lines of inline C# (DisplayNative class)
+- `personalization/Platform.ps1` — removed ~30 lines of inline C# (PersonalizationNative class)
+- `NvidiaInterop.ps1` — removed ~330 lines of inline C# (NvidiaApiNative class)
+
+Module manifest (`ParsecEventExecutor.psd1`) updated:
+- `RequiredAssemblies = @('ParsecEventExecutor.Native.dll')`
+- `PowerShellVersion = '7.5'` (requires .NET 9 runtime)
+
+### Parsec Compatibility Fix
+
+`StepAltTab` and `ActivateWindow` were rewritten to work under Parsec remote sessions:
+- Old: `SendInput` to synthesize Alt+Tab keystrokes — blocked by UIPI in remote sessions
+- New: Window enumeration + `AttachThreadInput` + `SetForegroundWindow` — works under Parsec
+- `StepAltTab` now respects virtual desktops and `WS_EX_APPWINDOW` style
+- `ActivateWindow` now honors `restoreIfMinimized` parameter via `ShowWindow(SW_RESTORE)`
+
+## Live Verification Results
+
+All APIs verified on NVIDIA RTX 4080 Super, Windows 11, ASUS PA278CV monitor, connected via Parsec.
+
+### Read-only APIs — all pass
+- DisplayNative: GetCurrentMonitors, GetDisplayModes (111 modes), GetDeviceMode (3000x2000@60Hz), GetDpiScaleForDevice (175%), GetPrimaryDpiScale, GetDesktopWallpaperPath, CreatePositionOnlyDevMode, GetDisplayConfigPaths (288 paths), GetForegroundWindowCapture, GetTopLevelWindows
+- PersonalizationNative: BroadcastSettingChange (6 area variants)
+- NvidiaApiNative: EnsureInitialized, GetDisplayIdByDisplayName, EnumCustomDisplays (6 custom resolutions)
+
+### Mutating APIs — all pass with capture/apply/reset
+- Resolution: 3000x2000 → 1920x1080 → 3000x2000
+- Orientation: Landscape → Portrait → Landscape
+- UI Scale/DPI: 175% → 150% → 175%
+- Wallpaper: original → empty → original
+- Window activation: ActivateWindow works, StepAltTab works
+- NVIDIA: TryAndSaveCustomDisplay added 1600x900@60Hz (no delete API — by design)
+
+### Known Limitation
+- `StepAltTab` cycles between windows using Z-order enumeration, not the OS MRU list. Some windows (e.g., Parsec's framerate window) can interfere with focus. Not a blocker — `ActivateWindow` with a specific handle is reliable.
+
+## Remaining Work
+
+### Phase 2: UISettingsController Text Scale (NEW CAPABILITY)
+
+The `display.set-textscale` ingredient currently uses registry writes + `WM_SETTINGCHANGE` broadcast, which does not trigger the WinRT `TextScaleFactorChanged` event that UWP/WinUI apps listen for. The proper API is `UISettingsController.SetTextScaleFactor()`.
+
+**Requirements:**
+- `UISettingsController` class in `Windows.UI.ViewManagement.Core`
+- Method: `SetTextScaleFactor(double value)` where value is 1.0–2.25 (100%–225%)
+- Obtain instance: `UISettingsController.RequestDefaultAsync()`
+- **Restricted capability:** `iot:systemManagement` in an MSIX manifest
+- Availability: Windows 10 version 2004+ (10.0.19041.0), UniversalApiContract v10.0
+
+**Architecture decision:** This requires MSIX packaging, which the class library DLL cannot provide. Build a separate small CLI executable (`src/ParsecEventExecutor.TextScale/`) that PowerShell calls as a subprocess for text scale operations only. All other APIs stay in the class library.
 
 **References:**
 - [UISettingsController Class](https://learn.microsoft.com/en-us/uwp/api/windows.ui.viewmanagement.core.uisettingscontroller?view=winrt-26100)
@@ -24,100 +95,42 @@ The Windows Settings app (`SystemSettings.exe`) is a packaged UWP app that uses 
 - [Raymond Chen: reading text scale factor](https://devblogs.microsoft.com/oldnewthing/20230830-00/?p=108680)
 - [App capability declarations](https://learn.microsoft.com/en-us/windows/uwp/packaging/app-capability-declarations)
 
-### Current Inline C# Inventory
-
-| Location | Lines | Purpose |
-|----------|-------|---------|
-| `Domains/display/Platform.ps1` | ~500 | Display configuration (CCD), resolution, orientation, DPI, window enumeration, SendInput, virtual desktop COM |
-| `Domains/personalization/Platform.ps1` | ~30 | `SendMessageTimeout` for `WM_SETTINGCHANGE` broadcast |
-| `NvidiaInterop.ps1` | ~340 | NVAPI P/Invoke (nvapi64.dll dynamic loading, custom resolution management) |
-
-### APIs That Should Migrate
-
-| API | Current Approach | C# Backend Approach |
-|-----|-----------------|---------------------|
-| Text scale set | Registry + broadcast (unreliable) | `UISettingsController.SetTextScaleFactor()` |
-| Display config | Inline C# `Add-Type` | Compiled assembly with type safety |
-| NVIDIA interop | Inline C# `Add-Type` | Compiled assembly with proper struct marshalling |
-| Window enum | Inline C# `Add-Type` | Compiled assembly |
-| WM_SETTINGCHANGE | Inline C# `Add-Type` | Compiled assembly |
-
-### APIs Fine to Leave in PowerShell
-
-| API | Reason |
-|-----|--------|
-| Sound (WMI/CIM) | Pure PowerShell cmdlets |
-| Process/Service lifecycle | Native `Start-Process`, `Get-Service` |
-| Command invoke | `Start-Process` |
-| Theme state | Registry is the documented method; no better API exists |
-
-## Proposed Architecture
-
-### Project: `src/ParsecEventExecutor.Native/`
-
-```
-src/ParsecEventExecutor.Native/
-├── ParsecEventExecutor.Native.csproj   # net8.0-windows10.0.19041.0
-├── Program.cs                          # CLI entry point
-├── Display/
-│   ├── DisplayNative.cs                # CCD, EnumDisplaySettings, ChangeDisplaySettingsEx
-│   ├── MonitorInfo.cs                  # Monitor enumeration, DPI queries
-│   └── WindowManager.cs               # Window enum, activation, SendInput
-├── Personalization/
-│   ├── TextScale.cs                    # UISettingsController.SetTextScaleFactor
-│   └── Broadcast.cs                    # WM_SETTINGCHANGE broadcasting
-├── Nvidia/
-│   └── NvApi.cs                        # NVAPI P/Invoke wrapper
-└── Package.appxmanifest                # MSIX manifest with systemManagement capability
-```
-
-### CLI Interface
-
-PowerShell calls the compiled binary as a subprocess:
-
-```
-ParsecEventExecutor.Native.exe set-text-scale --value 125
-ParsecEventExecutor.Native.exe get-text-scale
-ParsecEventExecutor.Native.exe set-primary --device \\.\DISPLAY1
-ParsecEventExecutor.Native.exe get-displays
-```
-
-JSON output on stdout, exit code for success/failure. This keeps the PowerShell ingredient framework as the orchestrator while the C# binary handles all Win32/WinRT interop.
-
-### MSIX Packaging
-
-Required for `UISettingsController` restricted capability:
-- `Package.appxmanifest` declares `iot:systemManagement` capability
-- Build with `dotnet publish` + MSIX packaging tools
-- Self-signed certificate for development, proper signing for distribution
-- The binary runs unpackaged for all APIs except text scale; MSIX is only needed for the restricted capability path
-
-### Migration Strategy
-
-1. **Phase 1:** Create the C# project, migrate display interop (`DisplayNative` class) — this is the largest block and already C#
-2. **Phase 2:** Add `UISettingsController` text scale support with MSIX packaging
-3. **Phase 3:** Migrate NVIDIA interop
-4. **Phase 4:** Migrate window management, broadcast
-5. **Phase 5:** Remove all `Add-Type -TypeDefinition` blocks from PowerShell, update adapters to call the compiled binary
-
-### PowerShell Integration
-
-The existing adapter pattern (`Invoke-ParsecDisplayAdapter`, `Invoke-ParsecPersonalizationAdapter`) already abstracts the backend. The migration replaces the adapter implementations — ingredient code doesn't change.
-
-## Blocked Ingredients
-
-The following ingredients are blocked on the native backend for full live verification:
-
+**Blocked ingredients:**
 - `display.set-textscale` — broadcast-only path doesn't trigger WinRT event
 - `display.set-uiscale` — depends on reliable text scale for composite scaling
 - `display.set-scaling` — composite ingredient wrapping text + UI scale
 
-## Current PR Status
+### Window Management Ingredients (Phase 4 from original plan)
 
-PR #2 (`feature/shared-state`) delivers the ingredient architecture and is ready to merge. The native backend should be a new PR (`feature/native-backend`) branched from main after merge.
+The DLL already contains compiled window management methods that are not yet wired to any ingredient:
 
-## Session Reference
+| Method | Purpose | Status |
+|--------|---------|--------|
+| `GetTopLevelWindows()` | Enumerate all windows with process/title/style info | Compiled, live-verified |
+| `GetForegroundWindowCapture()` | Capture foreground window details | Compiled, live-verified |
+| `StepAltTab()` | Cycle to next alt-tab-eligible window | Compiled, live-verified, Parsec-compatible |
+| `ActivateWindow(handle, restore)` | Activate a specific window by handle | Compiled, live-verified |
 
-- Conversation ID: `3acd1e99-972b-4384-9c48-ce2d53daa8fe`
-- Audit doc: `docs/audit/2026-03-15-ingredient-live-test-audit.md`
-- Previous audit: `docs/audit/2026-03-14-live-integration-test-audit.md`
+These are ready to be wired into ingredients when the use case is defined (e.g., a `window.activate` or `window.focus` ingredient).
+
+## Migration Phase Summary
+
+| Phase | Scope | Status |
+|-------|-------|--------|
+| 1 | Display interop (DisplayNative) | **Done** — PR #4 |
+| 2 | UISettingsController text scale with MSIX | **Not started** |
+| 3 | NVIDIA interop (NvidiaApiNative) | **Done** — PR #4 |
+| 4 | Window management ingredients | **DLL ready**, ingredients not yet created |
+| 5 | Remove all Add-Type blocks | **Done** — PR #4 |
+
+## Dev Environment
+
+- .NET SDK 9.0.312 (already installed, no additional setup needed)
+- PowerShell 7.5.4 on .NET 9.0.10
+- Build: `pwsh tools/Build-NativeLibrary.ps1`
+- Test: `Invoke-Pester -Path tests/` (106 tests, all pass)
+
+## PR History
+
+- PR #2 (`feature/shared-state`) — ingredient architecture (merged)
+- PR #4 (`feature/win-api`) — compiled C# native backend (this work)

@@ -1,22 +1,38 @@
-You are continuing work on the parsec-events project. Your task is to create a compiled C# native backend binary that replaces ~1000 lines of inline C# currently embedded as string literals inside PowerShell `Add-Type -TypeDefinition` blocks, and adds proper Windows API access for text scaling via `UISettingsController.SetTextScaleFactor`.
+You are continuing work on the parsec-events project. The compiled C# native backend (Phase 1/3/5) is complete — all inline `Add-Type -TypeDefinition` C# has been extracted into `ParsecEventExecutor.Native.dll`, live-verified on NVIDIA RTX 4080 Super via Parsec, and shipped in PR #4 on branch `feature/win-api`.
 
 Read these documents before starting any work:
 
-1. `docs/research/native-backend-handover.md` — full research findings, proposed architecture, migration strategy, and API references
-2. `docs/audit/2026-03-15-ingredient-live-test-audit.md` — current ingredient verification status and testing flow
+1. `docs/research/native-backend-handover.md` — full status, what was built, what remains, architecture decisions, and live verification results
+2. `docs/audit/2026-03-15-ingredient-live-test-audit.md` — ingredient verification status and testing flow
 3. `docs/audit/2026-03-14-live-integration-test-audit.md` — previous live test session with defect history
-4. `.claude/CLAUDE.md` — project conventions and constraints
 
-The inline C# that needs migrating lives in three files:
+## What Is Done
 
-- `src/ParsecEventExecutor/Private/Domains/display/Platform.ps1` — ~500 lines: display configuration (CCD QueryDisplayConfig, ChangeDisplaySettingsEx, EnumDisplaySettings), monitor enumeration, DPI queries, window enumeration/activation, SendInput, IVirtualDesktopManager COM, wallpaper via SystemParametersInfo
-- `src/ParsecEventExecutor/Private/Domains/personalization/Platform.ps1` — ~30 lines: SendMessageTimeout for WM_SETTINGCHANGE broadcast
-- `src/ParsecEventExecutor/Private/NvidiaInterop.ps1` — ~340 lines: NVAPI P/Invoke via nvapi64.dll dynamic loading, custom resolution structs and marshalling
+- `src/ParsecEventExecutor.Native/` — compiled `net9.0-windows` class library (9 source files) containing `DisplayNative`, `PersonalizationNative`, and `NvidiaApiNative` classes
+- All ~870 lines of inline C# removed from PowerShell; module loads DLL via `RequiredAssemblies`
+- `StepAltTab`/`ActivateWindow` rewritten for Parsec UIPI compatibility (AttachThreadInput instead of SendInput)
+- `tools/Build-NativeLibrary.ps1` build script with pre-commit integration
+- All 42+ PowerShell call sites unchanged; 106 Pester tests pass
+- All APIs live-verified with capture→apply→reset on production hardware
 
-Create a new C# project at `src/ParsecEventExecutor.Native/` targeting `net8.0-windows10.0.19041.0`. The binary should expose a CLI interface that PowerShell calls as a subprocess — JSON output on stdout, structured error on stderr, exit code for success/failure. The existing PowerShell adapter pattern (`Invoke-ParsecDisplayAdapter`, `Invoke-ParsecPersonalizationAdapter`) already abstracts the backend, so ingredient code should not need changes — only the adapter implementations that call into the native binary.
+## What Remains
 
-The critical new capability is `UISettingsController.SetTextScaleFactor()` from `Windows.UI.ViewManagement.Core`, which requires the `iot:systemManagement` restricted capability declared in an MSIX manifest. This is the only proper way to set text scaling — the current registry write + WM_SETTINGCHANGE broadcast approach does not trigger the WinRT `TextScaleFactorChanged` event that UWP/WinUI apps listen for. Research and API references are in the handover doc.
+### Priority 1: UISettingsController Text Scale (Phase 2)
 
-Migration phases from the handover doc: (1) display interop, (2) text scale with MSIX, (3) NVIDIA interop, (4) window management and broadcast, (5) remove all Add-Type blocks from PowerShell. Ground each phase in Microsoft developer documentation before implementing. Run `Invoke-Pester -Path tests/` after each phase to verify no regressions — current baseline is 106 tests passing.
+The `display.set-textscale` ingredient currently uses registry writes + `WM_SETTINGCHANGE` broadcast which does not trigger the WinRT `TextScaleFactorChanged` event. The proper API is `UISettingsController.SetTextScaleFactor()` from `Windows.UI.ViewManagement.Core`, which requires the `iot:systemManagement` restricted capability declared in an MSIX manifest.
 
-Branch from main after PR #2 merges. Target branch name: `feature/native-backend`.
+This needs a separate MSIX-packaged CLI executable (`src/ParsecEventExecutor.TextScale/`) that PowerShell calls as a subprocess for text scale set/get operations. The existing class library DLL cannot use this API because restricted capabilities require MSIX packaging. The `Set-ParsecTextScaleStateInternal` function in `personalization/Platform.ps1` would call this CLI instead of doing the registry write + broadcast double-apply workaround.
+
+API references are in the handover doc. Blocked ingredients: `display.set-textscale`, `display.set-uiscale`, `display.set-scaling`.
+
+### Priority 2: Window Management Ingredients (Phase 4)
+
+The DLL already contains compiled and live-verified window management methods (`GetTopLevelWindows`, `GetForegroundWindowCapture`, `StepAltTab`, `ActivateWindow`) that are not yet wired to any ingredient. Create ingredients when use cases are defined.
+
+## Constraints
+
+- PowerShell 7.5+ required (net9.0-windows DLL)
+- Build before testing: `pwsh tools/Build-NativeLibrary.ps1`
+- Test baseline: `Invoke-Pester -Path tests/` — 106 tests passing
+- Branch: `feature/win-api`, PR #4
+- System: NVIDIA RTX 4080 Super, Windows 11, ASUS PA278CV via DisplayPort, Parsec virtual display adapter present
