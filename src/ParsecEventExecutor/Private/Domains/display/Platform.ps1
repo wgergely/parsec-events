@@ -342,8 +342,6 @@ function Set-ParsecDisplayEnabledInternal {
     $deviceName = Resolve-ParsecDisplayTargetDeviceName -Arguments $Arguments
     $enable = [bool] $Arguments.enabled
 
-    $mode = Get-ParsecNativeDeviceMode -DeviceName $deviceName
-
     if ($enable) {
         $bounds = if ($Arguments.ContainsKey('bounds') -and $Arguments.bounds -is [System.Collections.IDictionary]) {
             ConvertTo-ParsecPlainObject -InputObject $Arguments.bounds
@@ -352,28 +350,76 @@ function Set-ParsecDisplayEnabledInternal {
             $null
         }
 
-        $width = if ($null -ne $bounds -and $bounds.Contains('width')) { [int] $bounds.width } else { [int] $mode.dmPelsWidth }
-        $height = if ($null -ne $bounds -and $bounds.Contains('height')) { [int] $bounds.height } else { [int] $mode.dmPelsHeight }
+        # When re-enabling a disabled display, GetDeviceMode fails because
+        # EnumDisplaySettingsEx has no mode for a detached device. Use bounds
+        # from the captured state to construct the DEVMODE, falling back to
+        # the current mode only if the display is still active.
+        $mode = $null
+        try {
+            $mode = Get-ParsecNativeDeviceMode -DeviceName $deviceName
+        }
+        catch {
+            Write-Verbose "GetDeviceMode failed for '$deviceName' (likely disabled): $_"
+        }
+
+        $posX = 0
+        $posY = 0
+        $width = 0
+        $height = 0
+
+        if ($null -ne $bounds) {
+            if ($bounds.Contains('x')) { $posX = [int] $bounds.x }
+            if ($bounds.Contains('y')) { $posY = [int] $bounds.y }
+            if ($bounds.Contains('width')) { $width = [int] $bounds.width }
+            if ($bounds.Contains('height')) { $height = [int] $bounds.height }
+        }
+
+        if ($width -le 0 -or $height -le 0) {
+            if ($null -ne $mode) {
+                $width = [int] $mode.dmPelsWidth
+                $height = [int] $mode.dmPelsHeight
+            }
+        }
+
         if ($width -le 0 -or $height -le 0) {
             return New-ParsecResult -Status 'Failed' -Message "Cannot enable '$deviceName' without width and height." -Requested $Arguments -Errors @('MissingCapturedState')
         }
 
-        $mode.dmPelsWidth = $width
-        $mode.dmPelsHeight = $height
-        if ($null -ne $bounds) {
-            if ($bounds.Contains('x')) { $mode.dmPositionX = [int] $bounds.x }
-            if ($bounds.Contains('y')) { $mode.dmPositionY = [int] $bounds.y }
+        if ($null -eq $mode) {
+            $mode = [ParsecEventExecutor.DisplayNative]::CreatePositionOnlyDevMode($posX, $posY)
+        }
+        else {
+            $mode.dmPositionX = $posX
+            $mode.dmPositionY = $posY
         }
 
+        $mode.dmPelsWidth = $width
+        $mode.dmPelsHeight = $height
         $mode.dmFields = [ParsecEventExecutor.DisplayNative]::DM_POSITION -bor [ParsecEventExecutor.DisplayNative]::DM_PELSWIDTH -bor [ParsecEventExecutor.DisplayNative]::DM_PELSHEIGHT
     }
     else {
+        $mode = try { Get-ParsecNativeDeviceMode -DeviceName $deviceName } catch { [ParsecEventExecutor.DisplayNative]::CreatePositionOnlyDevMode(0, 0) }
         $mode.dmPelsWidth = 0
         $mode.dmPelsHeight = 0
         $mode.dmFields = [ParsecEventExecutor.DisplayNative]::DM_POSITION -bor [ParsecEventExecutor.DisplayNative]::DM_PELSWIDTH -bor [ParsecEventExecutor.DisplayNative]::DM_PELSHEIGHT
     }
 
     $result = Invoke-ParsecApplyDisplayMode -DeviceName $deviceName -Mode $mode -Action 'SetEnabled' -Requested $Arguments
+    if ($result.Status -ne 'Succeeded' -and $enable) {
+        # Re-enabling a detached display fails via ChangeDisplaySettingsEx because
+        # the GDI device name is lost when detached. Fall back to SetDisplayConfig
+        # with SDC_TOPOLOGY_EXTEND which re-enables all available displays.
+        Write-Verbose "ChangeDisplaySettingsEx failed for '$deviceName', falling back to SetDisplayConfig(TOPOLOGY_EXTEND)."
+        $sdcResult = [ParsecEventExecutor.DisplayNative]::ApplyTopologyExtend()
+        if ($sdcResult -eq 0) {
+            $result = New-ParsecResult -Status 'Succeeded' -Message "Monitor '$deviceName' enabled via topology extend." -Requested $Arguments -Outputs @{
+                native_status = 0
+                native_name = 'Succeeded'
+                action = 'SetEnabled:topology_extend'
+            }
+        }
+    }
+
     if ($result.Status -eq 'Succeeded') {
         $stateLabel = if ($enable) { 'enabled' } else { 'disabled' }
         $result.Message = "Monitor '$deviceName' $stateLabel."

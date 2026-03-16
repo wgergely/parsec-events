@@ -281,6 +281,9 @@ public static class DisplayNative {
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern int ChangeDisplaySettingsEx(string lpszDeviceName, IntPtr lpDevMode, IntPtr hwnd, uint dwflags, IntPtr lParam);
 
+    [DllImport("user32.dll")]
+    private static extern int SetDisplayConfig(uint numPathArrayElements, IntPtr pathArray, uint numModeInfoArrayElements, IntPtr modeInfoArray, uint flags);
+
     [DllImport("Shcore.dll")]
     private static extern int GetDpiForMonitor(IntPtr hmonitor, int dpiType, out uint dpiX, out uint dpiY);
 
@@ -1118,5 +1121,16 @@ public static class DisplayNative {
 
     public static int ApplyPendingDisplayChanges() {
         return ChangeDisplaySettingsEx(null, IntPtr.Zero, IntPtr.Zero, 0, IntPtr.Zero);
+    }
+
+    // SetDisplayConfig flags
+    public const uint SDC_APPLY = 0x00000080;
+    public const uint SDC_TOPOLOGY_EXTEND = 0x00000004;
+    public const uint SDC_TOPOLOGY_CLONE = 0x00000002;
+    public const uint SDC_TOPOLOGY_INTERNAL = 0x00000001;
+    public const uint SDC_TOPOLOGY_EXTERNAL = 0x00000008;
+
+    public static int ApplyTopologyExtend() {
+        return SetDisplayConfig(0, IntPtr.Zero, 0, IntPtr.Zero, SDC_APPLY | SDC_TOPOLOGY_EXTEND);
     }
 }
