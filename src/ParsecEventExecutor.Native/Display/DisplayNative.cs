@@ -316,30 +316,6 @@ public static class DisplayNative {
     [DllImport("user32.dll")]
     private static extern IntPtr GetShellWindow();
 
-    [StructLayout(LayoutKind.Sequential)]
-    private struct INPUT {
-        public uint type;
-        public INPUTUNION U;
-    }
-
-    [StructLayout(LayoutKind.Explicit)]
-    private struct INPUTUNION {
-        [FieldOffset(0)]
-        public KEYBDINPUT ki;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct KEYBDINPUT {
-        public ushort wVk;
-        public ushort wScan;
-        public uint dwFlags;
-        public uint time;
-        public IntPtr dwExtraInfo;
-    }
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
-
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
 
@@ -794,7 +770,6 @@ public static class DisplayNative {
         if (foreground != IntPtr.Zero) {
             foregroundThreadId = GetWindowThreadProcessId(foreground, out _);
         }
-        uint targetThreadId = GetWindowThreadProcessId(hWnd, out _);
 
         bool attached = false;
         try {
@@ -836,10 +811,14 @@ public static class DisplayNative {
                 continue;
             }
 
-            // Alt-tab criteria: visible, not cloaked, not tool window, has title, no owner
+            // Alt-tab criteria: visible, not cloaked, on current virtual desktop,
+            // and either (no owner + not tool window) or has WS_EX_APPWINDOW
+            bool isToolWindow = (w.ExtendedStyle & 0x00000080L) != 0;
+            bool isAppWindow = (w.ExtendedStyle & 0x00040000L) != 0;
+            bool eligible = w.OwnerHandle == 0 ? !isToolWindow : isAppWindow;
             if (w.IsVisible && !w.IsCloaked && !w.IsShellWindow &&
-                !string.IsNullOrEmpty(w.Title) && w.OwnerHandle == 0 &&
-                (w.ExtendedStyle & 0x00000080L) == 0) {
+                w.IsOnCurrentVirtualDesktop &&
+                !string.IsNullOrEmpty(w.Title) && eligible) {
                 nextWindow = wHandle;
                 break;
             }

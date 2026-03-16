@@ -132,6 +132,9 @@ public static class NvidiaApiNative {
     [DllImport("kernel32", CharSet = CharSet.Ansi, ExactSpelling = true, SetLastError = true)]
     private static extern IntPtr GetProcAddress(IntPtr module, string procName);
 
+    [DllImport("kernel32", SetLastError = true)]
+    private static extern bool FreeLibrary(IntPtr hModule);
+
     private static uint MakeVersion(Type type, uint version) {
         return (uint)(Marshal.SizeOf(type) | ((int)version << 16));
     }
@@ -155,16 +158,19 @@ public static class NvidiaApiNative {
                 return;
             }
 
-            _libraryHandle = LoadLibraryW(libraryPath);
-            if (_libraryHandle == IntPtr.Zero) {
+            IntPtr handle = LoadLibraryW(libraryPath);
+            if (handle == IntPtr.Zero) {
                 throw new Win32Exception(Marshal.GetLastWin32Error(), string.Format("Failed to load NVAPI library '{0}'.", libraryPath));
             }
 
-            IntPtr queryPointer = GetProcAddress(_libraryHandle, "nvapi_QueryInterface");
+            IntPtr queryPointer = GetProcAddress(handle, "nvapi_QueryInterface");
             if (queryPointer == IntPtr.Zero) {
-                throw new Win32Exception(Marshal.GetLastWin32Error(), "NVAPI library does not export nvapi_QueryInterface.");
+                int error = Marshal.GetLastWin32Error();
+                FreeLibrary(handle);
+                throw new Win32Exception(error, "NVAPI library does not export nvapi_QueryInterface.");
             }
 
+            _libraryHandle = handle;
             _loadedLibraryPath = libraryPath;
             _queryInterface = Marshal.GetDelegateForFunctionPointer(queryPointer, typeof(NvapiQueryInterfaceDelegate)) as NvapiQueryInterfaceDelegate;
             _initialize = ResolveDelegate<NvapiInitializeDelegate>(NvAPI_Initialize_Id);

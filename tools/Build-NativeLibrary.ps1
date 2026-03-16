@@ -23,8 +23,8 @@ if ($LASTEXITCODE -ne 0) {
     throw "dotnet build failed with exit code $LASTEXITCODE."
 }
 
-$framework = Get-ChildItem -Path (Join-Path (Split-Path $projectPath) 'bin/Release') -Directory | Select-Object -First 1
-$dllSource = Join-Path -Path $framework.FullName -ChildPath 'ParsecEventExecutor.Native.dll'
+$projectDir = Split-Path $projectPath
+$dllSource = Join-Path -Path $projectDir -ChildPath 'bin/Release/net9.0-windows/ParsecEventExecutor.Native.dll'
 $dllTarget = Join-Path -Path $moduleRoot -ChildPath 'ParsecEventExecutor.Native.dll'
 
 if (-not (Test-Path -LiteralPath $dllSource)) {

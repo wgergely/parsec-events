@@ -6,7 +6,7 @@
     CompanyName = 'OpenAI'
     Copyright = '(c) OpenAI. All rights reserved.'
     Description = 'Mission-focused recipe executor for Parsec desktop/mobile transitions.'
-    PowerShellVersion = '7.0'
+    PowerShellVersion = '7.5'
     RequiredAssemblies = @('ParsecEventExecutor.Native.dll')
     FunctionsToExport = @(
         'Invoke-ParsecIngredient',
