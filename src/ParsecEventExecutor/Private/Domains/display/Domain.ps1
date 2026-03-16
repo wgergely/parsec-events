@@ -1499,6 +1499,20 @@ function Invoke-ParsecDisplayDomainTopologyReset {
 
     $failures = @($actionResults | Where-Object { -not (Test-ParsecSuccessfulStatus -Status $_.Status) })
     if ($failures.Count -gt 0) {
+        # Per-monitor restore failed — detached displays lose their GDI name and
+        # cannot be re-enabled via ChangeDisplaySettingsEx. Fall back to
+        # SetDisplayConfig(SDC_TOPOLOGY_EXTEND) which re-enables all available
+        # displays using CCD adapter+target IDs.
+        $hasEnableFailure = @($failures | Where-Object { $_.Errors -contains 'DisplayChangeFailed' -or $_.Errors -contains 'MonitorNotFound' -or $_.Errors -contains 'TopologyTargetUnresolved' }).Count -gt 0
+        if ($hasEnableFailure) {
+            Write-Verbose 'Topology restore failed for detached displays, falling back to SetDisplayConfig(TOPOLOGY_EXTEND).'
+            Initialize-ParsecDisplayInterop
+            $sdcResult = [ParsecEventExecutor.DisplayNative]::ApplyTopologyExtend()
+            if ($sdcResult -eq 0) {
+                return New-ParsecResult -Status 'Succeeded' -Message 'Display topology restored via topology extend.' -Outputs @{ snapshot_name = $SnapshotName; actions = $actionResults; fallback = 'topology_extend' }
+            }
+        }
+
         return New-ParsecResult -Status 'Failed' -Message $failures[0].Message -Outputs @{ snapshot_name = $SnapshotName; actions = $actionResults } -Errors @('ResetFailed')
     }
 

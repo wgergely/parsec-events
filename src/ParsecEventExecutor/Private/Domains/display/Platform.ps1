@@ -244,9 +244,16 @@ function Invoke-ParsecApplyDisplayMode {
 
     Initialize-ParsecDisplayInterop
 
-    $testResult = [ParsecEventExecutor.DisplayNative]::ApplyDeviceMode($DeviceName, $Mode, [uint32] ([ParsecEventExecutor.DisplayNative]::CDS_TEST -bor $Flags))
-    if ($testResult -ne [ParsecEventExecutor.DisplayNative]::DISP_CHANGE_SUCCESSFUL) {
-        return New-ParsecDisplayChangeFailureResult -Action "${Action}:test" -Code $testResult -Requested $Requested
+    # CDS_TEST is not supported for topology changes (enable/disable monitors).
+    # ChangeDisplaySettingsEx returns DISP_CHANGE_FAILED for detached displays
+    # even when the actual stage+commit would succeed. Skip the test for
+    # SetEnabled actions; keep it for resolution, orientation, and primary changes.
+    $isTopologyChange = $Action -like 'SetEnabled*'
+    if (-not $isTopologyChange) {
+        $testResult = [ParsecEventExecutor.DisplayNative]::ApplyDeviceMode($DeviceName, $Mode, [uint32] ([ParsecEventExecutor.DisplayNative]::CDS_TEST -bor $Flags))
+        if ($testResult -ne [ParsecEventExecutor.DisplayNative]::DISP_CHANGE_SUCCESSFUL) {
+            return New-ParsecDisplayChangeFailureResult -Action "${Action}:test" -Code $testResult -Requested $Requested
+        }
     }
 
     $stageFlags = [ParsecEventExecutor.DisplayNative]::CDS_UPDATEREGISTRY -bor [ParsecEventExecutor.DisplayNative]::CDS_NORESET -bor $Flags
