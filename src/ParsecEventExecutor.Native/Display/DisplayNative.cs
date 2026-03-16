@@ -31,32 +31,21 @@ public static class DisplayNative {
     private static readonly IVirtualDesktopManager VirtualDesktopManager = CreateVirtualDesktopManager();
     public const int DM_POSITION = 0x00000020;
     public const int DM_DISPLAYORIENTATION = 0x00000080;
-    public const int DM_BITSPERPEL = 0x00040000;
     public const int DM_PELSWIDTH = 0x00080000;
     public const int DM_PELSHEIGHT = 0x00100000;
-    public const int DM_DISPLAYFREQUENCY = 0x00400000;
-    public const int DM_DISPLAYFLAGS = 0x00200000;
     public const int CDS_UPDATEREGISTRY = 0x00000001;
     public const int CDS_TEST = 0x00000002;
     public const int CDS_SET_PRIMARY = 0x00000010;
     public const int CDS_NORESET = 0x10000000;
-    public const int CDS_RESET = 0x40000000;
     public const int DISP_CHANGE_SUCCESSFUL = 0;
-    public const int DISP_CHANGE_RESTART = 1;
-    public const int DISP_CHANGE_FAILED = -1;
-    public const int DISP_CHANGE_BADMODE = -2;
-    public const int DISP_CHANGE_NOTUPDATED = -3;
-    public const int DISP_CHANGE_BADFLAGS = -4;
-    public const int DISP_CHANGE_BADPARAM = -5;
-    public const int DISP_CHANGE_BADDUALVIEW = -6;
     public const int DMDO_DEFAULT = 0;
     public const int DMDO_90 = 1;
     public const int DMDO_180 = 2;
     public const int DMDO_270 = 3;
-    public const int SPI_SETDESKWALLPAPER = 0x0014;
-    public const int SPI_GETDESKWALLPAPER = 0x0073;
-    public const int SPIF_UPDATEINIFILE = 0x0001;
-    public const int SPIF_SENDCHANGE = 0x0002;
+    private const int SPI_SETDESKWALLPAPER = 0x0014;
+    private const int SPI_GETDESKWALLPAPER = 0x0073;
+    private const int SPIF_UPDATEINIFILE = 0x0001;
+    private const int SPIF_SENDCHANGE = 0x0002;
     private static readonly uint[] DpiScaleValues = new uint[] { 100, 125, 150, 175, 200, 225, 250, 300, 350, 400, 450, 500 };
 
     [StructLayout(LayoutKind.Sequential)]
