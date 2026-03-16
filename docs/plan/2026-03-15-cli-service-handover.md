@@ -157,6 +157,31 @@ The service runs in Session 0 (no desktop access). Recipe execution needs the us
 3. **PS module location**: Bundled inside `pe.exe` resources vs external path?
 4. **`pe restore` semantics**: What exactly should be restorable?
 5. **Config location**: `%ProgramData%\ParsecEventExecutor\` vs alongside `pe.exe`?
+6. **Remove DESKTOP/MOBILE mode concept** (see below)
+
+## Required Refactor: Remove Binary Mode State
+
+The current codebase carries a legacy `DESKTOP`/`MOBILE` binary state concept (`initial_mode`, `target_mode`, `desired_mode`, `actual_mode`) from the original two-state design. This is no longer appropriate.
+
+**Why it must go**: The system now supports N device profiles with per-user recipe binding. Recipes are triggered by Parsec connect/disconnect events — there is no inherent "mobile" or "desktop" state to track. The system should simply:
+
+- On connect: find and execute the matching recipe (apply settings)
+- On disconnect: find and execute the matching restore recipe (unroll settings)
+
+**What to remove**:
+
+| Field | Location | Replacement |
+|---|---|---|
+| `initial_mode` | Recipe TOML | Remove or make optional. Recipes match by `username` and event type, not mode. |
+| `target_mode` | Recipe TOML | Remove. The recipe's effect is defined by its steps, not a mode label. |
+| `desired_mode` | executor-state.json | Replace with `last_applied_recipe` or remove entirely. |
+| `actual_mode` | executor-state.json | Remove. |
+| `ValidateSet('DESKTOP', 'MOBILE')` | RecipeMatcher.ps1 | Already removed in this PR. |
+| Mode-based recipe matching | RecipeMatcher.ps1 | Replace with event-type matching: connect recipes run on connect, disconnect recipes run on disconnect. |
+
+**Impact**: This is a breaking change to the recipe schema and executor state. It should be done in the CLI PR alongside the `pe.exe` wrapper, since the CLI will define the new public contract.
+
+**Interim state (this PR)**: The `ValidateSet` constraint has been removed from `RecipeMatcher.ps1` so the watcher accepts any mode string. The `initial_mode`/`target_mode` fields remain in recipes for backward compatibility but are no longer the primary matching mechanism — `username` and event type are.
 
 ---
 

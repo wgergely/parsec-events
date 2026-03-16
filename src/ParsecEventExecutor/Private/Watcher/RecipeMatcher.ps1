@@ -1,11 +1,11 @@
 function Find-ParsecMatchingRecipe {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [string] $Username,
 
         [Parameter(Mandatory)]
-        [ValidateSet('DESKTOP', 'MOBILE')]
         [string] $CurrentMode,
 
         [Parameter(Mandatory)]
@@ -42,7 +42,9 @@ function Find-ParsecMatchingRecipe {
 }
 
 function Test-ParsecRecipeMatchesEvent {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', 'EventType')]
     [CmdletBinding()]
+    [OutputType([bool])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Recipe,
@@ -51,7 +53,6 @@ function Test-ParsecRecipeMatchesEvent {
         [string] $Username,
 
         [Parameter(Mandatory)]
-        [ValidateSet('DESKTOP', 'MOBILE')]
         [string] $CurrentMode,
 
         [Parameter(Mandatory)]
@@ -91,6 +92,7 @@ function Test-ParsecRecipeMatchesEvent {
 
 function Get-ParsecRecipeGracePeriod {
     [CmdletBinding()]
+    [OutputType([int])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Recipe,

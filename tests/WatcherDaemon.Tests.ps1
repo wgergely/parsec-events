@@ -86,8 +86,8 @@ Start-ParsecWatcher -ConfigPath '$($script:configPath)' -StateRoot '$($script:st
         $connectLine = "`n[I 2026-03-15 12:01:00] testdaemon#77777 connected.`n"
         [System.IO.File]::AppendAllText($script:syntheticLog, $connectLine)
 
-        # Wait for apply_delay_ms (200ms) + FSWatcher latency + recipe execution
-        Start-Sleep -Seconds 8
+        # Wait for poll_interval_ms (250ms) + apply_delay_ms (200ms) + recipe execution
+        Start-Sleep -Seconds 12
 
         # Check executor state — the recipe should have dispatched
         $executorState = & (Get-Module ParsecEventExecutor) {

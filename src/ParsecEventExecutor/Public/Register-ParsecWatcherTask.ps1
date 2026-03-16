@@ -1,5 +1,6 @@
 function Register-ParsecWatcherTask {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter()]
         [string] $TaskName = 'ParsecEventWatcher',
@@ -26,20 +27,19 @@ function Register-ParsecWatcherTask {
         $modulePath = Join-Path -Path (Get-ParsecModuleRoot) -ChildPath 'ParsecEventExecutor.psd1'
     }
 
-    $escapedModulePath = $modulePath.Replace("'", "''")
-    $escapedConfigPath = $ConfigPath.Replace("'", "''")
-
     $scriptBlock = @"
-Import-Module '$escapedModulePath' -Force
-Start-ParsecWatcher -ConfigPath '$escapedConfigPath' -InformationAction Continue
+Import-Module '$modulePath' -Force
+Start-ParsecWatcher -ConfigPath '$ConfigPath' -InformationAction Continue
 "@
 
     $pwshPath = (Get-Process -Id $PID).Path
-    $escapedScriptBlock = $scriptBlock.Replace('"', '\"')
+    $encodedCommand = [Convert]::ToBase64String(
+        [System.Text.Encoding]::Unicode.GetBytes($scriptBlock)
+    )
 
     $action = New-ScheduledTaskAction `
         -Execute $pwshPath `
-        -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command `"$escapedScriptBlock`""
+        -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -EncodedCommand $encodedCommand"
 
     $trigger = New-ScheduledTaskTrigger -AtLogon
 
@@ -77,6 +77,7 @@ Start-ParsecWatcher -ConfigPath '$escapedConfigPath' -InformationAction Continue
 
 function Unregister-ParsecWatcherTask {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter()]
         [string] $TaskName = 'ParsecEventWatcher'

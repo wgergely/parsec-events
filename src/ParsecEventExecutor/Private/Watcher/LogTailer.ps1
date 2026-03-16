@@ -1,5 +1,7 @@
 function New-ParsecLogTailer {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
         [string] $LogPath,
@@ -28,6 +30,7 @@ function New-ParsecLogTailer {
 }
 
 function Start-ParsecLogTailer {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
@@ -55,6 +58,7 @@ function Start-ParsecLogTailer {
 }
 
 function Stop-ParsecLogTailer {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
@@ -65,7 +69,9 @@ function Stop-ParsecLogTailer {
 }
 
 function Read-ParsecLogTailerNewLines {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '')]
     [CmdletBinding()]
+    [OutputType([System.Object[]])]
     param(
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Tailer
@@ -126,7 +132,9 @@ function Read-ParsecLogTailerNewLines {
 }
 
 function Read-ParsecLogTailLines {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '')]
     [CmdletBinding()]
+    [OutputType([System.Object[]])]
     param(
         [Parameter(Mandatory)]
         [string] $LogPath,
@@ -148,20 +156,32 @@ function Read-ParsecLogTailLines {
         )
 
         try {
+            # Seek to near end of file to avoid reading the entire log.
+            # Estimate ~200 bytes per line, read 2x the requested tail.
+            $seekBack = [long]($TailCount * 400)
+            if ($stream.Length -gt $seekBack) {
+                $stream.Seek(-$seekBack, [System.IO.SeekOrigin]::End) | Out-Null
+            }
+
             $reader = [System.IO.StreamReader]::new($stream, [System.Text.Encoding]::UTF8)
 
             try {
-                $allLines = [System.Collections.Generic.List[string]]::new()
+                # If we seeked mid-file, discard the first partial line
+                if ($stream.Position -gt 0 -and $stream.Position -lt $stream.Length) {
+                    $reader.ReadLine() | Out-Null
+                }
+
+                $lines = [System.Collections.Generic.List[string]]::new()
                 while ($null -ne ($line = $reader.ReadLine())) {
-                    $allLines.Add($line)
+                    $lines.Add($line)
                 }
 
-                if ($allLines.Count -le $TailCount) {
-                    return @($allLines)
+                if ($lines.Count -le $TailCount) {
+                    return @($lines)
                 }
 
-                $startIndex = $allLines.Count - $TailCount
-                return @($allLines.GetRange($startIndex, $TailCount))
+                $startIndex = $lines.Count - $TailCount
+                return @($lines.GetRange($startIndex, $TailCount))
             }
             finally {
                 $reader.Dispose()
