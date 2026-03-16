@@ -20,7 +20,11 @@
         'Test-ParsecProfile',
         'Get-ParsecExecutorState',
         'Repair-ParsecExecutorState',
-        'Start-ParsecExecutor'
+        'Start-ParsecExecutor',
+        'Start-ParsecWatcher',
+        'Stop-ParsecWatcher',
+        'Register-ParsecWatcherTask',
+        'Unregister-ParsecWatcherTask'
     )
     CmdletsToExport = @()
     VariablesToExport = @()

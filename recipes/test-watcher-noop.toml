@@ -1,0 +1,15 @@
+name = "test-watcher-noop"
+description = "Safe test recipe for watcher live validation. Captures a snapshot only — no display changes."
+initial_mode = "DESKTOP"
+target_mode = "MOBILE"
+
+[[steps]]
+id = "capture-test-snapshot"
+ingredient = "display.snapshot"
+operation = "capture"
+depends_on = []
+verify = false
+compensation_policy = "none"
+
+[steps.arguments]
+snapshot_name = "watcher-live-test"

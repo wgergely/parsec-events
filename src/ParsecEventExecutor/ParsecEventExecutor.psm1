@@ -24,6 +24,13 @@ if (Test-Path -LiteralPath $coreRoot) {
     }
 }
 
+$watcherRoot = Join-Path -Path $privateRoot -ChildPath 'Watcher'
+if (Test-Path -LiteralPath $watcherRoot) {
+    foreach ($watcherFile in Get-ChildItem -Path $watcherRoot -Filter '*.ps1' -File | Sort-Object Name) {
+        . $watcherFile.FullName
+    }
+}
+
 Get-ChildItem -Path $publicRoot -Filter '*.ps1' -File | Sort-Object Name | ForEach-Object {
     . $_.FullName
 }

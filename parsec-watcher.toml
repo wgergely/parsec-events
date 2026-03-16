@@ -1,0 +1,25 @@
+# Parsec State Watcher Configuration
+# This file controls the watcher daemon that monitors Parsec's log file
+# and dispatches recipes in response to connect/disconnect events.
+
+[watcher]
+# Path to Parsec log file. "auto" detects per-user or per-machine install.
+parsec_log_path = "auto"
+
+# Milliseconds to wait after connect event before dispatching recipe.
+# Allows Parsec to finish its own display negotiation first.
+apply_delay_ms = 3000
+
+# Default grace period (ms) before treating a disconnect as final.
+# Prevents recipe thrashing from brief network hiccups.
+# Can be overridden per-recipe via the grace_period_ms field.
+grace_period_ms = 10000
+
+# Polling interval (ms) for the log tailer.
+poll_interval_ms = 1000
+
+[patterns]
+# Regex patterns for Parsec log line matching.
+# Group 1 must capture the username (e.g., "wgergely#12571953").
+connect = '\]\s+(.+#\d+)\s+connected\.\s*$'
+disconnect = '\]\s+(.+#\d+)\s+disconnected\.\s*$'
