@@ -1,5 +1,6 @@
 function Get-ParsecWatcherDefaultConfigPath {
     [CmdletBinding()]
+    [OutputType([string])]
     param()
 
     return Join-Path -Path (Get-ParsecRepositoryRoot) -ChildPath 'parsec-watcher.toml'
@@ -7,6 +8,7 @@ function Get-ParsecWatcherDefaultConfigPath {
 
 function Read-ParsecWatcherConfig {
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter()]
         [string] $ConfigPath = (Get-ParsecWatcherDefaultConfigPath)
@@ -23,12 +25,11 @@ function Read-ParsecWatcherConfig {
         apply_delay_ms = 3000
         grace_period_ms = 10000
         poll_interval_ms = 1000
-        log_level = 'info'
     }
 
     if ($raw.Contains('watcher')) {
         $section = $raw.watcher
-        foreach ($key in @('parsec_log_path', 'apply_delay_ms', 'grace_period_ms', 'poll_interval_ms', 'log_level')) {
+        foreach ($key in @('parsec_log_path', 'apply_delay_ms', 'grace_period_ms', 'poll_interval_ms')) {
             if ($section.Contains($key)) {
                 $watcher[$key] = $section[$key]
             }
@@ -76,12 +77,6 @@ function Test-ParsecWatcherConfigInternal {
         }
     }
 
-    $validLogLevels = @('debug', 'info', 'warn', 'error')
-    $level = $Config.watcher.log_level
-    if ($level -notin $validLogLevels) {
-        throw "Watcher config: log_level '$level' is not valid. Must be one of: $($validLogLevels -join ', ')"
-    }
-
     foreach ($key in @('apply_delay_ms', 'grace_period_ms', 'poll_interval_ms')) {
         $value = $Config.watcher[$key]
         if ($value -isnot [int] -and $value -isnot [long]) {
@@ -96,6 +91,7 @@ function Test-ParsecWatcherConfigInternal {
 
 function Resolve-ParsecLogPath {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter()]
         [string] $ConfiguredPath = 'auto'

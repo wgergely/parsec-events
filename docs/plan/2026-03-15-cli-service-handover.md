@@ -195,6 +195,30 @@ The current codebase carries a legacy `DESKTOP`/`MOBILE` binary state concept (`
 | Session 0 bridge | High | High — `CreateProcessAsUser` is complex Win32 interop |
 | Packaging + distribution | Low | Low — `dotnet publish` handles most of it |
 
+## Discovered Issues (from PR #3 review, to address in future PRs)
+
+### CLI/Service PR scope
+
+- [ ] Implement `pe.exe` CLI binary (ADR-11)
+- [ ] Implement Windows Service via .NET Generic Host (ADR-12)
+- [ ] Session 0 bridge for display API access
+- [ ] Remove DESKTOP/MOBILE mode concept (see removal table above)
+- [ ] Structured JSON logging with severity levels (replaces `Start-Transcript`)
+- [ ] Health check mechanism (status query without reading state files)
+- [ ] Package and distribution (single-file publish, installer)
+
+### Enhancement backlog
+
+- [ ] Config hot-reload (detect `parsec-watcher.toml` changes without restart)
+- [ ] Recipe hot-reload (detect new/changed recipe TOML files without restart)
+- [ ] `Read-ParsecLogTailLines` seek heuristic assumes ~400 bytes/line — document or make configurable
+- [ ] Daemon test timing is fixed at 12 seconds — consider polling state files instead of sleeping
+- [ ] `Register-ParsecWatcherTask` hardcodes current `pwsh.exe` path — solved by CLI PR
+- [ ] Parsec log path auto-detection covers two fixed locations only — document or allow glob
+- [ ] Investigate `app_log_level = 2` for richer Parsec connection metadata
+- [ ] Parsec VDD integration as a new ingredient
+- [ ] Interactive first-connect profile assignment (toast notification UX)
+
 ## References
 
 - [winsw](https://github.com/winsw/winsw) — alternative to native service registration (used by ParsecVDA-Always-Connected)

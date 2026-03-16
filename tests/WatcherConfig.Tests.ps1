@@ -10,7 +10,6 @@ InModuleScope ParsecEventExecutor {
             $config.watcher.apply_delay_ms | Should -Be 3000
             $config.watcher.grace_period_ms | Should -Be 10000
             $config.watcher.poll_interval_ms | Should -Be 1000
-            $config.watcher.log_level | Should -Be 'info'
             $config.patterns.connect | Should -Not -BeNullOrEmpty
             $config.patterns.disconnect | Should -Not -BeNullOrEmpty
             $config.path | Should -Not -BeNullOrEmpty
@@ -27,7 +26,6 @@ parsec_log_path = "C:\custom\log.txt"
 apply_delay_ms = 5000
 grace_period_ms = 30000
 poll_interval_ms = 2000
-log_level = "debug"
 
 [patterns]
 connect = '\]\s+(\w+)\s+connected\.'
@@ -42,7 +40,6 @@ disconnect = '\]\s+(\w+)\s+disconnected\.'
                 $config.watcher.apply_delay_ms | Should -Be 5000
                 $config.watcher.grace_period_ms | Should -Be 30000
                 $config.watcher.poll_interval_ms | Should -Be 2000
-                $config.watcher.log_level | Should -Be 'debug'
             }
             finally {
                 Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -56,7 +53,7 @@ disconnect = '\]\s+(\w+)\s+disconnected\.'
             try {
                 $configContent = @'
 [watcher]
-log_level = "warn"
+apply_delay_ms = 5000
 '@
                 $configPath = Join-Path $tempDir 'minimal-watcher.toml'
                 Set-Content -LiteralPath $configPath -Value $configContent -NoNewline
@@ -64,9 +61,8 @@ log_level = "warn"
                 $config = Read-ParsecWatcherConfig -ConfigPath $configPath
 
                 $config.watcher.parsec_log_path | Should -Be 'auto'
-                $config.watcher.apply_delay_ms | Should -Be 3000
+                $config.watcher.apply_delay_ms | Should -Be 5000
                 $config.watcher.grace_period_ms | Should -Be 10000
-                $config.watcher.log_level | Should -Be 'warn'
             }
             finally {
                 Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -86,25 +82,6 @@ connect = '[\invalid'
                 Set-Content -LiteralPath $configPath -Value $configContent -NoNewline
 
                 { Read-ParsecWatcherConfig -ConfigPath $configPath } | Should -Throw '*not a valid regex*'
-            }
-            finally {
-                Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
-            }
-        }
-
-        It 'throws on invalid log level' {
-            $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "parsec-watcher-test-$(New-Guid)"
-            New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
-
-            try {
-                $configContent = @'
-[watcher]
-log_level = "verbose"
-'@
-                $configPath = Join-Path $tempDir 'bad-level.toml'
-                Set-Content -LiteralPath $configPath -Value $configContent -NoNewline
-
-                { Read-ParsecWatcherConfig -ConfigPath $configPath } | Should -Throw '*not valid*'
             }
             finally {
                 Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue

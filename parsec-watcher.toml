@@ -15,11 +15,8 @@ apply_delay_ms = 3000
 # Can be overridden per-recipe via the grace_period_ms field.
 grace_period_ms = 10000
 
-# Polling interval (ms) fallback if FileSystemWatcher is unreliable.
+# Polling interval (ms) for the log tailer.
 poll_interval_ms = 1000
-
-# Log level for the watcher's own logging: debug, info, warn, error
-log_level = "info"
 
 [patterns]
 # Regex patterns for Parsec log line matching.
