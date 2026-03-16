@@ -30,3 +30,8 @@ log/
 /*.log
 /*.txt
 /*.ini
+
+# Built native interop DLL (build from src/ParsecEventExecutor.Native/)
+src/ParsecEventExecutor/ParsecEventExecutor.Native.dll
+src/ParsecEventExecutor.Native/bin/
+src/ParsecEventExecutor.Native/obj/
