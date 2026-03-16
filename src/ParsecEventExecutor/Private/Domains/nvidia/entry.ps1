@@ -1,5 +1,6 @@
 $supportFiles = @(
     (Join-Path -Path (Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent) -ChildPath 'Core\HostSupport.ps1'),
+    (Join-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -ChildPath 'personalization\Platform.ps1'),
     (Join-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -ChildPath 'display\Platform.ps1'),
     (Join-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -ChildPath 'display\Domain.ps1'),
     (Join-Path -Path (Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent) -ChildPath 'NvidiaInterop.ps1'),
